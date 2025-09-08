@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "quick-draw: Latency-bounded Hybrid NPCs for Real-time FPS Interactions"
+authors:
+  - family-names: Zhao
+    given-names: Bryan
+    orcid: "0000-0000-0000-0000"
+date-released: 2025-09-08
+version: "v0.1.0"
+license: MIT
+repository-code: "https://github.com/USER/quick-draw"
+keywords: [unity, realtime, npc, latency, hci, ai, instrumentation]
