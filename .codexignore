@@ -1,0 +1,88 @@
+# ---- Unity generated/cache dirs (never let Codex read/write these) ----
+Library/
+Temp/
+Logs/
+Obj/
+Build*/
+UserSettings/
+MemoryCaptures/
+
+# Unity/IDE project fluff
+.vs/
+.idea/
+.vscode/
+*.sln
+*.csproj
+
+# Asset store tools / cache
+Assets/AssetStoreTools*/
+
+# If you add a web/worker later
+node_modules/
+dist/
+build/
+
+# Unity packages lock (don’t let Codex “fix” it)
+Packages/packages-lock.json
+
+# ---- Large/binary asset types (keep Codex focused on code) ----
+# Textures / images
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.exr
+*.psd
+*.gif
+*.bmp
+*.tiff
+*.hdr
+
+# Models / meshes
+*.fbx
+*.obj
+*.blend
+*.max
+*.dae
+*.stl
+*.gltf
+*.glb
+
+# Audio / video
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Unity asset bundles / packages / scenes (binary variants)
+*.unitypackage
+*.bundle
+*.assetbundle
+*.prefab.unity3d
+
+# Animation assets (often binary/heavy)
+*.anim
+*.controller
+*.playable
+
+# Fonts & binaries
+*.ttf
+*.otf
+*.dll
+*.so
+*.dylib
+*.exe
+
+# Archives
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# Optional: keep Codex from touching project settings (safer for this repo)
+ProjectSettings/
