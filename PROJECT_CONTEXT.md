@@ -169,9 +169,10 @@ The repository is still a pre-MVP scaffold:
 - `SimpleFPSController` is still an empty, non-attachable class.
 - Perception, reflex, logger, and overlay scripts exist as unwired scaffolds.
 - NPC activity, interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
-- Graphics and Quality settings reference missing URP pipeline assets.
+- Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
+- `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task remains `TASKS.md` section 1A: repair and verify the tracked URP baseline without changing gameplay behavior.
+The next implementation task is `TASKS.md` section 2: implement and verify the minimal player controller.
 
 ## Arena
 
@@ -1481,7 +1482,7 @@ Universal Render Pipeline Asset was not found.
 
 They also received a missing nested prefab error for `UI_EventSystem`.
 
-The current render-pipeline state must be inspected.
+Current resolution: URP is configured with tracked renderer and pipeline assets under `Assets/_Project/Settings/`. Graphics and both Quality levels reference the tracked pipeline asset, and `Test_Arena` opens without missing-pipeline, missing-material, or error-shader failures in Unity `6000.0.57f1` batch validation.
 
 The project can use:
 
@@ -1531,6 +1532,8 @@ Not needed:
 - Visible Meta Files.
 - Force Text asset serialization.
 - Auto Refresh on.
+
+Current resolution: `Test_Arena` is the sole enabled Build Settings scene, `Packages/packages-lock.json` and `ProjectSettings/EditorSettings.asset` are tracked, VSync is off for both Quality levels, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while keeping Scene Reload enabled.
 
 Important:
 

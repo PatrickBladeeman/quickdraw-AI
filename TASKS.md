@@ -38,31 +38,31 @@ Acceptance:
 
 Goal: make the existing greybox a reliable place to begin implementation.
 
-### 1A. Repair URP configuration — next recommended task
+### 1A. Repair URP configuration — completed
 
-- Create or restore tracked URP renderer and pipeline assets.
-- Assign valid assets in Graphics and each active Quality level.
-- Open `Test_Arena.unity` and confirm there are no missing-pipeline errors or pink materials.
-- Do not change gameplay scripts or scene behavior in this subtask.
-
-Acceptance:
-
-- Every configured render-pipeline GUID resolves to a tracked asset.
-- `Test_Arena` opens cleanly in Unity 6000.0.57f1.
-
-### 1B. Repair reproducibility settings
-
-- Put `Test_Arena.unity` in Build Settings and remove the missing `Assets/Scenes/SampleScene.unity` entry.
-- Confirm VSync is off, Incremental GC is on, and Active Input Handling supports the Input System.
-- Configure Enter Play Mode with Domain Reload off and Scene Reload on.
-- Reconcile `.gitignore` with `PROJECT_CONTEXT.md` so `Packages/packages-lock.json` and required reproducibility settings can be tracked intentionally.
+- [x] Create or restore tracked URP renderer and pipeline assets.
+- [x] Assign valid assets in Graphics and each active Quality level.
+- [x] Open `Test_Arena.unity` and confirm there are no missing-pipeline errors or pink materials.
+- [x] Do not change gameplay scripts or scene behavior in this subtask.
 
 Acceptance:
 
-- A fresh checkout resolves the same packages and opens the correct scene.
-- The documented editor settings are either tracked or explicitly documented as a required local step.
+- [x] Every configured render-pipeline GUID resolves to a tracked asset.
+- [x] `Test_Arena` opens cleanly in Unity 6000.0.57f1.
 
-## 2. Implement the minimal player controller
+### 1B. Repair reproducibility settings — completed
+
+- [x] Put `Test_Arena.unity` in Build Settings and remove the missing `Assets/Scenes/SampleScene.unity` entry.
+- [x] Confirm VSync is off, Incremental GC is on, and Active Input Handling supports the Input System.
+- [x] Configure Enter Play Mode with Domain Reload off and Scene Reload on.
+- [x] Reconcile `.gitignore` with `PROJECT_CONTEXT.md` so `Packages/packages-lock.json` and required reproducibility settings can be tracked intentionally.
+
+Acceptance:
+
+- [x] A fresh checkout resolves the same packages and opens the correct scene.
+- [x] The documented editor settings are tracked.
+
+## 2. Implement the minimal player controller — next recommended task
 
 Goal: move, look, and expose a trustworthy aiming state without Starter Assets.
 
