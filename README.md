@@ -1,70 +1,51 @@
-# quick-draw
+# quickdraw-AI
 
-**Latency-bounded hybrid NPCs for real-time FPS interactions.**  
-Goal: sub-150 ms median visible reaction when the player aims a gun at an NPC, while supporting longer-term tactical biasing and memory asynchronously.
+**Latency-bounded hybrid NPC behavior in Unity.**
 
-> Engine: **Unity 6.0 LTS (URP)**
+`quickdraw-AI` is an independent systems/HCI research project exploring how real-time NPCs can react in human time without waiting for slower generative reasoning.
 
-## Why this repo exists
-This project demonstrates a **two-speed agent architecture**:
-- **Reflex** (≤150 ms): non-blocking, deterministic reactions (e.g., flinch / hands-up / small step-back) with parametric variation.
-- **Tactical** (100–400 ms): Utility/GOAP drives short-horizon choices (comply / flee / peek). 
-- **LLM (async)**: Pre-generates bark lines, updates tactical weights and memory *between* spikes. Never blocks input.
+The central question is simple: how can an NPC preserve immediate, believable responses during urgent interactions while still supporting tactical context, memory, and generated dialogue asynchronously?
 
-## Week-1 Targets (MVP)
-- Aim at NPC → **visible pose change** (hands-up or flinch) with **median <150 ms**, **p95 <250 ms**.
-- **Soft FOV**: Peripheral detection builds suspicion; NPC turns to face before reflex.
-- **Logging**: JSONL with timestamps for events, reaction params, and latencies. Summary p50/p95 on quit.
+## Approach
 
-## Unity setup
-- Version: **6.0 LTS** (6000.0.x)
-- Template: **URP**
-- Packages: Input System, ProBuilder, Animation Rigging, Newtonsoft JSON
-- Recommended editor settings: Incremental GC ON; Enter Play Mode Options → enable (Domain Reload OFF, Scene Reload ON).
+The prototype separates behavior by urgency:
 
-## Project layout
-```
-Assets/_Project/
-  Code/
-    Core/                # bootstrap & overlays
-    AI/
-      Reflex/            # reflex selector + reaction variants
-      Perception/        # soft FOV + suspicion/turn-in-place
-    Logging/             # JSONL logger + summary
-  Prefabs/
-  Scenes/
-  ScriptableObjects/
-    Reactions/
-  Audio/
+- **Soft perception** models notice, suspicion, line of sight, and orientation.
+- **Interruption** allows an NPC to stop an ongoing activity when a threat is confirmed.
+- **Local reflexes** begin visible motion immediately without network or LLM dependency.
+- **Tactical recovery** determines whether the NPC remains threatened, complies, flees, or resumes its activity.
+- **Asynchronous enrichment** may later add cached dialogue or structured memory without entering the reflex path.
+
+```text
+ongoing activity
+→ perception and orientation
+→ threat confirmation
+→ interruption
+→ immediate reflex
+→ recovery
 ```
 
-## Build/run
-1. Open the project in Unity 6.0 LTS (URP).
-2. Open scene: `Assets/_Project/Scenes/Test_Arena.unity` (create if missing).
-3. Play. Hold **Right Mouse** to aim; look at the NPC. Reaction should be immediate.
-4. Logs are written to `{persistentDataPath}/YYYYMMDD_session.jsonl` (buffered; summary on quit).
+## Evaluation
 
-## Data logged (JSONL)
-Example:
-```json
-{"t":"session_start","ts":123.45}
-{"t":"threat_event","npcId":"NPC_01","ts":130.12,"angleDeg":35.4}
-{"t":"reflex_latency","npcId":"NPC_01","ts":130.14,"lat_ms":92,"variant":"RaiseHands_High","params":{"hand_height":0.83,"stepback_m":0.22}}
-{"t":"suspicion","npcId":"NPC_01","ts":129.90,"angleDeg":120.1,"time_in_suspicious_ms":410}
-```
+The primary metric is confirmed threat to first observed visible motion:
 
-## Environment & secrets
-Create `.env` from `.env.example` if/when you add cloud APIs (LLM, TTS). Never commit real keys.
+- median under 150 ms;
+- p95 under 250 ms.
 
-## Licensing
-Code: MIT (see LICENSE).  
-**Assets:** Do not include paid/proprietary assets in the public repo. See `ASSETS_LICENSE.md`.
+Perception delay, suspicion, orientation, reflex dispatch, and visible onset are recorded as separate stages in structured telemetry.
 
-## Citation
-If you use or reference this project, please cite via the `CITATION.cff`. A DOI can be minted by archiving a release on Zenodo.
+## Status
 
-## Roadmap (high-level)
-- Week 1: Reflex + logging + soft FOV (this repo scaffold)
-- Week 2: Add 2nd/3rd reaction family + Tactical (Utility/GOAP)
-- Week 3: Async LLM worker for bark pre-gen & weight nudging
-- Week 4+: Ablations, plots, short user study, paper write-up
+The project is in early development. The current focus is a reproducible greybox vertical slice with one NPC activity, soft field-of-view perception, interruption, a measurable placeholder reflex, and simple recovery. Generative dialogue and memory are later extensions.
+
+## Technology
+
+- Unity 6 and C#
+- Universal Render Pipeline
+- Unity Input System
+- ProBuilder
+- Structured JSONL telemetry
+
+## License and citation
+
+Code is available under the [MIT License](LICENSE). Third-party asset requirements are described in [ASSETS_LICENSE.md](ASSETS_LICENSE.md). Citation metadata is provided in [CITATION.cff](CITATION.cff).

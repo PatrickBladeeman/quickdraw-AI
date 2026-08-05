@@ -37,5 +37,9 @@ sysinfo.txt
 *.key
 *.pem
 
+# Local AI/session memory
+CONTEXT.md
+QUICKDRAW_SESSION_HANDOFF.md
+
 # Asset store cache
 /Assets/AssetStoreTools*

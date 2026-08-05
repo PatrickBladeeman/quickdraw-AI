@@ -1,345 +1,322 @@
-```markdown
-# quick-draw — Architecture & Code Contracts
+# quickdraw-AI — Architecture and Code Contracts
 
-This doc explains **how the system fits together**, with module boundaries, exact interfaces, and state machines. It is the authoritative reference for Codex and contributors.
+## Authority and status
 
----
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It describes the intended first complete local system, not functionality that should be assumed to exist already.
 
-## 0) High-level picture
+## System overview
 
-**Two-speed agent:**
-- **Reflex (≤150 ms):** deterministic, parametric reactions; never blocks.
-- **Tactical (100–400 ms):** short-horizon choice weighting (comply/flee/peek/seek cover).
-- **LLM (async):** pre-writes barks and nudges tactical weights; **never** in the input thread.
+```text
+Player controller
+  └─ IsAiming + camera pose
+       ↓
+Structured aim-threat stimulus
+       ↓
+Soft perception
+  ├─ distance and total-FOV half-angle checks
+  ├─ line of sight
+  ├─ suspicion with real tick delta
+  └─ orientation and one-shot threat confirmation
+       ↓
+NPC behavior coordinator
+  ├─ interrupt current activity
+  ├─ dispatch local reflex
+  └─ enter tactical recovery state
+       ↓
+Reflex execution
+  ├─ select stable, cooldown-safe variant
+  ├─ command visible placeholder motion immediately
+  └─ emit dispatch event
+       ↓
+Visible-onset observer
+  └─ detect first actual motion and emit measured latency
 
+Optional later:
+cached barks / structured memory / slow bias updates
+  └─ affect future choices only
 ```
 
-Player (RMB Aim)
-│
-├─ Camera.Ray → ThreatRaycaster ───► NPC.SoftFOVPerception.OnDirectThreatDetected()
-│                                            │
-│                                            ├─ Core FOV: Threatened immediately
-│                                            └─ Peripheral: suspicion→turn→Threatened
-│
-└────────────────────────────────────────────────► NPC.ReflexSelector.SelectAndPlay()
-│
-├─ Anim/Rig weights THIS FRAME
-├─ Optional step-back, gaze
-└─ Log reflex\_latency (t\_event→t\_anim\_start)
+The default flow never maps a camera hit directly to a reflex. An explicit debug-only bypass may confirm a threat for isolated reflex testing.
 
-````
+## Modules and dependency direction
 
----
+- `QuickDraw.Core` — player controller and development overlay.
+- `QuickDraw.AI.Stimuli` — structured aiming stimulus or emitter.
+- `QuickDraw.AI.Perception` — soft FOV, suspicion, visibility, and orientation.
+- `QuickDraw.AI.Activity` — the current interruptible NPC activity.
+- `QuickDraw.AI.Reflex` — reaction selection and immediate motion command.
+- `QuickDraw.AI.Behavior` — explicit high-level state and recovery coordination.
+- `QuickDraw.Logging` — structured event buffering, serialization, and summaries.
+- `QuickDraw.AI.Memory` — optional later structured memory.
 
-## 1) Modules & namespaces
+Dependency rules:
 
-- `QuickDraw.Core` — overlays, simple controller, utilities.
-- `QuickDraw.Logging` — JSONL logger & summaries.
-- `QuickDraw.AI.Perception` — Soft FOV, raycaster.
-- `QuickDraw.AI.Reflex` — reflex selector & variants.
-- `QuickDraw.AI.Tactical` — (week 3) utility/GOAP; provides bias weights.
+- Core does not know about individual NPCs.
+- Stimuli describe the player state; they do not select reactions.
+- Perception confirms threats but does not implement activities or tactical recovery.
+- The behavior coordinator owns interruption and state edges.
+- Reflex never calls logging file I/O, networking, tactical planning, or an LLM.
+- Optional slow systems publish data that future local decisions may read.
 
-> Consider adding an **asmdef** per module later (`Assets/_Project/Code/<Module>/<Module>.asmdef`) to speed compile times and enforce dependencies.
+Assembly definitions are optional later and should not delay the first vertical slice.
 
----
+## Component contracts
 
-## 2) Component contracts
+### `SimpleFPSController`
 
-### 2.1 `DevOverlay` (Core)
-- **Purpose:** show FPS & realtime to visually monitor perf budget.
-- **Public fields:** none (style optional).
-- **Notes:** runs in `OnGUI()` to keep it trivial.
+Purpose: minimal first-person movement and an observable aiming state.
 
-### 2.2 `SimpleFPController` (Core)
-- **Purpose:** minimal FP movement + aim FOV.
-- **Public fields:** `cam`, `moveSpeed`, `sprintMultiplier`, `mouseSensitivity`, `mouseSensitivityAim`, `normalFOV`, `aimFOV`, `fovLerp`, `jumpHeight`, `gravity`.
-- **Notes:** Uses legacy `Input` so Active Input Handling must be **Both**.
+Expected behavior:
 
-### 2.3 `ThreatRaycaster` (Perception)
-- **Purpose:** convert aim (RMB + crosshair on NPC) → direct threat event.
-- **Public fields:** `cam`, `npcMask`, `maxDistance=50f`, `refireCooldown=0.5f`.
-- **Behavior:** While RMB held, raycast from `cam.ViewportPointToRay(0.5,0.5)` to `maxDistance` with `npcMask`. On hit, find nearest `SoftFOVPerception` up the hierarchy and call `OnDirectThreatDetected()`. Debounce per NPC.
-- **Performance:** ≤ 1 raycast per frame while aiming; negligible.
+- Inherits `MonoBehaviour` and requires a `CharacterController`.
+- Uses the Unity Input System directly through `Keyboard.current` and `Mouse.current`.
+- Supports WASD, mouse look, gravity, cursor locking, RMB aim, smooth FOV change, and optional sprint/jump.
+- Exposes `public bool IsAiming { get; private set; }`.
+- Does not reference Starter Assets or NPC code.
 
-### 2.4 `SoftFOVPerception` (Perception)
-- **Purpose:** perception with soft peripheral band and hesitation; signal Threatened when facing.
-- **Public fields:**
-  - Refs: `eye:Transform`, `player:Transform`, `occludersMask:LayerMask`
-  - Angles: `coreFOV=90`, `peripheralFOV=140`
-  - Suspicion: `suspectTime=0.45`, `decayRate=0.8`
-  - Tick: `tickRateHz=12`
-  - Turn: `turnYawSpeed=300`
-  - Hooks: `reflex:ReflexSelector`, `animator:Animator (optional)`
-- **State machine:**
-  - `Idle` → `Suspicious` (when within peripheral + LoS; build suspicion with hysteresis).
-  - `TurnInPlace` (implicit: while Suspicious and not facing): rotate yaw until |Δyaw|<3°.
-  - `Threatened`: call `reflex.OnThreatEvent(GUN_AIMED_AT_ME, now)`.
-  - `Idle` (decay) when player moves away/out of LoS and suspicion < 0.3.
-- **Logging:** `suspicion` with `angleDeg` and `time_in_suspicious_ms`.
+### Aim-threat stimulus
 
-**Pseudocode (tick):**
-```csharp
-TickPerception():
-  toPlayer = (player - eye).normalized
-  angleDeg = acos(dot(fwd, toPlayer)) * Rad2Deg
-  withinPeriph = angleDeg <= peripheralFOV
-  withinCore   = angleDeg <= coreFOV
-  hasLoS = withinPeriph && !Physics.Linecast(eye, player, occludersMask)
-
-  if (withinCore && hasLoS):
-      suspicion = 1
-  else if (withinPeriph && hasLoS):
-      suspicion = clamp01(suspicion + dt / suspectTime)
-  else:
-      suspicion = clamp01(suspicion - decayRate * dt)
-
-  if (suspicion >= 0.5):
-      // turn toward player
-      targetYaw = yaw(lookRotation(toPlayer))
-      currentYaw = yaw(transform.rotation)
-      newYaw = moveTowardsAngle(currentYaw, targetYaw, turnYawSpeed * Time.deltaTime)
-      transform.rotation = yaw(newYaw)
-      if (abs(deltaAngle(newYaw, targetYaw)) < 3):
-          reflex.OnThreatEvent(GUN_AIMED_AT_ME, Time.realtimeSinceStartup)
-````
-
-### 2.5 `ReflexSelector` (Reflex)
-
-* **Purpose:** choose a reaction variant and start visible pose change immediately.
-* **Public fields:** `Animator animator`, `string handsUpTrigger="HandsUp"`, base params for variants, jitter ranges.
-* **Methods:**
-
-  * `OnThreatEvent(ThreatEventType evt, float tEventReceived)`
-* **Variants (initial):**
-
-  * `RaiseHands_High` — primary: hands up, small step-back, gaze to player.
-  * (Week 2) `Flinch_StepBack` — flinch angle ±30°, bigger step-back.
-* **Variety mechanisms:**
-
-  * Param noise; no-repeat masks; per-NPC seeded RNG.
-* **Logging:** `reflex_latency` with `lat_ms`, `variant`, `params`.
-
-**Pseudocode (core):**
+A minimal structured value may contain:
 
 ```csharp
-OnThreatEvent(evt, tEvent):
-  if (evt != GUN_AIMED_AT_ME) return
-  // sample params (no waits)
-  hh = clamp01(baseHandHeight + rand(-0.08, 0.08))
-  sb = clamp(baseStepBack + rand(-0.05, 0.05), 0.05, 0.60)
-
-  // start pose THIS FRAME
-  tStart = Time.realtimeSinceStartup
-  transform.position += -transform.forward * sb
-  if (animator) animator.SetTrigger(handsUpTrigger)
-
-  Logger.Log({
-    t: "reflex_latency", npcId, ts: tStart,
-    lat_ms: int((tStart - tEvent) * 1000),
-    variant: "RaiseHands_High",
-    params: { hand_height: hh, stepback_m: sb }
-  })
-```
-
-### 2.6 `JsonlLogger` (Logging)
-
-* **Purpose:** buffered JSONL writes; zero hitches during play.
-* **Behavior:** `Log(object)` → serialize (JsonUtility/Newtonsoft) → append to in-memory buffer; flush on quit (add periodic flush if needed).
-* **Summary:** on quit, compute p50/p95 from collected `lat_ms` list; log a `summary` line.
-
-**Percentile helper:**
-
-```csharp
-static int Percentile(List<int> xs, float p){
-  if (xs.Count == 0) return 0;
-  xs.Sort();
-  float idx = (xs.Count - 1) * p;
-  int lo = (int)Mathf.Floor(idx);
-  int hi = (int)Mathf.Ceil(idx);
-  if (lo == hi) return xs[lo];
-  return Mathf.RoundToInt(Mathf.Lerp(xs[lo], xs[hi], idx - lo));
+public struct AimThreatStimulus
+{
+    public int SourceId;
+    public Vector3 Origin;
+    public Vector3 Direction;
+    public float Timestamp;
+    public float MaxDistance;
+    public bool IsAiming;
 }
 ```
 
----
+The exact emitter class name is not fixed yet. It should expose current aiming state and geometry without forcing a target reaction.
 
-## 3) Data contracts (events & logs)
+An optional serialized `bypassPerceptionForDebug` flag may allow a center-camera hit to invoke confirmed threat during isolated testing. It defaults to false and is not used for final evaluation.
 
-### Event Types
+### `SoftFOVPerception`
 
-* `session_start`: `{ t, ts, unity }`
-* `scene_loaded`: `{ t, ts, name }`
-* `threat_event`: `{ t, ts, npcId, source("raycast"|"perception"), distance_m }` *(optional)*
-* `suspicion`: `{ t, ts, npcId, angleDeg, time_in_suspicious_ms }`
-* `reflex_latency`: `{ t, ts, npcId, lat_ms, variant, params{...} }`
-* `summary`: `{ t, ts, reflex{ count, p50_ms, p95_ms } }`
+Purpose: model gradual visual awareness and produce a single confirmed-threat edge.
 
-### Keys
+Required references and tunables:
 
-* `ts`: `Time.realtimeSinceStartup` (float seconds).
-* `lat_ms`: integer milliseconds (rounded).
-* `npcId`: `gameObject.name` (stable across sessions if prefab named).
+- `eye`, player or stimulus source, and `occludersMask`;
+- maximum visual distance;
+- total core FOV `90°` and total peripheral FOV `140°`;
+- suspicion build time `0.45 s`, decay rate `0.8`, and enter/exit thresholds `0.5/0.3`;
+- perception tick rate near `12 Hz`;
+- body turn speed near `300°/s` and facing threshold near `3°`.
 
----
+Rules:
 
-## 4) State machines
+1. Reject by distance first.
+2. Convert total FOV fields to half-angles before comparison.
+3. Perform line of sight only for plausible angles and distances.
+4. Update suspicion with measured elapsed perception-tick time.
+5. Emit notice, threshold, and orientation events on state edges.
+6. Confirm a threat only while the relevant aiming stimulus remains valid.
+7. Emit threat confirmation once per episode.
+8. Require a recovery/cooldown transition before a new episode can confirm.
 
-### Perception (soft FOV)
+Suggested states:
 
-```
-+-------+               +-------------+               +-------------+
-| Idle  | -- peripheral -> Suspicious  -- facing -->   Threatened   -> (signal Reflex)
-+-------+               +-------------+               +-------------+
-    ^                        |   ^
-    |   (decay < 0.3)       |   | (angle out of bands or LoS lost)
-    +------------------------+---+
-```
-
-* Enter Suspicious when `(angle <= peripheralFOV && LoS)` and build suspicion to ≥ 0.5 over `suspectTime`.
-* Leave Suspicious when suspicion ≤ 0.3 (hysteresis) or LoS/angle invalid.
-* During Suspicious, rotate toward player; when |Δyaw|<3°, trigger Threatened.
-
-### Reflex (selector)
-
-```
-Threatened
-  └─> SampleVariant (weights + tactical bias, no- repeat)
-        └─> ApplyPose (THIS FRAME: rig weights, step-back)
-              └─> LogLatency (t_event → t_start)
+```text
+Idle → Noticed → Suspicious → Orienting → ThreatConfirmed → Cooldown/Recovery
 ```
 
----
+`Noticed` may be combined with `Suspicious` in the first implementation if the emitted events remain unambiguous.
 
-## 5) Performance budgets
+### Interruptible activity
 
-* Reflex path (selection + pose start): **≤ 1 ms** on target machine.
-* Perception tick: **≤ 0.2 ms** @ 12–20 Hz (1 LoS cast at most).
-* No **GC.Alloc** during Reflex (Profiler should show 0 B/frame).
-* Rendering not a focus; URP/Built-in acceptable.
+The first activity may be patrol between two markers or inspect at one marker. A lightweight explicit component is preferred over a general framework.
 
----
+Minimum observable state:
 
-## 6) Animation & rigging notes
+- activity name and start time;
+- running and interruptible flags;
+- current target or progress;
+- interruption reason and timestamp;
+- suspended versus cancelled outcome;
+- resume timestamp, if any.
 
-* Use **Animation Rigging** for LookAt (head) and TwoBoneIK (hands).
-* If you don’t have clips yet:
+Threat confirmation must stop activity motion before dispatching the reflex. It must not resume while the threat remains active.
 
-  * Hands-up can be achieved with rig weights + constraints.
-  * Step-back is a small root translation; keep it small to avoid collider tunneling (CharacterController on NPC not required—static transform is fine for MVP).
-* Blend curves should be snappy (≤ 0.1 s) to maintain visible immediacy.
+### NPC behavior coordinator
 
----
+Purpose: own high-level state edges and sequencing.
 
-## 7) Tactical & LLM integration (future)
+Suggested initial states:
 
-### TacticalController (Week 3)
-
-* Inputs: `health`, `distance_to_player`, `cover_available`, `recent_memory`.
-* Output: `BiasWeights { comply, flee, peek, seekCover }` in \[0..1].
-* ReflexSelector reads these biases to slightly adjust variant probabilities.
-
-### LLM Worker (Week 4)
-
-* **Never** called from Reflex or Perception.
-* Runs in background:
-
-  * Pre-gen barks per tag/persona and store in local lists.
-  * Nudge tactical biases (e.g., slightly increase “comply” after being spared).
-* Fail open: if worker is down, gameplay is identical; only barks might fall back to canned lines.
-
----
-
-## 8) Editor settings (for reproducibility)
-
-* Project Settings:
-
-  * **Quality → VSync:** **Don’t Sync**
-  * **Player → Other:** **Incremental GC ON**
-  * **Editor → Enter Play Mode:** **Enable**, **Domain Reload OFF**, **Scene Reload ON**
-* Asset Pipeline:
-
-  * **Auto Refresh** ON (otherwise manually Assets → Refresh after Codex edits).
-
----
-
-## 9) Testing & verification
-
-### Manual functional tests
-
-* **Direct raycast:** Stand in front, hold RMB → immediate hands-up; release RMB and re-aim after cooldown → repeats.
-* **Peripheral:** Approach from behind/outside peripheral → no reaction; slide into peripheral → short hesitation → turn → hands-up.
-* **Multi-NPC:** Place two NPCs; repeated trials show different variants/params (once variant #2 is added).
-
-### Latency measurement
-
-* Perform 30 trials in Editor with Game window focused.
-* Inspect JSONL:
-
-  * Count of `reflex_latency` ≥ 30.
-  * `summary.reflex.p50_ms < 150`, `p95_ms < 250`.
-
----
-
-## 10) Non-goals (out of scope for MVP)
-
-* Inventory/crafting/carry weight.
-* Group tactics, comms, squad orders.
-* Pathfinding beyond simple step-back/crouch.
-* Live LLM calls in Reflex/Tactical hot paths.
-
----
-
-## 11) File map (initial)
-
+```text
+Activity
+→ ThreatConfirmed
+→ Reflex
+→ RemainThreatened or Comply or FleeToMarker
+→ Recover
+→ ResumeActivity or Idle
 ```
+
+This first implementation is a finite-state machine. A utility selector may later choose among a few recovery outcomes, but GOAP and behavior-tree frameworks are unnecessary.
+
+### `ReflexSelector`
+
+Purpose: choose a local reaction and command an immediate visible placeholder.
+
+Initial reaction:
+
+- `Flinch_StepBack` with collision-conscious root rotation or displacement.
+- Parameters may include step distance, direction, and intensity.
+
+Later reaction:
+
+- `RaiseHands_High` after an animation or rig provides a real pose.
+
+Rules:
+
+- Accept a confirmed-threat timestamp and episode identifier.
+- Ignore duplicate dispatch for the same episode.
+- Use a serialized stable style seed or profile GUID.
+- Apply cooldown and no-repeat rules when multiple variants exist.
+- Perform no waits, coroutines, network calls, or disk I/O before the motion command.
+- Emit an internal `reflex_commanded` event separately from observed motion.
+- Do not label `Animator.SetTrigger` time as visible onset.
+
+### Visible-onset observer
+
+Purpose: identify when the commanded reaction becomes visibly measurable.
+
+Acceptable signals include:
+
+- root position or rotation exceeds a defined threshold;
+- a tracked bone rotates beyond a threshold;
+- a rig weight crosses a threshold;
+- the Animator enters the target state and advances;
+- an animation event explicitly marks first motion.
+
+The observer emits `visible_motion_started` once per reaction episode. The primary SLA is calculated from `threat_confirmed` to this event.
+
+### `JsonlLogger`
+
+Purpose: preserve ordered structured evidence without urgent-path file I/O.
+
+Rules:
+
+- Use explicit DTOs, Newtonsoft JSON, or a custom writer.
+- Do not pass anonymous objects to `JsonUtility`.
+- Enqueue structured records in memory; serialize and flush outside the urgent path.
+- Avoid per-event string construction in reflex dispatch where practical.
+- Flush periodically and on quit; tolerate failures without affecting behavior.
+- Reset singleton/static state safely when Domain Reload is disabled.
+- Use a session-unique file name or session identifier.
+
+## Timing model
+
+Use `Time.realtimeSinceStartup` consistently for cross-stage event timestamps.
+
+Required measurements:
+
+```text
+stimulus_start → perception_notice
+perception_notice → suspicion_threshold
+suspicion_threshold → turn_started
+turn_started → threat_confirmed
+threat_confirmed → activity_interrupted
+threat_confirmed → reflex_commanded
+reflex_commanded → visible_motion_started
+threat_confirmed → visible_motion_started
+threat_ended → recovered_or_resumed
+```
+
+Targets:
+
+- Reflex selection and command execution: substantially under 1 ms when profiled.
+- Confirmed threat to visible motion: p50 under 150 ms and p95 under 250 ms.
+- Peripheral suspicion and orientation: intentionally separate from the reflex SLA.
+
+Do not enforce an artificial delay to make reactions appear human. Variation should come from reaction parameters and later tactical choices, not from blocking initial acknowledgment.
+
+## Event schema
+
+Representative records:
+
+```json
+{"t":"activity_started","ts":2.000,"npcId":"NPC_01","activity":"Patrol"}
+{"t":"aim_stimulus_started","ts":5.000,"sourceId":"Player"}
+{"t":"perception_notice","ts":5.050,"npcId":"NPC_01","angleDeg":62.4,"hasLos":true}
+{"t":"suspicion_threshold","ts":5.420,"npcId":"NPC_01","value":0.5}
+{"t":"turn_started","ts":5.421,"npcId":"NPC_01"}
+{"t":"threat_confirmed","ts":5.650,"npcId":"NPC_01","episodeId":3}
+{"t":"activity_interrupted","ts":5.651,"npcId":"NPC_01","activity":"Patrol","reason":"Threat"}
+{"t":"reflex_commanded","ts":5.653,"npcId":"NPC_01","variant":"Flinch_StepBack"}
+{"t":"visible_motion_started","ts":5.690,"npcId":"NPC_01","signal":"root_delta","confirmation_to_visible_ms":40}
+{"t":"tactical_state_changed","ts":5.800,"npcId":"NPC_01","state":"RemainThreatened"}
+```
+
+Session summaries should include counts and descriptive statistics for each defined stage, including min, max, mean, p50, p95, and optional standard deviation. A single reflex summary is insufficient for the final evaluation.
+
+## Arena responsibilities
+
+`Test_Arena` is a test fixture. Each object must support a named scenario:
+
+- open lane for direct frontal threat;
+- visual edge for peripheral notice;
+- full-height divider for occlusion;
+- two patrol markers for ongoing activity;
+- interaction marker for interruption;
+- low block or exit marker for later recovery choices.
+
+Required initial scenarios:
+
+1. Direct frontal threat.
+2. Peripheral notice and orientation.
+3. Occluded player with no false detection.
+4. Patrol interrupted once.
+5. Threat release followed by controlled recovery or resume.
+
+## Expected first file map
+
+Names marked “possible” are not fixed contracts.
+
+```text
 Assets/_Project/
   Code/
     Core/
+      SimpleFPSController.cs
       DevOverlay.cs
-      SimpleFPController.cs
-    Logging/
-      JsonlLogger.cs
-      LatencySummary.cs       (optional helper)
     AI/
+      Stimuli/
+        AimThreatStimulus.cs             (possible)
+        AimThreatEmitter.cs              (possible)
       Perception/
         SoftFOVPerception.cs
-        ThreatRaycaster.cs
+      Activity/
+        PatrolActivity.cs                (possible)
+      Behavior/
+        NpcBehaviorController.cs         (possible)
       Reflex/
-        ReflexSelector.cs
         ThreatEvents.cs
-    Tactical/                 (week 3)
-  Prefabs/
-    NPC/
-      NPC_01.prefab           (if you prefab it)
+        ReflexSelector.cs
+        VisibleMotionObserver.cs         (possible)
+    Logging/
+      JsonlLogger.cs
+      LogEvents.cs                       (possible DTOs)
   Scenes/
     Test_Arena.unity
-  ScriptableObjects/
-    Reactions/                (optional later)
-  Audio/                      (nonverbal stingers later)
 ```
 
----
+There is no required `ThreatRaycaster.cs` in the canonical runtime architecture.
 
-## 12) Coding standards
+## Failure modes to test explicitly
 
-* Namespace per module (`QuickDraw.Core`, `QuickDraw.AI.Reflex`…).
-* `[DisallowMultipleComponent]` where appropriate.
-* Guard null refs in `Awake()`; serialize all tunables.
-* Use `readonly` fields where possible; avoid `public static` except for singletons like Logger.
-* Avoid coroutines in Reflex; use direct method calls.
-
----
-
-## 13) Risks & mitigations
-
-* **Editor stutter:** Keep logger buffered; no file writes per frame.
-* **Breakpoint weirdness:** If breakpoints don’t hit (Domain Reload OFF), temporarily re-enable domain reload to debug, then switch back.
-* **Raycast spam:** Only raycast while aiming; debounce hits with `refireCooldown`.
-
----
-
-*End ARCH.md.*
-
-```
-::contentReference[oaicite:0]{index=0}
-```
+- Total FOV is accidentally treated as a half-angle.
+- Suspicion uses render-frame delta inside a lower-frequency tick.
+- Occlusion masks are empty or include the target incorrectly.
+- Threat confirmation or reflex dispatch repeats every tick.
+- Patrol movement continues during surrender or flinch.
+- Activity resumes while aiming remains active.
+- A direct debug bypass remains enabled in an evaluation build.
+- Raw root movement passes through a wall.
+- Name hashing changes style behavior across sessions.
+- Dispatch timestamp is reported as visible motion.
+- Logging serialization allocates or writes from the urgent path.
+- Static singleton state survives incorrectly with Domain Reload disabled.
