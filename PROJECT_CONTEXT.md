@@ -165,14 +165,15 @@ Logging requirements:
 
 The repository is still a pre-MVP scaffold:
 
-- `Test_Arena` currently contains a camera, light, floor, and ceiling rather than the complete test fixture.
-- `SimpleFPSController` is still an empty, non-attachable class.
+- `Test_Arena` now contains the required `Player → CameraPivot → Main Camera` hierarchy, a configured `CharacterController`, a light, floor, and ceiling, but not yet the complete arena fixture.
+- `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state.
+- Three focused Unity Play Mode tests verify the Task 2 component contract, scene configuration, and input-driven behavior; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
 - Perception, reflex, logger, and overlay scripts exist as unwired scaffolds.
 - NPC activity, interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
 - Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
 - `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task is `TASKS.md` section 2: implement and verify the minimal player controller.
+The next implementation task is `TASKS.md` section 3: complete the minimal test arena.
 
 ## Arena
 

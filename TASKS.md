@@ -62,7 +62,7 @@ Acceptance:
 - [x] A fresh checkout resolves the same packages and opens the correct scene.
 - [x] The documented editor settings are tracked.
 
-## 2. Implement the minimal player controller — next recommended task
+## 2. Implement the minimal player controller — completed
 
 Goal: move, look, and expose a trustworthy aiming state without Starter Assets.
 
@@ -73,21 +73,26 @@ Files:
 
 Steps:
 
-- Replace the empty class with a `MonoBehaviour` using `CharacterController`.
-- Read `Keyboard.current` and `Mouse.current` directly.
-- Add WASD, mouse look, gravity, cursor lock, RMB aim, and smooth FOV change.
-- Add optional sprint and jump only if they do not delay acceptance.
-- Expose `public bool IsAiming { get; private set; }`.
-- Create the `Player → CameraPivot → Main Camera` hierarchy and assign references.
+- [x] Replace the empty class with a `MonoBehaviour` using `CharacterController`.
+- [x] Read `Keyboard.current` and `Mouse.current` directly.
+- [x] Add WASD, mouse look, gravity, cursor lock, RMB aim, and smooth FOV change.
+- [x] Add optional sprint and jump only if they do not delay acceptance.
+- [x] Expose `public bool IsAiming { get; private set; }`.
+- [x] Create the `Player → CameraPivot → Main Camera` hierarchy and assign references.
 
 Acceptance:
 
-- Project compiles without Starter Assets.
-- WASD and mouse look work.
-- RMB changes FOV and `IsAiming` accurately follows input.
-- Escape releases or toggles the cursor predictably.
+- [x] Project compiles without Starter Assets.
+- [x] WASD and mouse look work.
+- [x] RMB changes FOV and `IsAiming` accurately follows input.
+- [x] Escape releases or toggles the cursor predictably.
 
-## 3. Complete the minimal test arena
+Verification:
+
+- Three focused Unity Play Mode tests pass for the component/API contract, configured scene hierarchy, and movement/look/sprint/jump/aim/FOV/cursor behavior.
+- A Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+## 3. Complete the minimal test arena — next recommended task
 
 Goal: give each initial test a controlled spatial fixture.
 
