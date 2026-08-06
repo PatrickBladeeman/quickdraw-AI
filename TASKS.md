@@ -92,25 +92,30 @@ Verification:
 - Three focused Unity Play Mode tests pass for the component/API contract, configured scene hierarchy, and movement/look/sprint/jump/aim/FOV/cursor behavior.
 - A Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
-## 3. Complete the minimal test arena — next recommended task
+## 3. Complete the minimal test arena — completed
 
 Goal: give each initial test a controlled spatial fixture.
 
 Steps:
 
-- Keep the existing floor and ceiling.
-- Add four walls, one full-height divider, and one low block.
-- Add player and NPC spawn markers.
-- Add two patrol markers and one interaction marker.
-- Add a `Systems` object for diagnostics and logging when those components are ready.
-- Create an `NPC` layer.
+- [x] Keep the existing floor and ceiling.
+- [x] Add four walls, one full-height divider, and one low block.
+- [x] Add player and NPC spawn markers.
+- [x] Add two patrol markers and one interaction marker.
+- [x] Add a `Systems` object for diagnostics and logging when those components are ready.
+- [x] Create an `NPC` layer.
 
 Acceptance:
 
-- The room supports direct, peripheral, and occluded sight lines.
-- Every added object supports a named test; there is no decorative scope creep.
+- [x] The room supports direct, peripheral, and occluded sight lines.
+- [x] Every added object supports a named test; there is no decorative scope creep.
 
-## 4. Add one ongoing NPC activity
+Verification:
+
+- Two focused arena Play Mode tests verify the exact hierarchy, collision fixtures, shared valid material, marker-only transforms, empty `Systems` container, enclosing walls, and direct/peripheral/occluded sightlines.
+- The complete Play Mode suite passes five tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+## 4. Add one ongoing NPC activity — next recommended task
 
 Goal: establish meaningful behavior that can later be interrupted.
 

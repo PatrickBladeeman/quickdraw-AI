@@ -165,15 +165,16 @@ Logging requirements:
 
 The repository is still a pre-MVP scaffold:
 
-- `Test_Arena` now contains the required `Player → CameraPivot → Main Camera` hierarchy, a configured `CharacterController`, a light, floor, and ceiling, but not yet the complete arena fixture.
+- `Test_Arena` now contains the required player hierarchy, light, floor, ceiling, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, and an empty `Systems` container.
 - `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state.
-- Three focused Unity Play Mode tests verify the Task 2 component contract, scene configuration, and input-driven behavior; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
+- Five focused Unity Play Mode tests verify the Task 2 controller and Task 3 arena hierarchy, fixtures, materials, markers, enclosing walls, and direct/peripheral/occluded sightlines; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
+- User layer 8 is named `NPC` for the upcoming NPC activity and perception tasks.
 - Perception, reflex, logger, and overlay scripts exist as unwired scaffolds.
 - NPC activity, interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
 - Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
 - `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task is `TASKS.md` section 3: complete the minimal test arena.
+The next implementation task is `TASKS.md` section 4: add one ongoing NPC activity.
 
 ## Arena
 
