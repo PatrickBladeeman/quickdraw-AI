@@ -89,7 +89,7 @@ Acceptance:
 
 Verification:
 
-- Three focused Unity Play Mode tests pass for the component/API contract, configured scene hierarchy, and movement/look/sprint/jump/aim/FOV/cursor behavior.
+- Four focused Unity Play Mode tests pass for the component/API contract, configured scene hierarchy, movement/look/sprint/jump/aim/FOV/cursor behavior, full unobstructed jump height, and immediate recovery from overhead collision.
 - A Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
 ## 3. Complete the minimal test arena — completed
@@ -98,7 +98,7 @@ Goal: give each initial test a controlled spatial fixture.
 
 Steps:
 
-- [x] Keep the existing floor and ceiling.
+- [x] Keep the existing floor and use an open-top arena for clear lighting and playtest visibility.
 - [x] Add four walls, one full-height divider, and one low block.
 - [x] Add player and NPC spawn markers.
 - [x] Add two patrol markers and one interaction marker.
@@ -112,10 +112,10 @@ Acceptance:
 
 Verification:
 
-- Two focused arena Play Mode tests verify the exact hierarchy, collision fixtures, shared valid material, marker-only transforms, empty `Systems` container, enclosing walls, and direct/peripheral/occluded sightlines.
-- The complete Play Mode suite passes five tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+- Two focused arena Play Mode tests verify the 16-by-16-unit open-top fixture, exact hierarchy, collision fixtures, shared valid material, marker-only transforms, empty `Systems` container, enclosing walls, and direct/peripheral/occluded sightlines.
+- The complete Play Mode suite passes ten tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
-## 4. Add one ongoing NPC activity — next recommended task
+## 4. Add one ongoing NPC activity — completed
 
 Goal: establish meaningful behavior that can later be interrupted.
 
@@ -123,17 +123,22 @@ Recommended first activity: patrol between two markers. A simple inspect activit
 
 Steps:
 
-- Create one capsule NPC on the `NPC` layer.
-- Implement explicit start, tick, interrupt, resume, and cancel behavior without a general AI framework.
-- Track activity name, start time, current target/progress, and running state.
-- Add reset behavior for repeatable manual tests.
+- [x] Create one capsule NPC on the `NPC` layer.
+- [x] Implement explicit start, tick, interrupt, resume, and cancel behavior without a general AI framework.
+- [x] Track activity name, start time, current target/progress, and running state.
+- [x] Add reset behavior for repeatable manual tests.
 
 Acceptance:
 
-- The NPC performs the activity repeatedly and deterministically.
-- Interrupt and resume can be invoked manually without leaving motion or state stuck.
+- [x] The NPC performs the activity repeatedly and deterministically.
+- [x] Interrupt and resume can be invoked manually without leaving motion or state stuck.
 
-## 5. Add structured aiming stimulus
+Verification:
+
+- Four focused Play Mode tests verify the configured capsule NPC, collision-aware wall blocking, deterministic repeated patrol, observable activity state, and consistent interrupt/resume/cancel/reset transitions.
+- The complete Play Mode suite passes ten tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+## 5. Add structured aiming stimulus — next recommended task
 
 Goal: expose aiming geometry without directly controlling NPC behavior.
 

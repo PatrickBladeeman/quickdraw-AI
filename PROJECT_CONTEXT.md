@@ -165,22 +165,23 @@ Logging requirements:
 
 The repository is still a pre-MVP scaffold:
 
-- `Test_Arena` now contains the required player hierarchy, light, floor, ceiling, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, and an empty `Systems` container.
-- `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state.
-- Five focused Unity Play Mode tests verify the Task 2 controller and Task 3 arena hierarchy, fixtures, materials, markers, enclosing walls, and direct/peripheral/occluded sightlines; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
-- User layer 8 is named `NPC` for the upcoming NPC activity and perception tasks.
+- `Test_Arena` is a 16-by-16-unit controlled fixture containing the required player hierarchy, light, floor, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, one capsule NPC, and an empty `Systems` container. It is intentionally open-top for clear lighting and playtest visibility.
+- `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state. Upward velocity is cleared on overhead collision so a blocked jump immediately begins falling.
+- `PatrolActivity` moves the NPC deterministically between the two patrol markers through a collision-aware `CharacterController` and exposes explicit start, tick, interrupt, resume, cancel, and reset operations with observable activity state and timing.
+- Ten focused Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, and Task 4 patrol configuration, wall collision, repeated movement, interruption, resume, cancellation, and reset behavior; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
+- User layer 8 is named `NPC` for NPC activity and perception queries.
 - Perception, reflex, logger, and overlay scripts exist as unwired scaffolds.
-- NPC activity, interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
+- Threat-driven interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
 - Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
 - `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task is `TASKS.md` section 4: add one ongoing NPC activity.
+The next implementation task is `TASKS.md` section 5: add a structured aiming stimulus.
 
 ## Arena
 
 `Assets/_Project/Scenes/Test_Arena.unity` is a controlled greybox testbed. Its eventual minimum contents are:
 
-- floor, ceiling, and four walls;
+- an open-top floor and four walls;
 - one full-height occluder and one low block;
 - player spawn and NPC spawn;
 - two patrol markers;
@@ -238,6 +239,7 @@ These values are retained as design references rather than claims of completed f
 - `fovLerp = 12`
 - `gravity = -9.81`
 - `jumpHeight = 1.1`
+- upward `CharacterController` collision clears positive vertical velocity immediately
 
 The controller uses the corrected design: use the Unity Input System directly, expose `IsAiming`, and do not depend on Starter Assets.
 
@@ -1136,19 +1138,19 @@ Expected scene:
 
 `Assets/_Project/Scenes/Test_Arena.unity`
 
-The scene currently contains only:
+The scene began with only:
 
 - floor,
 - ceiling.
 
-Do not assume walls, NPCs, or player objects exist without inspection.
+The ceiling has since been removed. The current 16-by-16-unit open-top fixture, walls, markers, player, and NPC are recorded in the current repository baseline above.
 
 #### 14.2 Minimal map elements
 
-Build:
+Current minimum:
 
 - floor,
-- ceiling,
+- open top with no ceiling,
 - four walls,
 - one occluding wall or divider,
 - one waist-high block,

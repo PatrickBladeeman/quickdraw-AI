@@ -11,20 +11,20 @@ namespace QuickDraw.Tests.PlayMode
     {
         private static readonly Dictionary<string, Vector3> ExpectedGeometry = new Dictionary<string, Vector3>
         {
-            { "Wall_North", new Vector3(12f, 2.8f, 0.2f) },
-            { "Wall_South", new Vector3(12f, 2.8f, 0.2f) },
-            { "Wall_East", new Vector3(0.2f, 2.8f, 12f) },
-            { "Wall_West", new Vector3(0.2f, 2.8f, 12f) },
+            { "Wall_North", new Vector3(16f, 2.8f, 0.2f) },
+            { "Wall_South", new Vector3(16f, 2.8f, 0.2f) },
+            { "Wall_East", new Vector3(0.2f, 2.8f, 16f) },
+            { "Wall_West", new Vector3(0.2f, 2.8f, 16f) },
             { "OcclusionDivider", new Vector3(0.25f, 2.8f, 5f) },
             { "LowBlock", new Vector3(2f, 1f, 1.5f) }
         };
 
         private static readonly Dictionary<string, Vector3> ExpectedMarkers = new Dictionary<string, Vector3>
         {
-            { "PlayerSpawn", new Vector3(0f, 1f, -4f) },
-            { "NPCSpawn", new Vector3(0f, 0f, 3f) },
-            { "PatrolPoint_A", new Vector3(-3f, 0f, 3f) },
-            { "PatrolPoint_B", new Vector3(3f, 0f, 3f) },
+            { "PlayerSpawn", new Vector3(0f, 1f, -5.5f) },
+            { "NPCSpawn", new Vector3(0f, 0f, 4.5f) },
+            { "PatrolPoint_A", new Vector3(-4.5f, 0f, 4.5f) },
+            { "PatrolPoint_B", new Vector3(4.5f, 0f, 4.5f) },
             { "InteractionPoint", Vector3.zero }
         };
 
@@ -44,17 +44,19 @@ namespace QuickDraw.Tests.PlayMode
         }
 
         [Test]
-        public void SceneContainsOnlyThePrescribedTask3Fixtures()
+        public void SceneContainsApprovedOpenTopArenaFixtures()
         {
             GameObject floor = GameObject.Find("PB_floor");
             Assert.That(floor, Is.Not.Null, "The existing floor must remain.");
-            Assert.That(GameObject.Find("Cube"), Is.Not.Null, "The existing ceiling must remain.");
+            Assert.That(GameObject.Find("Cube"), Is.Null, "The approved arena must remain open-top.");
             Assert.That(LayerMask.NameToLayer("NPC"), Is.EqualTo(8));
 
             Material floorMaterial = floor.GetComponent<Renderer>()?.sharedMaterial;
             Assert.That(floorMaterial, Is.Not.Null);
             Assert.That(floorMaterial.shader, Is.Not.Null);
             Assert.That(floorMaterial.shader.name, Is.Not.EqualTo("Hidden/InternalErrorShader"));
+            Assert.That(floor.GetComponent<Collider>().bounds.size.x, Is.EqualTo(16f).Within(0.01f));
+            Assert.That(floor.GetComponent<Collider>().bounds.size.z, Is.EqualTo(16f).Within(0.01f));
 
             Transform geometryRoot = RequireObject("ArenaGeometry").transform;
             Assert.That(geometryRoot.childCount, Is.EqualTo(ExpectedGeometry.Count));
@@ -89,25 +91,31 @@ namespace QuickDraw.Tests.PlayMode
         {
             Vector3 playerEye = RequireObject("PlayerSpawn").transform.position + Vector3.up * 0.65f;
             Vector3 npcEye = RequireObject("NPCSpawn").transform.position + Vector3.up * 1.65f;
+            int npcLayer = LayerMask.NameToLayer("NPC");
+            Assert.That(npcLayer, Is.GreaterThanOrEqualTo(0));
+            int geometryMask = ~(1 << npcLayer);
 
-            Assert.That(Physics.Linecast(playerEye, npcEye, out RaycastHit directHit), Is.False,
+            Assert.That(Physics.Raycast(Vector3.up * 0.1f, Vector3.up, 100f, geometryMask), Is.False,
+                "No ceiling may obstruct the approved open top.");
+
+            Assert.That(Physics.Linecast(playerEye, npcEye, out RaycastHit directHit, geometryMask), Is.False,
                 $"Direct lane was blocked by {directHit.collider?.name}.");
 
             Vector3 peripheralDirection = Quaternion.Euler(0f, 60f, 0f) * Vector3.back;
             Vector3 peripheralPosition = npcEye + peripheralDirection * 5f;
             float peripheralAngle = Vector3.Angle(Vector3.back, peripheralDirection);
             Assert.That(peripheralAngle, Is.GreaterThan(45f).And.LessThanOrEqualTo(70f));
-            Assert.That(Physics.Linecast(npcEye, peripheralPosition, out RaycastHit peripheralHit), Is.False,
+            Assert.That(Physics.Linecast(npcEye, peripheralPosition, out RaycastHit peripheralHit, geometryMask), Is.False,
                 $"Peripheral lane was blocked by {peripheralHit.collider?.name}.");
 
             Vector3 occludedTarget = new Vector3(3.5f, 1.65f, 2f);
-            Assert.That(Physics.Linecast(playerEye, occludedTarget, out RaycastHit occludedHit), Is.True);
+            Assert.That(Physics.Linecast(playerEye, occludedTarget, out RaycastHit occludedHit, geometryMask), Is.True);
             Assert.That(occludedHit.collider.name, Is.EqualTo("OcclusionDivider"));
 
-            AssertWallHit(new Vector3(0f, 1.4f, 0f), Vector3.forward * 7f, "Wall_North");
-            AssertWallHit(new Vector3(0f, 1.4f, 0f), Vector3.back * 7f, "Wall_South");
-            AssertWallHit(new Vector3(0f, 1.4f, -3f), Vector3.right * 7f, "Wall_East");
-            AssertWallHit(new Vector3(0f, 1.4f, -3f), Vector3.left * 7f, "Wall_West");
+            AssertWallHit(new Vector3(0f, 1.4f, 0f), Vector3.forward * 10f, "Wall_North", geometryMask);
+            AssertWallHit(new Vector3(0f, 1.4f, 0f), Vector3.back * 10f, "Wall_South", geometryMask);
+            AssertWallHit(new Vector3(0f, 1.4f, -3f), Vector3.right * 10f, "Wall_East", geometryMask);
+            AssertWallHit(new Vector3(0f, 1.4f, -3f), Vector3.left * 10f, "Wall_West", geometryMask);
 
             Collider divider = RequireObject("OcclusionDivider").GetComponent<Collider>();
             Collider lowBlock = RequireObject("LowBlock").GetComponent<Collider>();
@@ -123,9 +131,9 @@ namespace QuickDraw.Tests.PlayMode
             return result;
         }
 
-        private static void AssertWallHit(Vector3 start, Vector3 direction, string expectedWall)
+        private static void AssertWallHit(Vector3 start, Vector3 direction, string expectedWall, int geometryMask)
         {
-            Assert.That(Physics.Linecast(start, start + direction, out RaycastHit hit), Is.True,
+            Assert.That(Physics.Linecast(start, start + direction, out RaycastHit hit, geometryMask), Is.True,
                 $"No enclosing collider was found for {expectedWall}.");
             Assert.That(hit.collider.name, Is.EqualTo(expectedWall));
         }

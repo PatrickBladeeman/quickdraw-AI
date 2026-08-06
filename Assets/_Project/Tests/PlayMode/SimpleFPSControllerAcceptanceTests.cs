@@ -23,7 +23,7 @@ namespace QuickDraw.Tests.PlayMode
         }
 
         [UnityTearDown]
-        public IEnumerator TearDown()
+        public IEnumerator TearDownScene()
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -37,7 +37,7 @@ namespace QuickDraw.Tests.PlayMode
             GameObject player = GameObject.Find("Player");
 
             Assert.That(player, Is.Not.Null);
-            Assert.That(player.transform.position, Is.EqualTo(new Vector3(0f, 1f, -4f)));
+            Assert.That(player.transform.position, Is.EqualTo(new Vector3(0f, 1f, -5.5f)));
 
             CharacterController characterController = player.GetComponent<CharacterController>();
             Assert.That(characterController, Is.Not.Null);
@@ -170,6 +170,86 @@ namespace QuickDraw.Tests.PlayMode
             InputSystem.Update();
             Assert.That(ReadField<bool>(controller, "_cursorLocked"), Is.True, "A second Escape press must relock the cursor.");
 
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator JumpReachesConfiguredHeightAndDoesNotHangOnOverheadCollision()
+        {
+            Type controllerType = GetControllerType();
+            GameObject player = GameObject.Find("Player");
+            Component controller = player.GetComponent(controllerType);
+            CharacterController characterController = player.GetComponent<CharacterController>();
+
+            _keyboard = InputSystem.AddDevice<Keyboard>("Task2 Jump Test Keyboard");
+            _mouse = InputSystem.AddDevice<Mouse>("Task2 Jump Test Mouse");
+            yield return new WaitForSeconds(0.75f);
+
+            ((Behaviour)controller).enabled = false;
+            Invoke(controller, "SetCursorLocked", true);
+
+            for (int i = 0; i < 180 && !characterController.isGrounded; i++)
+            {
+                TickController(controller, 1);
+            }
+
+            Assert.That(characterController.isGrounded, Is.True, "The player must settle before the jump test starts.");
+            float groundedY = player.transform.position.y;
+            Press(_keyboard.spaceKey);
+            InputSystem.Update();
+            TickController(controller, 1);
+            Release(_keyboard.spaceKey);
+            InputSystem.Update();
+
+            float maximumY = player.transform.position.y;
+            bool landed = false;
+            for (int i = 0; i < 180; i++)
+            {
+                TickController(controller, 1);
+                maximumY = Mathf.Max(maximumY, player.transform.position.y);
+                if (i > 10 && characterController.isGrounded)
+                {
+                    landed = true;
+                    break;
+                }
+            }
+
+            Assert.That(landed, Is.True, "The unobstructed jump must return to the floor.");
+            Assert.That(maximumY - groundedY, Is.InRange(0.9f, 1.2f), "The configured 1.1 m jump must not be artificially clamped.");
+
+            GameObject overheadBlocker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            overheadBlocker.name = "JumpTestOverheadBlocker";
+            overheadBlocker.transform.localScale = new Vector3(2f, 0.2f, 2f);
+            float blockerBottom = characterController.bounds.max.y + 0.15f;
+            overheadBlocker.transform.position = new Vector3(
+                player.transform.position.x,
+                blockerBottom + 0.1f,
+                player.transform.position.z);
+            Physics.SyncTransforms();
+
+            Press(_keyboard.spaceKey);
+            InputSystem.Update();
+            TickController(controller, 1);
+            Release(_keyboard.spaceKey);
+            InputSystem.Update();
+
+            bool upwardVelocityCleared = false;
+            for (int i = 0; i < 12; i++)
+            {
+                TickController(controller, 1);
+                if (ReadField<float>(controller, "_verticalVelocity") <= 0f)
+                {
+                    upwardVelocityCleared = true;
+                    break;
+                }
+            }
+
+            Assert.That(upwardVelocityCleared, Is.True, "An overhead collision must clear upward velocity immediately.");
+            float collisionHeight = player.transform.position.y;
+            TickController(controller, 3);
+            Assert.That(player.transform.position.y, Is.LessThan(collisionHeight), "The player must begin falling without an apex pause.");
+
+            UnityEngine.Object.Destroy(overheadBlocker);
             yield return null;
         }
 

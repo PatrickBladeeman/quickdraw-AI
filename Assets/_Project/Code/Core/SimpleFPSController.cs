@@ -102,7 +102,7 @@ namespace QuickDraw.Core
 
         private void ApplyMovement(Keyboard keyboard, float deltaTime)
         {
-            if (_characterController == null)
+            if (_characterController == null || !_characterController.enabled)
             {
                 return;
             }
@@ -136,7 +136,12 @@ namespace QuickDraw.Core
 
             _verticalVelocity += gravity * deltaTime;
             Vector3 velocity = horizontalVelocity + Vector3.up * _verticalVelocity;
-            _characterController.Move(velocity * deltaTime);
+            CollisionFlags collisionFlags = _characterController.Move(velocity * deltaTime);
+
+            if ((collisionFlags & CollisionFlags.Above) != 0 && _verticalVelocity > 0f)
+            {
+                _verticalVelocity = 0f;
+            }
         }
 
         private void ApplyLook(Vector2 mouseDelta)
