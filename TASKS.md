@@ -138,23 +138,28 @@ Verification:
 - Four focused Play Mode tests verify the configured capsule NPC, collision-aware wall blocking, deterministic repeated patrol, observable activity state, and consistent interrupt/resume/cancel/reset transitions.
 - The complete Play Mode suite passes ten tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
-## 5. Add structured aiming stimulus — next recommended task
+## 5. Add structured aiming stimulus — complete
 
 Goal: expose aiming geometry without directly controlling NPC behavior.
 
 Steps:
 
-- Define a small `AimThreatStimulus` containing source identity, origin, direction, timestamp, maximum distance, and aiming state.
-- Publish or expose the current stimulus from the player/camera.
-- Do not call `ReflexSelector` from the controller or emitter.
-- If isolated reflex testing needs a direct center-camera hit, protect it with a serialized `bypassPerceptionForDebug` flag that defaults to false.
+- [x] Define a small `AimThreatStimulus` containing source identity, origin, direction, timestamp, maximum distance, and aiming state.
+- [x] Publish the current camera-backed stimulus and explicit aim-start/aim-end edges from the player.
+- [x] Keep the controller and emitter independent from `ReflexSelector` and NPC behavior.
+- [x] Omit the optional direct center-camera debug bypass because isolated reflex testing does not need it at this stage.
 
 Acceptance:
 
-- Starting and ending RMB aim creates clear stimulus edges.
-- With the debug bypass disabled, aiming alone cannot directly force a reflex.
+- [x] Starting and ending RMB aim creates clear stimulus edges.
+- [x] Aiming alone cannot directly force a reflex.
 
-## 6. Correct soft perception and orientation
+Verification:
+
+- Two focused Play Mode tests verify the six-field stimulus contract, camera-derived snapshots, serialized player wiring, single RMB start/end edges, and the absence of direct NPC/reflex effects.
+- The complete Play Mode suite passes twelve tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+## 6. Correct soft perception and orientation — next recommended task
 
 Goal: turn the structured stimulus into gradual awareness and one-shot threat confirmation.
 

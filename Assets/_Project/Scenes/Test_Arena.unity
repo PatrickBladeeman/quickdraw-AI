@@ -1236,6 +1236,7 @@ GameObject:
   - component: {fileID: 1062353843}
   - component: {fileID: 1062353842}
   - component: {fileID: 1062353841}
+  - component: {fileID: 1062353844}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1267,6 +1268,21 @@ MonoBehaviour:
   normalFOV: 70
   aimFOV: 55
   fovLerp: 12
+--- !u!114 &1062353844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1062353840}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68f50853c04b45e681c0ab8319437d2f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  controller: {fileID: 1062353841}
+  sourceCamera: {fileID: 1111901122}
+  maxDistance: 30
 --- !u!143 &1062353842
 CharacterController:
   m_ObjectHideFlags: 0

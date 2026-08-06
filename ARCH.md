@@ -76,7 +76,7 @@ Expected behavior:
 
 ### Aim-threat stimulus
 
-A minimal structured value may contain:
+The implemented structured value contains:
 
 ```csharp
 public struct AimThreatStimulus
@@ -90,7 +90,9 @@ public struct AimThreatStimulus
 }
 ```
 
-The exact emitter class name is not fixed yet. It should expose current aiming state and geometry without forcing a target reaction.
+`AimThreatEmitter` is attached to the player beside `SimpleFPSController`. It samples the configured player camera in `LateUpdate`, exposes the current snapshot, and raises one `AimStarted` or `AimEnded` event per aiming-state transition. It does not reference NPC behavior, perception, or reflex selection; perception remains the only path from stimulus data to threat confirmation.
+
+The emitter exposes current aiming state and geometry without forcing a target reaction.
 
 An optional serialized `bypassPerceptionForDebug` flag may allow a center-camera hit to invoke confirmed threat during isolated testing. It defaults to false and is not used for final evaluation.
 
@@ -285,12 +287,12 @@ Assets/_Project/
       DevOverlay.cs
     AI/
       Stimuli/
-        AimThreatStimulus.cs             (possible)
-        AimThreatEmitter.cs              (possible)
+        AimThreatStimulus.cs
+        AimThreatEmitter.cs
       Perception/
         SoftFOVPerception.cs
       Activity/
-        PatrolActivity.cs                (possible)
+        PatrolActivity.cs
       Behavior/
         NpcBehaviorController.cs         (possible)
       Reflex/

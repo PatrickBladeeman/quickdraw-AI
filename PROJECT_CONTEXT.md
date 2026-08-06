@@ -168,14 +168,15 @@ The repository is still a pre-MVP scaffold:
 - `Test_Arena` is a 16-by-16-unit controlled fixture containing the required player hierarchy, light, floor, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, one capsule NPC, and an empty `Systems` container. It is intentionally open-top for clear lighting and playtest visibility.
 - `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state. Upward velocity is cleared on overhead collision so a blocked jump immediately begins falling.
 - `PatrolActivity` moves the NPC deterministically between the two patrol markers through a collision-aware `CharacterController` and exposes explicit start, tick, interrupt, resume, cancel, and reset operations with observable activity state and timing.
-- Ten focused Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, and Task 4 patrol configuration, wall collision, repeated movement, interruption, resume, cancellation, and reset behavior; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
+- `AimThreatStimulus` is a plain six-field value, and the camera-backed `AimThreatEmitter` on the player publishes the current snapshot plus one start or end event for each RMB aim transition. It has no NPC, perception, reflex, or debug-bypass dependency.
+- Twelve focused Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, Task 4 patrol behavior, and Task 5 stimulus snapshots, wiring, and RMB edges; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
 - User layer 8 is named `NPC` for NPC activity and perception queries.
 - Perception, reflex, logger, and overlay scripts exist as unwired scaffolds.
 - Threat-driven interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
 - Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
 - `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task is `TASKS.md` section 5: add a structured aiming stimulus.
+The next implementation task is `TASKS.md` section 6: correct soft perception and orientation.
 
 ## Arena
 
@@ -754,7 +755,7 @@ The player does not need a real gun yet.
 
 #### 9.2 Threat stimulus
 
-A future structured stimulus could contain:
+The implemented structured stimulus contains:
 
 ```csharp
 public struct AimThreatStimulus
