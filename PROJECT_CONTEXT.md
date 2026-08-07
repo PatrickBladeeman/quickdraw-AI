@@ -165,18 +165,19 @@ Logging requirements:
 
 The repository is still a pre-MVP scaffold:
 
-- `Test_Arena` is a 16-by-16-unit controlled fixture containing the required player hierarchy, light, floor, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, one capsule NPC, and an empty `Systems` container. It is intentionally open-top for clear lighting and playtest visibility.
+- `Test_Arena` is a 16-by-16-unit controlled fixture containing the required player hierarchy, light, floor, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, one capsule NPC with perception-eye and non-colliding facing markers, and an empty `Systems` container. It is intentionally open-top for clear lighting and playtest visibility.
 - `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state. Upward velocity is cleared on overhead collision so a blocked jump immediately begins falling.
 - `PatrolActivity` moves the NPC deterministically between the two patrol markers through a collision-aware `CharacterController` and exposes explicit start, tick, interrupt, resume, cancel, and reset operations with observable activity state and timing.
 - `AimThreatStimulus` is a plain six-field value, and the camera-backed `AimThreatEmitter` on the player publishes the current snapshot plus one start or end event for each RMB aim transition. It has no NPC, perception, reflex, or debug-bypass dependency.
-- Twelve focused Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, Task 4 patrol behavior, and Task 5 stimulus snapshots, wiring, and RMB edges; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
+- `SoftFOVPerception` is wired to the NPC and Task 5 emitter. It applies a 20-unit visual limit, total-FOV half-angle checks, non-allocating line of sight, measured 12 Hz suspicion timing, 0.5/0.3 hysteresis, 300-degree-per-second orientation, and one confirmation per released-and-rearmed aim episode. A confirmed episode continues tracking a renewed valid aim without rearming, incrementing the episode, or re-emitting confirmation; tracking stops when the active aim is no longer valid. Camera-ray intersection with NPC bounds qualifies threat relevance but never bypasses perception or invokes a reflex. In Play Mode, renderer-local property blocks color both the capsule and facing marker by state so transitions are observable directly in the Game view without changing the shared arena material.
+- Twenty-two focused Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, Task 4 patrol behavior, Task 5 stimulus snapshots and RMB edges, and Task 6 perception, occlusion, suspicion, orientation, confirmed-threat tracking, one-shot confirmation, recovery, scheduling, state-gizmo clearance, and runtime state colors on the NPC capsule and facing marker; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
 - User layer 8 is named `NPC` for NPC activity and perception queries.
-- Perception, reflex, logger, and overlay scripts exist as unwired scaffolds.
+- Reflex, logger, and overlay scripts remain unwired scaffolds; perception does not yet interrupt patrol or command a reaction.
 - Threat-driven interruption coordination, recovery state, and trustworthy visible-onset telemetry do not yet exist.
 - Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
 - `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task is `TASKS.md` section 6: correct soft perception and orientation.
+The next implementation task is `TASKS.md` section 7: interrupt activity and command one reflex.
 
 ## Arena
 

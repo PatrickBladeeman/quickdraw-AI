@@ -159,7 +159,7 @@ Verification:
 - Two focused Play Mode tests verify the six-field stimulus contract, camera-derived snapshots, serialized player wiring, single RMB start/end edges, and the absence of direct NPC/reflex effects.
 - The complete Play Mode suite passes twelve tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
-## 6. Correct soft perception and orientation — next recommended task
+## 6. Correct soft perception and orientation — complete
 
 Goal: turn the structured stimulus into gradual awareness and one-shot threat confirmation.
 
@@ -169,25 +169,31 @@ Files:
 
 Steps:
 
-- Represent explicit perception state or equivalent unambiguous state edges.
-- Treat `coreFOV = 90°` and `peripheralFOV = 140°` as total widths.
-- Check maximum distance, then angle, then line of sight.
-- Tick near 12 Hz and use measured elapsed tick time for suspicion.
-- Use enter/exit thresholds of 0.5 and 0.3.
-- Turn the body near 300 degrees per second while orienting.
-- Confirm only while the aiming stimulus remains valid and yaw difference is below approximately 3 degrees.
-- Emit confirmation once per threat episode and require recovery before rearming.
-- Add debug visualization for cones, line of sight, and current state if it can remain allocation-light.
+- [x] Represent explicit perception state and unambiguous state edges.
+- [x] Treat `coreFOV = 90°` and `peripheralFOV = 140°` as total widths.
+- [x] Check maximum distance, then angle, then line of sight.
+- [x] Tick near 12 Hz and use measured elapsed tick time for suspicion.
+- [x] Use enter/exit thresholds of 0.5 and 0.3.
+- [x] Turn the body near 300 degrees per second while orienting.
+- [x] Confirm only while the aiming stimulus remains valid and yaw difference is below approximately 3 degrees.
+- [x] Emit confirmation once per threat episode and require recovery before rearming.
+- [x] Continue tracking a renewed valid aim during an unrearmed confirmed episode without emitting another confirmation.
+- [x] Add allocation-light debug visualization for cones, line of sight, current state, eye position, and facing direction; expose state colors directly in the Game view through renderer-local capsule and facing-marker colors, with the supplemental gizmo sphere above the NPC bounds.
 
 Acceptance:
 
-- Frontal stimulus confirms quickly.
-- Peripheral stimulus builds suspicion and turns before confirming.
-- An occluder prevents visual confirmation.
-- Losing the stimulus decays or cancels awareness correctly.
-- Holding aim does not generate repeated confirmations.
+- [x] Frontal stimulus confirms quickly.
+- [x] Peripheral stimulus builds suspicion and turns before confirming.
+- [x] An occluder prevents visual confirmation.
+- [x] Losing the stimulus decays or cancels awareness correctly.
+- [x] Holding aim does not generate repeated confirmations.
 
-## 7. Interrupt activity and command one reflex
+Verification:
+
+- Ten focused Play Mode tests verify scene wiring, frontal and peripheral perception, measured suspicion timing, 300-degree-per-second orientation, distance and total-FOV half-angle rejection, occlusion, release/recovery/rearm, renewed-aim tracking without duplicate confirmation, invalid-aim tracking rejection, held-aim one-shot behavior, real-frame scheduling, state-gizmo clearance, and runtime state colors on both NPC renderers.
+- The complete Play Mode suite passes twenty-two tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+## 7. Interrupt activity and command one reflex — next recommended task
 
 Goal: make confirmed threat visibly interrupt the ongoing activity exactly once.
 

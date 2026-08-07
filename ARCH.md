@@ -100,7 +100,7 @@ An optional serialized `bypassPerceptionForDebug` flag may allow a center-camera
 
 Purpose: model gradual visual awareness and produce a single confirmed-threat edge.
 
-Required references and tunables:
+Implemented references and tunables:
 
 - `eye`, player or stimulus source, and `occludersMask`;
 - maximum visual distance;
@@ -115,18 +115,20 @@ Rules:
 2. Convert total FOV fields to half-angles before comparison.
 3. Perform line of sight only for plausible angles and distances.
 4. Update suspicion with measured elapsed perception-tick time.
-5. Emit notice, threshold, and orientation events on state edges.
+5. Expose notice, threshold, and orientation transitions through state edges.
 6. Confirm a threat only while the relevant aiming stimulus remains valid.
 7. Emit threat confirmation once per episode.
 8. Require a recovery/cooldown transition before a new episode can confirm.
 
-Suggested states:
+Implemented states:
 
 ```text
 Idle → Noticed → Suspicious → Orienting → ThreatConfirmed → Cooldown/Recovery
 ```
 
-`Noticed` may be combined with `Suspicious` in the first implementation if the emitted events remain unambiguous.
+The implementation combines `Noticed` with `Suspicious`, exposes `StateChanged`, and emits `ThreatConfirmed` with the perception component as the event source. A camera ray intersecting the NPC `CharacterController` bounds qualifies the stimulus as relevant, but distance, cone, line-of-sight, suspicion, orientation, and one-shot rearming rules still control confirmation. Once confirmed, a renewed valid aim in the same unrearmed episode may continue steering the NPC without incrementing the episode or emitting another confirmation; invalid aim does not steer it. The component has no activity or reflex dependency.
+
+`Test_Arena` provides a child `PerceptionEye` for sight checks and a small non-colliding `FacingMarker` so orientation is visible during playtests. In Play Mode, renderer-local material property blocks tint both the NPC capsule and facing marker green, yellow, orange, red, or cyan for `Idle`, `Suspicious`, `Orienting`, `ThreatConfirmed`, or `Recovering`; the shared arena material is never modified. Selected-object gizmos remain supplemental diagnostics for core/peripheral boundaries, the current source line, and eye position, with a matching state sphere above the capsule bounds.
 
 ### Interruptible activity
 
