@@ -149,6 +149,10 @@ Threat confirmation must stop activity motion before dispatching the reflex. It 
 
 Purpose: own high-level state edges and sequencing.
 
+`NpcBehaviorController` is the current narrow coordinator. It subscribes to `SoftFOVPerception.ThreatConfirmed`, suspends `PatrolActivity` synchronously, records the interruption metadata and outcome in observable properties, and emits `ActivityInterrupted` only after patrol has stopped. It then commands `ReflexSelector` only when the activity remains stopped. The `(episode ID, confirmation timestamp)` pair guards duplicate interruption delivery while the selector independently guards duplicate reflex commands by episode ID. The coordinator does not write telemetry, choose recovery, or resume the activity.
+
+`NpcBehaviorControllerEditor` is an editor-only diagnostic surface for those existing properties. It preserves the normal serialized-reference controls, presents interruption count and metadata as read-only runtime values, and repaints during Play Mode without duplicating or serializing coordinator state.
+
 Suggested initial states:
 
 ```text
@@ -184,6 +188,8 @@ Rules:
 - Perform no waits, coroutines, network calls, or disk I/O before the motion command.
 - Emit an internal `reflex_commanded` event separately from observed motion.
 - Do not label `Animator.SetTrigger` time as visible onset.
+
+The implemented Task 7B selector replaces the original scaffold's name hashing, raw transform displacement, deferred hands-up animation, and direct logger dependency. `NPC_01` uses serialized seed `1001`, a `0.35 ± 0.05 m` step, and a deterministic yaw offset within `±30°`. It rotates on the horizontal plane and uses the existing `CharacterController.Move` path so arena colliders constrain displacement. Read-only command metadata and an editor-only live Inspector make command count, episode, timing, requested/applied movement, yaw, and collision flags observable. `ReflexCommanded` is a command event only; visible onset remains a separate Task 8 measurement.
 
 ### Visible-onset observer
 
@@ -296,9 +302,8 @@ Assets/_Project/
       Activity/
         PatrolActivity.cs
       Behavior/
-        NpcBehaviorController.cs         (possible)
+        NpcBehaviorController.cs
       Reflex/
-        ThreatEvents.cs
         ReflexSelector.cs
         VisibleMotionObserver.cs         (possible)
     Logging/

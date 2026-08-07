@@ -589,6 +589,8 @@ GameObject:
   - component: {fileID: 399708008}
   - component: {fileID: 399708013}
   - component: {fileID: 399708016}
+  - component: {fileID: 399708021}
+  - component: {fileID: 399708022}
   m_Layer: 8
   m_Name: NPC_01
   m_TagString: Untagged
@@ -643,6 +645,37 @@ MonoBehaviour:
   tickRateHz: 12
   turnYawSpeed: 300
   facingThreshold: 3
+--- !u!114 &399708021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 399708007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 961dd17423e64c35a7a747a753ca3082, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  perception: {fileID: 399708016}
+  patrolActivity: {fileID: 399708008}
+  reflexSelector: {fileID: 399708022}
+--- !u!114 &399708022
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 399708007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af141def1a1f0654697084ad0c99cd69, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  styleSeed: 1001
+  stepBackDistance: 0.35
+  stepDistanceVariation: 0.05
+  maximumYawOffset: 30
 --- !u!23 &399708009
 MeshRenderer:
   m_ObjectHideFlags: 0

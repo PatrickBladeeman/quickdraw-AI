@@ -17,7 +17,6 @@ namespace QuickDraw.Tests.PlayMode
         private const string EmitterTypeName = "QuickDraw.AI.Stimuli.AimThreatEmitter, Assembly-CSharp";
         private const string StimulusTypeName = "QuickDraw.AI.Stimuli.AimThreatStimulus, Assembly-CSharp";
         private const string PatrolTypeName = "QuickDraw.AI.Activity.PatrolActivity, Assembly-CSharp";
-        private const string ReflexTypeName = "QuickDraw.AI.Reflex.ReflexSelector, Assembly-CSharp";
 
         private int _startCount;
         private int _endCount;
@@ -111,7 +110,6 @@ namespace QuickDraw.Tests.PlayMode
             Type controllerType = RequireType(ControllerTypeName);
             Type emitterType = RequireType(EmitterTypeName);
             Type patrolType = RequireType(PatrolTypeName);
-            Type reflexType = RequireType(ReflexTypeName);
             GameObject player = GameObject.Find("Player");
             GameObject npc = GameObject.Find("NPC_01");
             Component controller = player.GetComponent(controllerType);
@@ -122,7 +120,6 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(controller, Is.Not.Null);
             Assert.That(emitter, Is.Not.Null);
             Assert.That(patrol, Is.Not.Null);
-            Assert.That(npc.GetComponent(reflexType), Is.Null, "Task 5 must not wire reflex selection directly.");
 
             ((Behaviour)controller).enabled = false;
             ((Behaviour)emitter).enabled = false;
@@ -253,4 +250,3 @@ namespace QuickDraw.Tests.PlayMode
         }
     }
 }
-

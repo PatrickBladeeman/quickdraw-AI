@@ -17,7 +17,7 @@ namespace QuickDraw.Tests.PlayMode
         private const string PerceptionTypeName = "QuickDraw.AI.Perception.SoftFOVPerception, Assembly-CSharp";
         private const string PerceptionStateTypeName = "QuickDraw.AI.Perception.PerceptionState, Assembly-CSharp";
         private const string PatrolTypeName = "QuickDraw.AI.Activity.PatrolActivity, Assembly-CSharp";
-        private const string ReflexTypeName = "QuickDraw.AI.Reflex.ReflexSelector, Assembly-CSharp";
+        private const string BehaviorControllerTypeName = "QuickDraw.AI.Behavior.NpcBehaviorController, Assembly-CSharp";
 
         private Type _controllerType;
         private Type _emitterType;
@@ -30,6 +30,7 @@ namespace QuickDraw.Tests.PlayMode
         private Component _emitter;
         private Component _perception;
         private Component _patrol;
+        private Component _behaviorController;
         private int _confirmationCount;
         private object _lastConfirmedPerception;
 
@@ -43,6 +44,7 @@ namespace QuickDraw.Tests.PlayMode
             _emitterType = RequireType(EmitterTypeName);
             _perceptionType = RequireType(PerceptionTypeName);
             _patrolType = RequireType(PatrolTypeName);
+            Type behaviorControllerType = RequireType(BehaviorControllerTypeName);
             _player = RequireObject("Player");
             _npc = RequireObject("NPC_01");
             _sourceCamera = _player.GetComponentInChildren<Camera>(true);
@@ -50,17 +52,20 @@ namespace QuickDraw.Tests.PlayMode
             _emitter = _player.GetComponent(_emitterType);
             _perception = _npc.GetComponent(_perceptionType);
             _patrol = _npc.GetComponent(_patrolType);
+            _behaviorController = _npc.GetComponent(behaviorControllerType);
 
             Assert.That(_sourceCamera, Is.Not.Null);
             Assert.That(_controller, Is.Not.Null);
             Assert.That(_emitter, Is.Not.Null);
             Assert.That(_perception, Is.Not.Null);
             Assert.That(_patrol, Is.Not.Null);
+            Assert.That(_behaviorController, Is.Not.Null);
 
             ((Behaviour)_controller).enabled = false;
             ((Behaviour)_emitter).enabled = false;
             ((Behaviour)_perception).enabled = false;
             ((Behaviour)_patrol).enabled = false;
+            ((Behaviour)_behaviorController).enabled = false;
             Invoke(_perception, "ResetPerception");
             _confirmationCount = 0;
             _lastConfirmedPerception = null;
@@ -78,7 +83,6 @@ namespace QuickDraw.Tests.PlayMode
         public void SceneContainsConfiguredIsolatedPerceptionContract()
         {
             Type stateType = RequireType(PerceptionStateTypeName);
-            Type reflexType = RequireType(ReflexTypeName);
             Transform eye = _npc.transform.Find("PerceptionEye");
             Transform facingMarker = _npc.transform.Find("FacingMarker");
             CharacterController npcBounds = _npc.GetComponent<CharacterController>();
@@ -117,7 +121,6 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(_perceptionType.GetEvent("StateChanged"), Is.Not.Null);
             Assert.That(_perceptionType.GetEvent("ThreatConfirmed"), Is.Not.Null);
             Assert.That(_perceptionType.GetMethod("OnDirectThreatDetected"), Is.Null);
-            Assert.That(_npc.GetComponent(reflexType), Is.Null, "Task 6 must not wire reflex execution.");
 
             string[] dependencies = _perceptionType
                 .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)

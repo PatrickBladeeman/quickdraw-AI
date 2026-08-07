@@ -1,60 +1,140 @@
+using System;
 using UnityEngine;
-using QuickDraw.Logging;
 
 namespace QuickDraw.AI.Reflex
 {
-    public class ReflexSelector : MonoBehaviour
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(CharacterController))]
+    public sealed class ReflexSelector : MonoBehaviour
     {
-        [Header("Params")]
-        [Range(0.7f, 0.95f)] public float handHeight = 0.85f;
-        [Range(0.10f, 0.40f)] public float stepBackMeters = 0.20f;
-        public Transform optionalLookTarget; // e.g., player's camera
+        public const string FlinchStepBackVariant = "Flinch_StepBack";
+        public const string ReflexCommandedEventName = "reflex_commanded";
 
-        // Hooks (Animator or rig weights) - optional for scaffold
-        public Animator animator;
-        public string handsUpTrigger = "HandsUp";
+        [Header("Stable Style")]
+        [SerializeField] private int styleSeed = 1001;
 
-        System.Random _rng;
-        string _npcId;
+        [Header("Flinch Step Back")]
+        [SerializeField, Range(0.1f, 0.6f)] private float stepBackDistance = 0.35f;
+        [SerializeField, Range(0f, 0.25f)] private float stepDistanceVariation = 0.05f;
+        [SerializeField, Range(0f, 30f)] private float maximumYawOffset = 30f;
 
-        void Awake()
+        private CharacterController _characterController;
+
+        public int CommandCount { get; private set; }
+        public int LastCommandedThreatEpisodeId { get; private set; }
+        public string LastCommandedVariant { get; private set; } = string.Empty;
+        public float LastConfirmedThreatTime { get; private set; } = -1f;
+        public float LastCommandTime { get; private set; } = -1f;
+        public float LastRequestedStepDistance { get; private set; }
+        public float LastAppliedStepDistance { get; private set; }
+        public float LastYawOffset { get; private set; }
+        public CollisionFlags LastCollisionFlags { get; private set; }
+
+        public event Action ReflexCommanded;
+
+        private void Awake()
         {
-            _npcId = gameObject.name;
-            _rng = new System.Random(_npcId.GetHashCode());
+            ResolveReferences();
         }
 
-        public void OnThreatEvent(ThreatEventType evt, float tEventReceived)
+        public bool TryCommandFlinchStepBack(int threatEpisodeId, float confirmedThreatTime)
         {
-            if (evt != ThreatEventType.GUN_AIMED_AT_ME) return;
+            ResolveReferences();
+            if (threatEpisodeId <= 0 ||
+                threatEpisodeId == LastCommandedThreatEpisodeId ||
+                _characterController == null ||
+                !_characterController.enabled)
+            {
+                return false;
+            }
 
-            // Param jitter (no artificial delay)
-            float hh = Mathf.Clamp01(handHeight + RandRange(-0.08f, 0.08f));
-            float sb = Mathf.Clamp(stepBackMeters + RandRange(-0.05f, 0.05f), 0.05f, 0.6f);
+            float yawOffset = Mathf.Lerp(
+                -maximumYawOffset,
+                maximumYawOffset,
+                Sample01(threatEpisodeId, 0xA511E9B3u));
+            float distanceOffset = Mathf.Lerp(
+                -stepDistanceVariation,
+                stepDistanceVariation,
+                Sample01(threatEpisodeId, 0x63D83595u));
+            float requestedDistance = Mathf.Clamp(
+                stepBackDistance + distanceOffset,
+                0.1f,
+                0.6f);
 
-            // "Animation start" happens immediately here (no blocking / no LLM)
-            float tAnimStart = Time.realtimeSinceStartup;
+            Vector3 horizontalForward = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (horizontalForward.sqrMagnitude <= Mathf.Epsilon)
+            {
+                horizontalForward = Vector3.forward;
+            }
 
-            // Optional: small step-back
-            transform.position += -transform.forward * sb;
+            horizontalForward.Normalize();
+            Vector3 flinchForward = Quaternion.AngleAxis(yawOffset, Vector3.up) * horizontalForward;
+            transform.rotation = Quaternion.LookRotation(flinchForward, Vector3.up);
 
-            // Optional: trigger animator
-            if (animator && !string.IsNullOrEmpty(handsUpTrigger))
-                animator.SetTrigger(handsUpTrigger);
+            Vector3 positionBeforeCommand = transform.position;
+            float commandTime = Time.realtimeSinceStartup;
+            CollisionFlags collisionFlags = _characterController.Move(
+                -flinchForward * requestedDistance);
+            float appliedDistance = Vector3.ProjectOnPlane(
+                transform.position - positionBeforeCommand,
+                Vector3.up).magnitude;
 
-            // Log latency + params
-            JsonlLogger.Instance?.Log(new {
-                t = "reflex_latency",
-                npcId = _npcId,
-                ts = tAnimStart,
-                lat_ms = Mathf.RoundToInt((tAnimStart - tEventReceived) * 1000f),
-                variant = "RaiseHands_High",
-                @params = new { hand_height = hh, stepback_m = sb }
-            });
+            LastCommandedThreatEpisodeId = threatEpisodeId;
+            LastCommandedVariant = FlinchStepBackVariant;
+            LastConfirmedThreatTime = confirmedThreatTime;
+            LastCommandTime = commandTime;
+            LastRequestedStepDistance = requestedDistance;
+            LastAppliedStepDistance = appliedDistance;
+            LastYawOffset = yawOffset;
+            LastCollisionFlags = collisionFlags;
+            CommandCount++;
+            ReflexCommanded?.Invoke();
+            return true;
         }
 
-        float RandRange(float a, float b)
+        [ContextMenu("Reset Reflex State")]
+        public void ResetReflex()
         {
-            return (float)(_rng.NextDouble() * (b - a) + a);
+            CommandCount = 0;
+            LastCommandedThreatEpisodeId = 0;
+            LastCommandedVariant = string.Empty;
+            LastConfirmedThreatTime = -1f;
+            LastCommandTime = -1f;
+            LastRequestedStepDistance = 0f;
+            LastAppliedStepDistance = 0f;
+            LastYawOffset = 0f;
+            LastCollisionFlags = CollisionFlags.None;
         }
+
+        private float Sample01(int threatEpisodeId, uint salt)
+        {
+            unchecked
+            {
+                uint value = (uint)styleSeed;
+                value ^= (uint)threatEpisodeId * 0x9E3779B9u;
+                value ^= salt;
+                value ^= value >> 16;
+                value *= 0x7FEB352Du;
+                value ^= value >> 15;
+                value *= 0x846CA68Bu;
+                value ^= value >> 16;
+                return (value & 0x00FFFFFFu) / 16777215f;
+            }
+        }
+
+        private void ResolveReferences()
+        {
+            if (_characterController == null)
+            {
+                _characterController = GetComponent<CharacterController>();
+            }
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            ResolveReferences();
+        }
+#endif
     }
 }

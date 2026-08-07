@@ -191,33 +191,76 @@ Acceptance:
 Verification:
 
 - Ten focused Play Mode tests verify scene wiring, frontal and peripheral perception, measured suspicion timing, 300-degree-per-second orientation, distance and total-FOV half-angle rejection, occlusion, release/recovery/rearm, renewed-aim tracking without duplicate confirmation, invalid-aim tracking rejection, held-aim one-shot behavior, real-frame scheduling, state-gizmo clearance, and runtime state colors on both NPC renderers.
-- The complete Play Mode suite passes twenty-two tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+- The complete Play Mode suite passes twenty-five tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
-## 7. Interrupt activity and command one reflex — next recommended task
+## 7. Interrupt activity and command one reflex — completed
 
 Goal: make confirmed threat visibly interrupt the ongoing activity exactly once.
+
+### 7A. One-shot activity interruption coordinator — completed
+
+Files:
+
+- `Assets/_Project/Code/AI/Behavior/NpcBehaviorController.cs`
+- `Assets/_Project/Editor/NpcBehaviorControllerEditor.cs`
+
+Steps:
+
+- [x] Subscribe to the threat-confirmed edge without adding an activity dependency to perception.
+- [x] Interrupt the current patrol activity synchronously.
+- [x] Record activity name, reason, real-time timestamp, threat episode ID, and suspended/cancelled outcome.
+- [x] Guard against duplicate delivery of the same confirmation.
+- [x] Expose a post-interruption event for the reflex step.
+- [x] Show the existing interruption count and metadata in a live, read-only custom Inspector.
+- [x] Leave resume and recovery policy explicit and unimplemented.
+
+Acceptance:
+
+- [x] Patrol motion stops on confirmed threat.
+- [x] A held threat or duplicate event causes one interruption.
+- [x] A later rearmed episode can interrupt a deliberately resumed activity again.
+- [x] Runtime interruption diagnostics are inspectable without making coordinator state editable or serialized.
+- [x] Task 7A itself introduces no reflex, logging, recovery, networking, file I/O, or LLM dependency.
+
+Verification:
+
+- Three focused Play Mode tests verify scene/API isolation, interruption metadata and motion stop, duplicate suppression, and a later rearmed episode.
+- The complete Play Mode suite passes twenty-five tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+### 7B. Command `Flinch_StepBack` — completed
 
 Files:
 
 - `Assets/_Project/Code/AI/Reflex/ReflexSelector.cs`
-- A small behavior coordinator or equivalent explicit state owner.
+- `Assets/_Project/Code/AI/Behavior/NpcBehaviorController.cs`
+- `Assets/_Project/Editor/ReflexSelectorEditor.cs`
+- `Assets/_Project/Scenes/Test_Arena.unity`
+- `Assets/_Project/Tests/PlayMode/ReflexSelectorAcceptanceTests.cs`
 
 Steps:
 
-- On the threat-confirmed edge, interrupt the current activity first.
-- Record activity, reason, timestamp, and suspended/cancelled outcome.
-- Implement `Flinch_StepBack` as the first placeholder reaction.
-- Use collision-conscious rotation/displacement where practical; label any raw transform delta as temporary.
-- Add a serialized stable style seed.
-- Guard against duplicate dispatch for the same episode.
-- Emit `reflex_commanded`; do not claim this is visible onset.
+- [x] Implement `Flinch_StepBack` as the first placeholder reaction.
+- [x] Use collision-conscious rotation and `CharacterController.Move` displacement.
+- [x] Add a serialized stable style seed and deterministic per-episode variation.
+- [x] Command the reflex only from the coordinator's post-interruption path.
+- [x] Guard against duplicate reflex dispatch for the same episode.
+- [x] Emit `reflex_commanded`; do not claim this is visible onset.
+- [x] Expose live command and collision diagnostics through a read-only custom Inspector.
 
 Acceptance:
 
-- Patrol or inspect motion stops before the reflex command.
-- The placeholder motion is obvious in the Game view.
-- A held threat causes one interruption and one reflex, not repeated steps.
-- No coroutine delay, file I/O, networking, or LLM call occurs before the command.
+- [x] The already-interrupted patrol remains stopped before the reflex command.
+- [x] The placeholder motion is obvious in the Game view.
+- [x] A held threat causes one interruption and one reflex, not repeated steps.
+- [x] A rearmed threat does not command another reflex unless activity was deliberately resumed and interrupted again.
+- [x] Arena walls constrain the step-back displacement.
+- [x] No coroutine delay, file I/O, networking, or LLM call occurs before the command.
+
+Verification:
+
+- Five focused `ReflexSelector` Play Mode tests verify the scene/API boundary, deterministic serialized style, interruption-before-command ordering, one-shot and paused-activity suppression, obvious displacement, and wall collision.
+- Three coordinator tests also verify duplicate suppression and a later resumed/rearmed episode issuing a second interruption and reflex.
+- The complete Play Mode suite passes thirty tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
 ## 8. Implement trustworthy structured telemetry
 
