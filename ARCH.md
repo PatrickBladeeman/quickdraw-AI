@@ -161,7 +161,7 @@ Purpose: own high-level state edges and sequencing.
 
 `NpcBehaviorControllerEditor` is an editor-only diagnostic surface for those existing properties. It preserves the normal serialized-reference controls, presents interruption count and metadata as read-only runtime values, and repaints during Play Mode without duplicating or serializing coordinator state.
 
-Suggested initial states:
+Historical recovery sketch (not implemented):
 
 ```text
 Activity
@@ -172,7 +172,7 @@ Activity
 → ResumeActivity or Idle
 ```
 
-This first implementation is a finite-state machine. A utility selector may later choose among a few recovery outcomes, but GOAP and behavior-tree frameworks are unnecessary.
+No recovery state machine is implemented, and the superseded automatic-recovery task must not be added to `Test_Arena`. The current coordinator remains narrowly responsible for one-shot interruption and reflex sequencing.
 
 ### `ReflexSelector`
 
@@ -395,7 +395,7 @@ Primary network:
 → branch Q_i = V + A_i - mean(A_i)
 ```
 
-Use Double-DQN online action selection and target-network evaluation, replay capacity 100,000, replay warmup 10,000 decisions, batch 64, `gamma=0.99`, Adam `1e-4`, Huber loss averaged over selected branch values, update every four decisions, hard target synchronization every 10,000 optimizer updates, and epsilon decay `1.0 → 0.1`. Final evaluation is greedy.
+Use Double-DQN online action selection and target-network evaluation, replay capacity 100,000, replay warmup 10,000 decisions, batch 64, `gamma=0.99`, Adam `1e-4`, Huber loss averaged over selected branch values, update every four decisions, hard target synchronization every 10,000 optimizer updates, and epsilon decay `1.0 → 0.1`, followed by a `0.05` evaluation floor only during exploratory validation. Final evaluation is greedy.
 
 Train five independent policy seeds. Each seed has its own configuration, learning curves, checkpoint lineage, export-parity test, and SHA-256. The same final strategic checkpoint for a seed is loaded into all factorial conditions for that seed.
 
@@ -616,7 +616,7 @@ Assets/_Project/
         NpcBehaviorController.cs
       Reflex/
         ReflexSelector.cs
-        VisibleMotionObserver.cs         (possible)
+        VisibleMotionObserver.cs
     Logging/
       JsonlLogger.cs
       LogEvents.cs

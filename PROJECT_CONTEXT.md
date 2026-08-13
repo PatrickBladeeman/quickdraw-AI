@@ -59,7 +59,7 @@ Implemented and previously verified:
 - Typed buffered JSONL telemetry, stage summaries, failure containment, and Domain-Reload-safe lifecycle.
 - Forty-one Play Mode tests covering Tasks 1–8.
 
-The latest commit is Task 7B. Task 8 code, tests, scene wiring, and documentation exist in the working tree but remain uncommitted. Task 8 must be reverified and committed independently before adding packages or research gameplay.
+Task 8 is committed and pushed as two consecutive Task 8-only commits: `ac1274e` (`task 8 : Logging and telemetry`) and `b5532e1` (`task 8 continued`). `main`, `origin/main`, and `origin/HEAD` resolve to `b5532e1`. The checkpoint passed all 41 Play Mode tests and a Windows standalone build in Unity `6000.0.57f1` and contains no ML-Agents/research-gameplay/combat/LLM integration. Research Task R0 is complete.
 
 Not implemented:
 
@@ -136,7 +136,7 @@ Training defaults:
 - replay capacity 100,000 and 10,000-decision warmup;
 - batch 64, `gamma=0.99`, Adam `1e-4`, and Huber loss;
 - update every four decisions and hard target synchronization every 10,000 optimizer updates;
-- epsilon from `1.0` to `0.1`; final evaluation is greedy;
+- epsilon from `1.0` to `0.1`, followed by a `0.05` evaluation floor only during exploratory validation; final evaluation is greedy;
 - five independent training seeds, each with checkpoints, curves, manifests, and hashes.
 
 One strategic checkpoint per training seed is reused unchanged across runtime ablations. Training randomizes reflex availability and uses a deterministic teacher to provide every strategic goal. Potential-based goal shaping may guide attack, cover, health, or ammunition behavior without replacing shared terminal and damage rewards. Live LLM calls are excluded from policy training.
@@ -174,7 +174,7 @@ Raw JSONL, CSV, checkpoints, and model outputs live under an ignored project-loc
 
 ### Ordered next work and non-goals
 
-The next task is Research Task R0: re-run all 41 Play Mode tests and the Windows build, resolve only Task 8 regressions, commit Task 8 independently, verify local `CONTEXT.md` remains ignored, and only then add ML infrastructure.
+The next phase is Research Task R1: establish the version-locked Unity/Python boundary, immutable environment contracts, seed and manifest conventions, ignored experiment-artifact boundary, and deterministic backend smoke gate. Before editing, decompose R1 into a separately approved smallest safe next task. The recommended first subtask is contract-and-dependency preflight for Unity ML-Agents `4.0.0` and the matching Python 3.10.12 environment; it must not add research gameplay, combat, BDQ training, or LLM runtime code.
 
 Current non-goals are survival/extraction systems, crafting or loot economies, multiplayer/networking, production art, procedural worlds, group AI, speech/TTS, unrestricted conversation, LLM training/fine-tuning, LLM frame-level control, hybrid-only privileged mechanics, tactical masks for legal actions, unobserved visible-latency claims, and post-hoc changes to registered thresholds without an exploratory label.
 

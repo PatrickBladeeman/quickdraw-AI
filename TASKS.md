@@ -335,26 +335,26 @@ Verification:
 
 The former Tasks 9–13—a tactical-recovery FSM, completion of the old local slice, reaction-family variation, its original experiment harness, and optional dialogue/memory enrichment—were not implemented. They are superseded by the approved hierarchical deep-RL research program below. Tasks 1–8 and their verification remain valid and must be preserved.
 
-## R0. Checkpoint the deterministic substrate
+## R0. Checkpoint the deterministic substrate — completed
 
 Goal: establish a clean, independently reproducible Task 8 baseline before any research package, scene, combat, model, or LLM change.
 
 Steps:
 
-- Re-run the complete 41-test Unity Play Mode suite against the current working tree.
-- Run the Windows standalone build in Unity `6000.0.57f1`.
-- Investigate and resolve only failures attributable to the existing Task 8 implementation.
-- Confirm `reflex_commanded` and `visible_motion_started` remain distinct and that telemetry file I/O remains outside urgent event handlers.
-- Confirm `CONTEXT.md` is ignored and `PROJECT_CONTEXT.md` contains the synchronized public research context.
-- Review the working tree and commit Task 8 code, tests, scene wiring, `.meta` files, and tracked documentation as one isolated checkpoint without adding research dependencies.
+- [x] Re-run the complete 41-test Unity Play Mode suite against the current working tree.
+- [x] Run the Windows standalone build in Unity `6000.0.57f1`.
+- [x] Investigate and resolve only failures attributable to the existing Task 8 implementation.
+- [x] Confirm `reflex_commanded` and `visible_motion_started` remain distinct and that telemetry file I/O remains outside urgent event handlers.
+- [x] Confirm `CONTEXT.md` is ignored and `PROJECT_CONTEXT.md` contains the synchronized public research context.
+- [x] Review the working tree and push Task 8 code, tests, scene wiring, and `.meta` files as an isolated Task 8 checkpoint series without adding research dependencies. The implementation is split across consecutive commits `ac1274e` and `b5532e1`.
 
 Acceptance:
 
-- All 41 Play Mode tests pass from the checkpoint candidate.
-- The standalone Windows player builds successfully.
-- Task 8 telemetry remains populated, ordered, buffered, failure-tolerant, and Domain-Reload safe.
-- The latest commit after the checkpoint contains no ML-Agents, training environment, combat mechanic, or LLM integration.
-- The old tactical-recovery task remains unimplemented and is no longer the next task.
+- [x] All 41 Play Mode tests pass from the checkpoint candidate.
+- [x] The standalone Windows player builds successfully.
+- [x] Task 8 telemetry remains populated, ordered, buffered, failure-tolerant, and Domain-Reload safe.
+- [x] The latest commit after the checkpoint contains no ML-Agents, training environment, combat mechanic, or LLM integration.
+- [x] The old tactical-recovery task remains unimplemented and is no longer the next task.
 
 ## R1. Establish research contracts and reproducible ML infrastructure
 
@@ -431,7 +431,7 @@ Registered defaults:
 - Adam learning rate `1e-4`;
 - optimizer update every four decisions;
 - hard target synchronization every 10,000 optimizer updates;
-- epsilon decay from `1.0` to `0.1`; final evaluation is greedy;
+- epsilon decay from `1.0` to `0.1`, followed by a `0.05` evaluation floor only during exploratory validation; final evaluation is greedy;
 - five independent policy-training seeds.
 
 Controls and diagnostics:

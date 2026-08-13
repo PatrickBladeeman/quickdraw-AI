@@ -36,6 +36,7 @@ sysinfo.txt
 # Local AI/session memory
 CONTEXT.md
 QUICKDRAW_SESSION_HANDOFF.md
+SESSION HANDOFF.md
 
 # Asset store cache
 /Assets/AssetStoreTools*
