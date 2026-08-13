@@ -9,7 +9,7 @@ The current objective is a small FPS AI behavior laboratory, not a survival or e
 ## Ground rules
 
 - Keep gameplay implementation under `Assets/_Project/**` unless a task explicitly requires package or ProjectSettings changes.
-- Do not add inventory, weapons, shooting, damage, survival mechanics, networking, or LLM integration during the local vertical slice.
+- Preserve the existing `Test_Arena` deterministic fixture without adding inventory, weapons, shooting, damage, survival mechanics, networking, or LLM dependencies to that fixture. Named research scenes may add only the combat and model-integration mechanics explicitly required below.
 - Do not place disk I/O, networking, waits, or serialization in the reflex dispatch path.
 - Use `Time.realtimeSinceStartup` for pipeline event timestamps.
 - Treat documented FOV values as total cone widths and compare against their half-angles.
@@ -262,100 +262,361 @@ Verification:
 - Three coordinator tests also verify duplicate suppression and a later resumed/rearmed episode issuing a second interruption and reflex.
 - The complete Play Mode suite passes thirty tests, and a Windows standalone player build succeeds in Unity `6000.0.57f1`.
 
-## 8. Implement trustworthy structured telemetry
+## 8. Implement trustworthy structured telemetry — completed
 
 Goal: measure the complete interaction pipeline, including actual visible onset.
 
+### 8A. Observe actual visible onset — completed
+
 Files:
 
+- `Assets/_Project/Code/AI/Reflex/VisibleMotionObserver.cs`
+- `Assets/_Project/Code/AI/Reflex/ReflexSelector.cs`
+- `Assets/_Project/Editor/VisibleMotionObserverEditor.cs`
+- `Assets/_Project/Scenes/Test_Arena.unity`
+- `Assets/_Project/Tests/PlayMode/VisibleMotionObserverAcceptanceTests.cs`
+
+Steps:
+
+- [x] Capture the root position and rotation immediately before the reflex command changes them.
+- [x] Arm observation from `reflex_commanded` without treating command dispatch as visible onset.
+- [x] Detect the first root displacement of at least `0.01 m` or rotation of at least `1°` in `LateUpdate`.
+- [x] Emit one `visible_motion_started` edge per threat episode with command-to-visible and confirmation-to-visible timings.
+- [x] Expose live read-only onset diagnostics without adding logging or file I/O to the observer.
+
+Acceptance:
+
+- [x] `reflex_commanded` and `visible_motion_started` are separate one-shot events.
+- [x] Sub-threshold changes do not count as visible motion.
+- [x] Position-only and rotation-only placeholder motion can be observed.
+- [x] Confirmed-threat → visible-motion latency is calculated from the observed edge.
+
+Verification:
+
+- Five focused Play Mode tests verify scene/API isolation, command/onset separation, threshold behavior, rotation-only observation, duplicate suppression, and later episodes.
+- Before Task 8B, the complete Play Mode suite passed thirty-five tests.
+
+### 8B. Record buffered typed JSONL telemetry — completed
+
+Files:
+
+- `Assets/_Project/Code/Logging/LogEvents.cs`
 - `Assets/_Project/Code/Logging/JsonlLogger.cs`
-- Explicit log DTOs or equivalent event records.
-- A visible-onset observer associated with the placeholder reaction.
+- `Assets/_Project/Code/Logging/TelemetryRecorder.cs`
+- `Assets/_Project/Editor/JsonlLoggerEditor.cs`
+- `Assets/_Project/Scenes/Test_Arena.unity`
+- `Assets/_Project/Tests/PlayMode/StructuredTelemetryAcceptanceTests.cs`
 
 Steps:
 
-- Replace anonymous-object `JsonUtility` calls with explicit DTOs, Newtonsoft JSON, or a custom writer.
-- Queue events in memory and flush outside urgent dispatch.
-- Reset singleton/static state safely with Domain Reload off.
-- Emit stimulus, notice, suspicion threshold, turn, confirmation, interruption, reflex command, visible onset, recovery, and resume events.
-- Detect visible onset from a measured transform, bone, rig, or Animator signal.
-- Calculate stage-specific descriptive statistics.
+- [x] Replace anonymous-object `JsonUtility` calls with explicit Newtonsoft-serialized event records.
+- [x] Queue typed records in memory, then serialize and flush outside urgent dispatch.
+- [x] Reset singleton/static state safely with Domain Reload off and use a session-unique JSONL path.
+- [x] Observe stimulus, notice, suspicion threshold, turn, confirmation, interruption, reflex command, visible onset, threat release, and actual activity lifecycle edges.
+- [x] Keep logging out of AI component dependencies; a scene-wired recorder owns event translation.
+- [x] Calculate min, max, mean, p50, p95, and standard deviation for every sampled stage.
+- [x] Contain serialization and disk-write failures without changing NPC behavior.
 
 Acceptance:
 
-- JSONL records contain their intended fields rather than `{}`.
-- `reflex_commanded` and `visible_motion_started` are separate events.
-- Confirmed-threat → visible-motion latency is calculated from observed events.
-- Logging failure cannot block or break NPC behavior.
+- [x] JSONL records contain their intended fields rather than `{}`.
+- [x] Event dispatch only enqueues typed records; serialization and file I/O occur later.
+- [x] Command-to-visible and confirmed-threat-to-visible remain distinct latency samples.
+- [x] A forced flush failure leaves buffered data available and does not block activity interruption or resume.
+- [x] Task 8 records real threat-release and manual activity-resume edges without fabricating the Task 9 tactical recovery policy.
 
-## 9. Add simple tactical recovery
+Verification:
 
-Goal: complete the local interaction loop after the reflex.
+- Six focused Play Mode tests verify the telemetry contract, populated valid JSON, deferred flushing, ordered end-to-end recording, descriptive statistics, Domain Reload safety, and write-failure containment.
+- The complete Play Mode suite passes forty-one tests.
+- A Windows standalone player build succeeds in Unity `6000.0.57f1`.
+
+## Superseded future tasks
+
+The former Tasks 9–13—a tactical-recovery FSM, completion of the old local slice, reaction-family variation, its original experiment harness, and optional dialogue/memory enrichment—were not implemented. They are superseded by the approved hierarchical deep-RL research program below. Tasks 1–8 and their verification remain valid and must be preserved.
+
+## R0. Checkpoint the deterministic substrate
+
+Goal: establish a clean, independently reproducible Task 8 baseline before any research package, scene, combat, model, or LLM change.
 
 Steps:
 
-- Use a finite-state machine for `RemainThreatened`, one follow-up such as `Comply` or `FleeToMarker`, `Recover`, and `ResumeActivity`.
-- Keep the NPC threatened while the aiming stimulus remains active.
-- Define a stable threat-release and recovery delay condition.
-- Resume or abandon the interrupted activity deliberately; do not restart it every frame.
-- Emit state-change and resume/cancel events.
+- Re-run the complete 41-test Unity Play Mode suite against the current working tree.
+- Run the Windows standalone build in Unity `6000.0.57f1`.
+- Investigate and resolve only failures attributable to the existing Task 8 implementation.
+- Confirm `reflex_commanded` and `visible_motion_started` remain distinct and that telemetry file I/O remains outside urgent event handlers.
+- Confirm `CONTEXT.md` is ignored and `PROJECT_CONTEXT.md` contains the synchronized public research context.
+- Review the working tree and commit Task 8 code, tests, scene wiring, `.meta` files, and tracked documentation as one isolated checkpoint without adding research dependencies.
 
 Acceptance:
 
-- The NPC does not resume while the player remains aimed at it.
-- Releasing the threat leads to one deterministic recovery outcome.
-- The activity resumes or remains cancelled according to explicit state.
+- All 41 Play Mode tests pass from the checkpoint candidate.
+- The standalone Windows player builds successfully.
+- Task 8 telemetry remains populated, ordered, buffered, failure-tolerant, and Domain-Reload safe.
+- The latest commit after the checkpoint contains no ML-Agents, training environment, combat mechanic, or LLM integration.
+- The old tactical-recovery task remains unimplemented and is no longer the next task.
 
-## 10. Validate the first local vertical slice
+## R1. Establish research contracts and reproducible ML infrastructure
 
-Run repeatable manual scenarios:
+Goal: create a version-locked Unity/Python boundary and prove deterministic environment communication before implementing the full learned task.
 
-1. Direct frontal threat.
-2. Peripheral notice and orientation.
-3. Occluded player with no visual response.
-4. Patrol or inspect activity interrupted once.
-5. Threat release followed by recovery or resume.
+Steps:
 
-Collect at least 20–30 confirmed-threat trials after visible-onset telemetry is trustworthy.
+- Add `com.unity.ml-agents` version `4.0.0`, compatible with Unity 6, and track the package-lock change.
+- Create a Python 3.10.12 environment specification with matching `mlagents`/`mlagents-envs`, PyTorch, numerical, plotting, and test dependencies pinned.
+- Record package versions, operating system, Unity version, Python version, CPU/GPU, driver, and trainer-plugin version in a machine-readable run manifest.
+- Define stable episode, policy-training, opponent, and evaluation seeds. Never derive seeds from runtime object names or unstable hashes.
+- Define immutable observation, action, reward, terminal, truncation, and side-channel contracts.
+- Add a trainer/backend smoke environment before adding combat complexity.
+- Run a deterministic 10,000-step CPU reference trace and throughput measurement.
+- Test an available supported AMD backend against the same trace. Accept it only if observations, actions, seeded returns, checkpoint reload, and exported inference agree within documented floating-point tolerance and measured steps per second improve; otherwise retain CPU.
+- Create an ignored project-local experiment-artifact root for raw JSONL, CSV, checkpoints, model files, and run manifests. Track schemas, scripts, and configurations, not large generated artifacts.
 
 Acceptance:
 
-- Confirmed-threat → visible-motion p50 is under 150 ms and p95 is under 250 ms.
-- Peripheral suspicion and orientation are reported separately.
-- Profiler inspection shows reflex selection/command is substantially under 1 ms and performs no file I/O or network work.
-- Resetting the scenario produces comparable starting conditions.
+- A fresh documented Python environment connects to an Editor or standalone Unity environment and completes seeded reset/step/terminal cycles.
+- Repeating the same smoke seed produces the same initial observation, action legality, reward sequence, and terminal reason.
+- Package and environment versions are pinned rather than inferred from a developer machine.
+- Backend selection is recorded as a measured decision, with CPU remaining the reference.
+- No learned model or LLM claim is made in this infrastructure task.
 
-## 11. Reaction variation
+## R2. Implement the Unity Basic visual-control benchmark
 
-Only after the local vertical slice passes:
+Goal: create a small Unity hitscan analogue of the ViZDoom Basic Scenario that can validate visual Q-learning before strategic or LLM complexity.
 
-- Add `RaiseHands_High` when a suitable animation or rig exists.
-- Add cooldown and no-repeat behavior across reaction families.
-- Add stable per-NPC personality values or profile assets.
-- Add environment constraints such as walls behind the NPC.
-- Demonstrate divergence between two NPCs.
+Scene and mechanics:
 
-## 12. Experiment harness and evaluation
+- Create a separate primitive-geometry research scene with a long narrow floor and enclosing walls.
+- Spawn the capsule agent at the south end and one target at a seeded random lateral position near the north end.
+- Give the agent one egocentric `84×84` grayscale camera observation with four-frame stacking.
+- Use two concurrent discrete branches:
+  - movement `[Stay, Left, Right]`;
+  - combat `[Idle, Shoot]`.
+- Use a fixed forward crosshair and one identical hitscan implementation. The learned policy moves laterally to align and never controls a mouse or privileged target snap in this benchmark.
+- End the episode on a target hit or after 300 policy decisions.
+- Apply reward `+1` for a hit, `-0.01` per decision, and `-0.02` for a missed shot.
+- Reset agent transform, target position, ammunition, cooldowns, frame stack, counters, telemetry, and random state deterministically.
+- Add random and scripted heuristic policies through the exact same action and actuator interfaces.
 
-After behavior is stable:
+Acceptance:
 
-- Add named scenario presets and repeatable resets.
-- Export stage-specific summaries and plots.
-- Compare direct, peripheral, and occluded conditions.
-- Record standalone Windows-build results in addition to Editor measurements.
-- Add an optional 30 FPS versus 60 FPS comparison or small user study only if time permits.
+- Observation shape, grayscale encoding, frame order, and stacking reset are stable and testable.
+- Every one of the six joint action tuples produces the documented mechanical result.
+- Fixed-seed target sequences and episode results repeat across resets and standalone runs.
+- Invalid states, including a stale frame stack or an episode that continues after a hit, have focused tests.
+- Random and scripted baselines export the same episode schema expected from learned policies.
 
-## 13. Later optional work
+## R3. Implement and validate Branching Double DQN
 
-Prioritize structured memory before live generative features:
+Goal: train a visual branched Q-policy with reproducible checkpoints and demonstrate that learning succeeds on Unity Basic.
 
-- threat/spared counts, trust, and fear;
-- future local bias changes;
-- cached asynchronous bark generation;
-- structured encounter summaries;
-- optional slow tactical weight nudges.
+Trainer and network:
 
-An LLM worker must remain optional, asynchronous, and irrelevant to the current reflex latency distribution.
+- Implement BDQ as a pinned custom ML-Agents off-policy trainer plugin; do not describe the built-in PPO/SAC trainers as DQN.
+- Use four stacked `84×84` grayscale frames.
+- Shared encoder:
+  - 32 filters, `8×8`, stride 4;
+  - 64 filters, `4×4`, stride 2;
+  - 64 filters, `3×3`, stride 1;
+  - 512-unit shared representation.
+- Use a scalar dueling value head and one mean-centered advantage head per action branch.
+- Use Double-DQN online selection and target-network evaluation, replay memory, epsilon-greedy collection, averaged branch Huber loss, gradient clipping if needed and documented, checkpointing, resume, and inference export.
+
+Registered defaults:
+
+- replay capacity 100,000;
+- replay warmup 10,000 decisions;
+- batch size 64;
+- `gamma = 0.99`;
+- Adam learning rate `1e-4`;
+- optimizer update every four decisions;
+- hard target synchronization every 10,000 optimizer updates;
+- epsilon decay from `1.0` to `0.1`; final evaluation is greedy;
+- five independent policy-training seeds.
+
+Controls and diagnostics:
+
+- Implement a joint-action Double DQN head for the Basic benchmark's six action tuples as a sanity comparison, not the primary final architecture.
+- Record training return, success rate, learning-curve area, Huber loss, mean absolute TD error, epsilon, replay size, Q-value summaries, environment steps per second, inference time, checkpoint hash, and configuration hash.
+- Unit-test branch-to-action mapping, Double-DQN target construction, terminal masking, replay sampling, target synchronization, checkpoint restore, and exported inference parity.
+
+Acceptance:
+
+- At least four of five BDQ training seeds reach at least 90% success over 500 held-out target-placement seeds.
+- Each passing seed exceeds random-policy success by at least 30 percentage points.
+- The BDQ-versus-joint-action result is reported even if BDQ performs worse; do not hide branch-factorization limitations.
+- Every reported model is traceable to a seed, configuration, training curve, checkpoint, and hash.
+
+## R4. Implement the strategic combat benchmark and goal-conditioned policy
+
+Goal: create a controlled combat decision problem with enough resource and positioning tradeoffs for reflex and strategic-director evaluation.
+
+Shared mechanics:
+
+- Use three concurrent action branches:
+  - movement `[Stay, Forward, Backward, Left, Right]`;
+  - combat `[Idle, Shoot]`;
+  - utility `[Idle, Reload, Interact]`.
+- Use 100 health, 20 hitscan damage, a six-round magazine, 18 reserve rounds, a 0.25-second shot cooldown, a 1.5-second reload, and a 30-second episode timeout.
+- Add named cover, health/ammunition pickups, collision-aware movement, line of sight, and a bounded interaction radius.
+- Add one seeded scripted opponent with deterministic spawn, movement, target selection, aim, fire schedule, and difficulty parameters.
+- Emit a structured imminent-shot telegraph exactly 400 ms before each opponent shot.
+- When `Shoot` is selected, use the same hardcoded nearest-visible-legal-target resolver, one-frame look-at/snap, and hitscan test in every research condition.
+- Make mechanically impossible actions maskable; do not mask physically legal actions merely because they conflict with a strategy.
+
+Goal conditioning:
+
+- Add categorical goals `BALANCED`, `OFFENSIVE_RUSH`, `DEFENSIVE_RETREAT`, `SEEK_HEALTH`, and `CONSERVE_AMMO` at the BDQ shared representation.
+- Use a deterministic teacher during training so every goal receives balanced scenario coverage.
+- Use documented potential-based shaping for progress toward the active enemy, cover, health, or ammunition goal without replacing shared terminal and damage rewards.
+- Randomize reflex availability during strategic training so one checkpoint per policy seed can be used unchanged across runtime ablations.
+- Never use a live LLM during policy training.
+
+Acceptance:
+
+- All branches and goal categories have stable enum/index contracts and inference/export tests.
+- Every condition uses identical visual input, goal encoding, action tuple, mechanics, and policy checkpoint for a given training seed.
+- The scripted opponent and all environment randomization repeat from the scenario seed.
+- Episode outcome, damage, shots, reloads, pickups, survival, directive occupancy, and terminal reason are recorded independently from training reward.
+- A rule or scripted curriculum can demonstrate every goal-specific behavior before LLM integration.
+
+## R5. Add and isolate the deterministic evade reflex
+
+Goal: test whether a narrowly bounded urgent layer improves survival without depending on BDQ or LLM timing.
+
+Steps:
+
+- Implement `EvadeTelegraphedShot` as one collision-safe `0.6 m` lateral step with a one-second cooldown.
+- Trigger only from the structured 400 ms imminent-shot event.
+- Choose direction and clearance deterministically from shared actuator/physics data.
+- Preempt only the movement portion of the currently held action tuple; do not change combat, utility, strategic goal, reward, or model state.
+- Return movement control to the most recent BDQ intent after the bounded evade completes.
+- Perform no wait, serialization, file I/O, network call, model inference, or LLM request before command dispatch.
+- Record telegraph, reflex decision, command, requested/applied displacement, collision, visible onset, damage avoided, preemption duration, cooldown suppression, and control return.
+
+Acceptance:
+
+- Reflex-disabled and reflex-enabled conditions share all non-reflex code and configuration.
+- A duplicate telegraph cannot cause duplicate evades.
+- Walls constrain displacement and cannot be crossed by root teleportation.
+- The reflex cannot aim or fire and receives no information unavailable to the shared actuator.
+- Focused delay-injection tests demonstrate that LLM completion timing cannot enter the reflex call graph.
+
+## R6. Scaffold the asynchronous local LLM strategic director
+
+Goal: integrate a reproducible local model as a slow bounded goal selector without allowing it to control mechanics or urgent timing.
+
+Runtime and model:
+
+- Define a provider-neutral local HTTP interface and deterministic mock implementation.
+- Use quantized Qwen3-8B in non-thinking/instruction mode through a pinned `llama.cpp` server, preferring a validated Vulkan backend on the AMD GPU.
+- Record the exact server version/commit, model source, quantization, SHA-256, context, prompt template, schema, generation parameters, and hardware.
+- Do not commit model weights.
+
+State and output:
+
+- Capture an immutable state snapshot every two seconds containing quantized health/ammunition; visible-enemy count, distance, and health categories; cover/pickup availability and distance categories; current directive; episode ID; sequence; and timestamp.
+- Never send raw frames or continuous matrices to the LLM.
+- Require schema-constrained JSON fields `strategic_intent`, `priority_target`, and `engagement_rule`.
+- Accept only coherent templates for `BALANCED`, `OFFENSIVE_RUSH`, `DEFENSIVE_RETREAT`, `SEEK_HEALTH`, and `CONSERVE_AMMO`.
+- Convert a valid template to the fixed categorical goal input. Never convert text directly into movement, aiming, shooting, reload, interaction, reward changes, or tactical action masks.
+
+Concurrency and failure rules:
+
+- Capture Unity state on the main thread.
+- Perform HTTP, generation waiting, and parsing asynchronously without touching Unity objects.
+- Publish results through a thread-safe queue and apply them on the main thread.
+- Use a two-second request cadence, five-second timeout, four-second result TTL, monotonic sequence IDs, temperature zero, a recorded seed, and a small JSON-only output limit.
+- Discard malformed, incoherent, stale, timed-out, and out-of-order results.
+- Retain the latest valid directive; use `BALANCED` when no valid directive exists.
+- Mock fixed responses, invalid JSON, connection loss, timeouts, out-of-order completions, and delays of `0`, `500`, `1000`, `2000`, and `3000 ms`.
+
+Acceptance:
+
+- Automated failures never pause physics, BDQ decisions, the shared actuator, or the reflex.
+- Background work never accesses Unity objects.
+- Every request/result transition and fallback is observable in telemetry.
+- The same snapshot and pinned deterministic settings produce an auditable recorded output, while reproducibility claims acknowledge that model execution may not be bitwise identical across backends.
+- Live-model effectiveness is not claimed until R7.
+
+## R7. Run the registered factorial evaluation
+
+Goal: measure causal contributions, timing isolation, and uncertainty with paired conditions.
+
+Main 2×2 conditions:
+
+1. BDQ with fixed `BALANCED` goal and reflex off.
+2. BDQ + reflex with fixed `BALANCED` goal.
+3. BDQ + LLM with reflex off.
+4. BDQ + reflex + LLM.
+
+Secondary controls:
+
+- BDQ + deterministic rule director, reflex off.
+- BDQ + deterministic rule director + reflex.
+- The rule director receives the exact same abstract snapshot and emits the exact same directive schema as the LLM.
+
+Run protocol:
+
+- Evaluate each of five independently trained policy seeds on the same 100 held-out scenario seeds in every condition: 500 paired episodes per condition.
+- Use the identical checkpoint for all conditions associated with a policy seed.
+- Use greedy evaluation with no weight, replay, epsilon, reward, or optimizer updates.
+- Predeclare exclusions for corrupted/incomplete runs based only on infrastructure validity, not performance.
+- Use a 10,000-resample hierarchical bootstrap that resamples policy seed and then paired scenario seed.
+
+Primary outcome:
+
+```text
+U = episode_outcome
+  + 0.25 * (damage_dealt - damage_taken) / 100
+  - 0.05 * missed_shot_fraction
+  - 0.05 * wasted_resource_fraction
+```
+
+`episode_outcome` is `+1` for opponent elimination, `-1` for agent death, and `0` for timeout. Always report its components separately.
+
+Registered decision criteria:
+
+- H1: full hybrid minus BDQ-only utility is at least `0.10`, with paired 95% confidence interval above zero.
+- H2: reflex conditions reduce damage per telegraphed shot, with paired 95% confidence interval below zero.
+- H3: full-hybrid telegraph-to-visible-evade p95 is at most `50 ms` and no more than one `20 ms` physics step slower than BDQ+reflex at every injected LLM delay tier; use at least 200 reflex events per tier.
+- H4: LLM factorial main effect is positive. A strong LLM claim additionally requires at least `0.05` utility improvement over the same-information rule director with paired 95% confidence interval above zero.
+
+Required output:
+
+- paired effect sizes, 95% confidence intervals, reflex/LLM main effects, interaction, and rule-director comparison;
+- training and sample-efficiency metrics;
+- utility and every raw combat component;
+- BDQ inference, frame, fixed-step, reflex-command, visible-onset, and deadline metrics;
+- LLM generation, validity, discard, timeout, fallback, and directive metrics;
+- run, model, scene, configuration, seed, package, and hardware manifests.
+
+Acceptance:
+
+- All conditions pass the fairness and seed-pairing audit before analysis.
+- No threshold or primary outcome is changed after viewing final results.
+- Negative/null results and failed hypotheses are reported explicitly.
+- If the LLM fails to beat the rule director, the report does not attribute a unique benefit to the LLM.
+
+## R8. Curate the reproducible research artifact
+
+Goal: make the experiment inspectable, rerunnable, and honest without committing large generated files.
+
+Steps:
+
+- Track environment/trainer/model-server configurations, dependency locks, schemas, analysis scripts, plotting code, curated aggregate tables, figures, checksums, and a limitations document.
+- Keep raw JSONL/CSV, checkpoints, model weights, caches, and generated plots under the ignored artifact root until selected aggregates are curated.
+- Document exact commands for environment creation, training, checkpoint evaluation, local-model launch, factorial runs, analysis, and figure regeneration.
+- State which hypotheses were supported, rejected, or inconclusive and distinguish confirmatory from exploratory analysis.
+- Report branch-factorization limitations, reward-shaping sensitivity, privileged scripted mechanics, model/backend reproducibility limits, and external validity beyond the two research scenes.
+- Do not add a participant study to this prototype.
+
+Acceptance:
+
+- A fresh checkout can reconstruct the software environments and run smoke tests without untracked private instructions.
+- Every published number and plot traces to a run manifest and analysis command.
+- Model and dataset licenses permit the public research artifact.
+- The public README remains a short project introduction; internal execution instructions stay in context, architecture, and task documents.
 
 ## Commit hygiene
 

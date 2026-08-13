@@ -18,16 +18,177 @@ When synchronized public information differs, `CONTEXT.md` controls and both doc
 - `Flinch_StepBack` is the first measurable placeholder; `RaiseHands_High` comes later.
 - Stable serialized seeds replace runtime name hashing.
 - Command dispatch and observed visible motion are separate latency events.
-- The first recovery controller is a finite-state machine.
-- LLM, TTS, memory enrichment, GOAP, and broader tactics are deferred until the local loop is functional and measured.
+- The originally proposed first recovery controller was a finite-state machine; that unfinished task is now superseded by the approved research pivot.
+- The earlier handoff deferred reinforcement learning and LLM work until the local loop was functional and measured. Tasks 1–8 supplied that deterministic substrate, so the controlling research program below now authorizes bounded deep-RL and local-LLM work.
 
-## Mission
+## Current approved research program
+
+This section is the controlling public project scope. It supersedes the older deterministic-slice summary and historical plans below wherever they conflict. The deterministic work remains an implemented regression fixture, but the active research target is now a hierarchical FPS agent combining deterministic control, deep reinforcement learning, and an asynchronous local LLM.
+
+### Mission and terminology
+
+Build and evaluate a reproducible Unity FPS agent with four explicitly separated timescales:
+
+1. A shared deterministic actuator executes movement, aiming, shooting, reload, and interaction at the 50 Hz physics rate.
+2. An optional event-driven reflex may preempt movement by the next physics step for a confirmed imminent threat.
+3. A visual goal-conditioned Branching Double Deep Q-Network selects tactical intents every five physics steps, or 10 Hz.
+4. An optional local LLM evaluates a compact strategic snapshot asynchronously every two seconds, or 0.5 Hz.
+
+DQN and BDQ are deep reinforcement learning, not traditional machine learning. The accurate research framing is deterministic control + deep reinforcement learning + local LLM.
+
+### Scope resolutions
+
+- Tasks 1–8 are preserved as the completed deterministic control-and-measurement substrate.
+- `Test_Arena` remains the regression fixture for player control, patrol, soft perception, one-shot interruption, `Flinch_StepBack`, visible-onset measurement, and typed telemetry.
+- The old Task 9 tactical-recovery FSM is superseded before implementation and is not complete.
+- Shooting, damage, health, ammunition, reload, cover, pickups, and interaction are now in scope only for named research environments.
+- The first learned task is a Unity hitscan analogue inspired by ViZDoom Basic, not a claim to reproduce ViZDoom's published numeric results.
+- Mechanical aim is a controlled variable implemented by one identical hardcoded actuator for all conditions.
+- The primary learned policy is Branching Double DQN. A joint-action Double DQN sanity baseline tests BDQ's branch-factorization assumption on the six-action Basic task.
+- The main evaluation is a 2×2 reflex-by-LLM factorial. Deterministic rule-director controls receive the same abstract strategic state as the LLM.
+- The local-model default is quantized Qwen3-8B through a version-pinned `llama.cpp` server.
+
+### Honest current state
+
+Implemented and previously verified:
+
+- Unity `6000.0.57f1`, URP, Input System, reproducible settings, and a successful Windows standalone build.
+- The 16-by-16-unit open-top `Test_Arena` and its direct, peripheral, and occluded fixtures.
+- `SimpleFPSController`, collision-aware `PatrolActivity`, `AimThreatStimulus`, `SoftFOVPerception`, one-shot interruption, and deterministic `Flinch_StepBack`.
+- Separate `ReflexCommanded` and observed `visible_motion_started` events.
+- Typed buffered JSONL telemetry, stage summaries, failure containment, and Domain-Reload-safe lifecycle.
+- Forty-one Play Mode tests covering Tasks 1–8.
+
+The latest commit is Task 7B. Task 8 code, tests, scene wiring, and documentation exist in the working tree but remain uncommitted. Task 8 must be reverified and committed independently before adding packages or research gameplay.
+
+Not implemented:
+
+- Unity ML-Agents or a pinned Python training environment.
+- Basic or strategic research scenes, episode/reward/reset contracts, BDQ training, replay, model export, or trained policies.
+- Combat, cover, the scripted opponent, or `EvadeTelegraphedShot` research reflex.
+- Qwen3/`llama.cpp`, the local HTTP client, strategic directives, failure injection, or LLM evaluation.
+- The seeded factorial runner, confidence-interval analysis, or curated research report.
+
+The existing tests prove software contracts, not the research hypothesis. A single telemetry trace is not a latency distribution.
+
+### Central thesis
+
+> Under identical visual observations, action interfaces, mechanical actuators, learned policy weights, opponent scripts, and evaluation seeds, a temporally partitioned FPS agent—combining a goal-conditioned Branching Double DQN, an event-driven deterministic evade reflex, and an asynchronous local-LLM strategic director—will improve combat utility over BDQ alone while preserving urgent reaction latency independently of LLM inference latency.
+
+Registered hypotheses:
+
+- **H1:** Full hybrid exceeds BDQ-only mean combat utility by at least `0.10`, with the paired 95% hierarchical-bootstrap confidence interval above zero.
+- **H2:** Reflex-enabled conditions reduce damage received per telegraphed shot, with the paired 95% confidence interval below zero.
+- **H3:** Full-hybrid telegraph-to-visible-evade p95 is at most `50 ms` and within one `20 ms` physics step of BDQ+reflex under injected LLM delays of `0`, `500`, `1000`, `2000`, and `3000 ms`; each delay tier contains at least 200 reflex events.
+- **H4:** The LLM factorial main effect is positive. A strong LLM-specific claim additionally requires the LLM director to beat the same-information rule director by at least `0.05` utility with the 95% confidence interval above zero.
+
+If the hierarchy beats BDQ but the LLM does not beat the rule director, the supported conclusion is that hierarchy helps but LLM-specific value was not demonstrated. Registered thresholds are not changed after final evaluation.
+
+Primary episode utility:
+
+```text
+U = episode_outcome
+  + 0.25 * (damage_dealt - damage_taken) / 100
+  - 0.05 * missed_shot_fraction
+  - 0.05 * wasted_resource_fraction
+```
+
+`episode_outcome` is `+1` for eliminating the opponent, `-1` for agent death, and `0` for timeout. Win rate, deaths, damage, shots, reloads, pickups, and survival time are always reported separately.
+
+### Environment contracts
+
+`Test_Arena` remains unchanged as the deterministic fixture. Its regression targets remain confirmed-threat-to-visible-motion p50 below `150 ms`, p95 below `250 ms`, reflex command execution substantially below `1 ms`, and a strict distinction between command and observed motion.
+
+The Unity Basic benchmark contains a narrow primitive room, an agent at the south end, and a target at a seeded random lateral position near the north end. It uses:
+
+- one egocentric `84×84` grayscale observation with four-frame stacking;
+- movement `[Stay, Left, Right]`;
+- combat `[Idle, Shoot]`;
+- a fixed forward crosshair and identical hitscan mechanic;
+- episode termination on a hit or after 300 decisions;
+- reward `+1` hit, `-0.01` per decision, and `-0.02` missed shot;
+- deterministic reset of transforms, ammunition, counters, frame stack, and seed.
+
+At least four of five BDQ seeds must reach 90% success on 500 held-out target placements and exceed random success by at least 30 percentage points.
+
+The strategic benchmark uses:
+
+- movement `[Stay, Forward, Backward, Left, Right]`;
+- combat `[Idle, Shoot]`;
+- utility `[Idle, Reload, Interact]`;
+- 100 health, 20 hitscan damage, a six-round magazine, 18 reserve rounds, a 0.25-second shot cooldown, a 1.5-second reload, and a 30-second episode limit;
+- named cover, health/ammunition pickups, and one seeded scripted opponent;
+- a 400 ms telegraph before every opponent shot;
+- identical one-frame nearest-visible-target resolution and hitscan execution after `Shoot` in every condition;
+- one collision-safe `0.6 m` lateral evade reflex with a one-second cooldown.
+
+The reflex records threat, command, applied motion, collision, observed onset, preemption duration, and return of control. It cannot aim, shoot, select goals, perform I/O, or call a model.
+
+### BDQ contract
+
+Pin `com.unity.ml-agents` 4.0.0 and matching Python packages in Python 3.10.12. ML-Agents supplies the Unity bridge; BDQ is implemented as a pinned custom off-policy trainer because the built-in trainers are not DQN.
+
+The network uses four stacked `84×84` grayscale frames; convolution layers `(32, 8×8, stride 4)`, `(64, 4×4, stride 2)`, and `(64, 3×3, stride 1)`; a 512-unit shared representation; a scalar dueling value head; and one centered advantage head per action branch. The strategic-goal category joins the shared representation for the goal-conditioned model.
+
+Training defaults:
+
+- Double-DQN selection/evaluation and a target network;
+- replay capacity 100,000 and 10,000-decision warmup;
+- batch 64, `gamma=0.99`, Adam `1e-4`, and Huber loss;
+- update every four decisions and hard target synchronization every 10,000 optimizer updates;
+- epsilon from `1.0` to `0.1`; final evaluation is greedy;
+- five independent training seeds, each with checkpoints, curves, manifests, and hashes.
+
+One strategic checkpoint per training seed is reused unchanged across runtime ablations. Training randomizes reflex availability and uses a deterministic teacher to provide every strategic goal. Potential-based goal shaping may guide attack, cover, health, or ammunition behavior without replacing shared terminal and damage rewards. Live LLM calls are excluded from policy training.
+
+Run a 10,000-step deterministic CPU/backend parity and throughput gate before long training. CPU is the reference; AMD acceleration is accepted only when seeded traces, returns, checkpoint reload, model export, and floating-point tolerances pass and throughput improves. The development system has an AMD Radeon RX 7900 XT and 32 GB RAM but no configured ML Python environment yet.
+
+### Local LLM contract
+
+Serve a quantized Qwen3-8B non-thinking/instruction model through a pinned `llama.cpp` local HTTP server, preferring a validated Vulkan backend. Record runtime version, model source, quantization, context and generation settings, and SHA-256. Model weights are not committed.
+
+Every two seconds Unity captures an immutable compact snapshot: quantized health/ammunition, visible-enemy count/distance/health categories, cover and pickup availability/distance categories, current directive, episode ID, sequence, and timestamp. The LLM receives no raw frame or continuous scene matrix.
+
+Schema-constrained output contains `strategic_intent`, `priority_target`, and `engagement_rule`. Valid coherent directives are `BALANCED`, `OFFENSIVE_RUSH`, `DEFENSIVE_RETREAT`, `SEEK_HEALTH`, and `CONSERVE_AMMO`. The validated directive becomes a categorical BDQ goal input, never an actuator action or a tactical legality mask.
+
+Runtime defaults are one request every two seconds, five-second timeout, four-second TTL, monotonic sequence IDs, temperature zero, recorded seed, and a small JSON-only token budget. Invalid, incoherent, stale, timed-out, and out-of-order results are discarded. The last valid directive remains active; no valid directive falls back to `BALANCED`.
+
+Main-thread code captures and applies plain data. HTTP and parsing run asynchronously without accessing Unity objects and publish through a thread-safe queue. A deterministic mock covers fixed responses, invalid JSON, connection loss, timeout, out-of-order completion, and all five registered delay tiers before live inference.
+
+### Evaluation and artifacts
+
+Main conditions:
+
+1. BDQ, fixed `BALANCED`, reflex off.
+2. BDQ + reflex, fixed `BALANCED`.
+3. BDQ + LLM, reflex off.
+4. BDQ + reflex + LLM.
+
+Secondary controls replace the LLM with a deterministic rule director using the identical state snapshot and directive schema, with reflex off and on.
+
+For each of five policy seeds, run every condition on the same 100 held-out scenario seeds: 500 paired episodes per condition. Use a 10,000-resample hierarchical bootstrap over policy seed and paired scenario seed. Report paired effects, 95% confidence intervals, factorial main effects and interaction, and the rule-director comparison.
+
+Required measurements include training return, success, learning-curve area, TD statistics, epsilon, replay size, steps per second, utility and all raw combat components, BDQ inference latency, frame/fixed-step time, all reflex timing and collision stages, damage avoided, deadline misses, all LLM request/validation/discard/fallback stages, directive occupancy, logger pressure/failures, allocations, and model/scene/configuration hashes.
+
+Raw JSONL, CSV, checkpoints, and model outputs live under an ignored project-local experiment-artifact directory with run manifests. Track schemas, scripts, configurations, curated aggregate tables, plots, model checksums, and conclusions. No participant study is included. Negative and null results remain valid research results.
+
+### Ordered next work and non-goals
+
+The next task is Research Task R0: re-run all 41 Play Mode tests and the Windows build, resolve only Task 8 regressions, commit Task 8 independently, verify local `CONTEXT.md` remains ignored, and only then add ML infrastructure.
+
+Current non-goals are survival/extraction systems, crafting or loot economies, multiplayer/networking, production art, procedural worlds, group AI, speech/TTS, unrestricted conversation, LLM training/fine-tuning, LLM frame-level control, hybrid-only privileged mechanics, tactical masks for legal actions, unobserved visible-latency claims, and post-hoc changes to registered thresholds without an exploratory label.
+
+## Superseded deterministic-slice summary (historical)
+
+The following material records the earlier downsized vertical-slice scope. It remains useful for the implemented `Test_Arena` fixture but does not control the active research roadmap where it conflicts with the section above.
+
+### Historical mission
 
 Build a small Unity FPS behavior laboratory that demonstrates how an NPC can preserve human-time responsiveness during urgent interactions while slower tactical or generative systems remain off the urgent path.
 
 This is independent systems/HCI/applied-AI work. It is not a survival game, an extraction shooter, or core machine-learning research.
 
-## Current downsized scope
+## Historical downsized scope
 
 The player needs only:
 
@@ -63,7 +224,7 @@ NPC performs a basic activity
 → NPC later resumes or abandons the activity
 ```
 
-## Canonical control flow
+## Historical deterministic control flow
 
 ```text
 Player.IsAiming
@@ -79,7 +240,7 @@ Player.IsAiming
 
 A camera ray may directly confirm a threat only behind an explicit debug bypass. It must not be the default or permanent gameplay path.
 
-## Layer responsibilities
+## Historical deterministic layer responsibilities
 
 ### Perception and stimulus
 
@@ -118,9 +279,9 @@ A camera ray may directly confirm a threat only behind an explicit debug bypass.
 
 ### Optional asynchronous enrichment
 
-LLM integration is deferred until the complete local loop is functional and measured. Later, an asynchronous worker may generate cached barks, summarize memory, or nudge future biases. The NPC must behave correctly when that worker is absent.
+During that historical deterministic phase, LLM integration was deferred until the local loop was functional and measured. The approved research program above now replaces that deferral with a bounded asynchronous strategic-director experiment; the agent must still behave correctly when the director is absent.
 
-## Timing and telemetry
+## Historical deterministic timing and telemetry
 
 Do not collapse the whole interaction into one vague latency value. Record distinct stages:
 
@@ -151,7 +312,7 @@ Logging requirements:
 - Queue structured events in memory and flush outside the urgent path.
 - Reset static logger state safely when Domain Reload is disabled.
 
-## Technical baseline
+## Historical deterministic technical baseline
 
 - Unity: `6000.0.57f1`.
 - Intended render pipeline: URP.
@@ -165,22 +326,24 @@ Logging requirements:
 
 The repository is still a pre-MVP scaffold:
 
-- `Test_Arena` is a 16-by-16-unit controlled fixture containing the required player hierarchy, light, floor, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, one capsule NPC with perception-eye and non-colliding facing markers, and an empty `Systems` container. It is intentionally open-top for clear lighting and playtest visibility.
+- `Test_Arena` is a 16-by-16-unit controlled fixture containing the required player hierarchy, light, floor, four enclosing walls, a full-height occlusion divider, a low block, player/NPC spawn markers, two patrol markers, an interaction marker, one capsule NPC with perception-eye and non-colliding facing markers, and a `Systems` container with the structured logger and telemetry recorder. It is intentionally open-top for clear lighting and playtest visibility.
 - `SimpleFPSController` is an attachable custom Input System controller with WASD movement, mouse look, gravity, sprint, jump, cursor toggling, RMB aim, smooth FOV, and public read-only `IsAiming` state. Upward velocity is cleared on overhead collision so a blocked jump immediately begins falling.
-- `PatrolActivity` moves the NPC deterministically between the two patrol markers through a collision-aware `CharacterController` and exposes explicit start, tick, interrupt, resume, cancel, and reset operations with observable activity state and timing.
-- `AimThreatStimulus` is a plain six-field value, and the camera-backed `AimThreatEmitter` on the player publishes the current snapshot plus one start or end event for each RMB aim transition. It has no NPC, perception, reflex, or debug-bypass dependency.
+- `PatrolActivity` moves the NPC deterministically between the two patrol markers through a collision-aware `CharacterController` and exposes explicit start, tick, interrupt, resume, cancel, and reset operations with observable activity state, real-time timing, and lifecycle events.
+- `AimThreatStimulus` is a plain six-field value, and the camera-backed `AimThreatEmitter` on the player publishes real-time-stamped current snapshots plus one start or end event for each RMB aim transition. It has no NPC, perception, reflex, logging, or debug-bypass dependency.
 - `SoftFOVPerception` is wired to the NPC and Task 5 emitter. It applies a 20-unit visual limit, total-FOV half-angle checks, non-allocating line of sight, measured 12 Hz suspicion timing, 0.5/0.3 hysteresis, 300-degree-per-second orientation, and one confirmation per released-and-rearmed aim episode. A confirmed episode continues tracking a renewed valid aim without rearming, incrementing the episode, or re-emitting confirmation; tracking stops when the active aim is no longer valid. Camera-ray intersection with NPC bounds qualifies threat relevance but never bypasses perception or invokes a reflex. In Play Mode, renderer-local property blocks color both the capsule and facing marker by state so transitions are observable directly in the Game view without changing the shared arena material.
-- Thirty focused Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, Task 4 patrol behavior, Task 5 stimulus snapshots and RMB edges, Task 6 perception and visualization, Task 7A one-shot activity interruption, and Task 7B deterministic one-shot reflex dispatch with paused-activity suppression and wall-constrained displacement; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
+- Forty-one Unity Play Mode tests verify the Task 2 controller and jump behavior, Task 3 open-top arena dimensions and sightlines, Task 4 patrol behavior, Task 5 stimulus snapshots and RMB edges, Task 6 perception and visualization, Task 7A one-shot activity interruption, Task 7B deterministic one-shot reflex dispatch, Task 8A measured visible onset, and Task 8B structured telemetry; the tests pass, and a Windows standalone build also succeeds in Unity `6000.0.57f1`.
 - User layer 8 is named `NPC` for NPC activity and perception queries.
 - `NpcBehaviorController` is wired to `NPC_01` as the explicit Task 7A/7B state-edge owner. It subscribes to one-shot threat confirmation, synchronously suspends `PatrolActivity`, records the interruption metadata, and commands a reflex only after the activity remains stopped. Duplicate confirmation delivery is ignored, and a rearmed episode produces another interruption/reflex only after activity was deliberately resumed. The controller does not resume activity automatically.
-- `ReflexSelector` replaces the old name-hashed, raw-transform, logger-coupled scaffold. It commands one immediate `Flinch_StepBack` per interrupted threat episode through `CharacterController.Move`, using serialized seed `1001`, deterministic `0.35 ± 0.05 m` distance variation, and yaw within `±30°`. It exposes a separate `ReflexCommanded` event and read-only runtime metadata without claiming visible onset. Editor-only custom Inspectors display interruption and reflex command/collision diagnostics live during Play Mode.
-- Logger and overlay scripts remain unwired scaffolds. Recovery state and trustworthy visible-onset telemetry do not yet exist.
+- `ReflexSelector` replaces the old name-hashed, raw-transform, logger-coupled scaffold. It commands one immediate `Flinch_StepBack` per interrupted threat episode through `CharacterController.Move`, using serialized seed `1001`, deterministic `0.35 ± 0.05 m` distance variation, and yaw within `±30°`. It exposes `ReflexCommanded` plus the pre-command pose and other read-only command metadata without claiming dispatch is visible onset.
+- `VisibleMotionObserver` measures the first root displacement of at least `0.01 m` or rotation of at least `1°` after a reflex command, emits one separate `visible_motion_started` event per episode, and exposes command-to-visible and confirmed-threat-to-visible timings. It has no logging or file dependency.
+- The old anonymous-`JsonUtility` logger scaffold is replaced. `TelemetryRecorder` observes gameplay events without adding logging dependencies to AI components, while `JsonlLogger` queues typed Newtonsoft event records, serializes and periodically flushes outside urgent dispatch, uses a Domain-Reload-safe singleton and session-unique JSONL path, retains buffered lines after failed writes, and emits per-stage count/min/max/mean/p50/p95/standard-deviation summaries. Read-only custom Inspectors expose visible-onset and telemetry diagnostics in Play Mode.
+- Task 8 records real threat-release and manual activity-resume edges but does not implement or fabricate Task 9 tactical recovery. `DevOverlay` remains an unwired scaffold.
 - Tracked URP renderer and pipeline assets now resolve in Graphics and both Quality levels; `Test_Arena` passed batch-mode pipeline and material validation in Unity `6000.0.57f1`.
 - `Test_Arena` is the sole enabled Build Settings scene; the package lock and editor settings are tracked; VSync is off, Incremental GC is on, Active Input Handling is `Both`, and Enter Play Mode disables Domain Reload while retaining Scene Reload.
 
-The next implementation task is `TASKS.md` section 8: implement trustworthy structured telemetry and a separate visible-onset observer.
+At that historical point, the planned next task was the now-superseded tactical-recovery state machine.
 
-## Arena
+## Historical arena scope
 
 `Assets/_Project/Scenes/Test_Arena.unity` is a controlled greybox testbed. Its eventual minimum contents are:
 
@@ -193,7 +356,7 @@ The next implementation task is `TASKS.md` section 8: implement trustworthy stru
 
 Do not add production art, a large map, complex NavMesh layout, combat encounters, loot, or decorative props that do not support a named test.
 
-## Current definition of done
+## Historical deterministic definition of done
 
 The first complete local milestone requires:
 
@@ -208,18 +371,18 @@ The first complete local milestone requires:
 
 LLMs, generated speech, structured long-term memory, multiple reaction families, automated experiments, and a polished report come only after this milestone.
 
-## Hard non-goals
+## Historical hard non-goals
 
 Do not implement without an explicit scope change:
 
 - inventory, hunger, thirst, crafting, loot, or an extraction economy;
 - firearms, shooting, ammo, reloads, damage, or full combat;
 - multiplayer or networking;
-- reinforcement learning or LLM training;
+- reinforcement learning or LLM training within that historical deterministic slice;
 - large behavior-tree or GOAP frameworks;
 - production art, procedural worlds, group AI, speech recognition, or high-quality TTS.
 
-## Work discipline
+## Historical deterministic work discipline
 
 - Follow the ordered tasks in `TASKS.md` one narrow task at a time.
 - Inspect the actual repository before assuming a documented component exists.

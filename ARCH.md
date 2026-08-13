@@ -2,41 +2,37 @@
 
 ## Authority and status
 
-`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It describes the intended first complete local system, not functionality that should be assumed to exist already.
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena` fixture from the approved but unimplemented learned-agent research architecture; planned contracts must not be described as existing runtime behavior.
 
 ## System overview
 
 ```text
-Player controller
-  └─ IsAiming + camera pose
-       ↓
-Structured aim-threat stimulus
-       ↓
-Soft perception
-  ├─ distance and total-FOV half-angle checks
-  ├─ line of sight
-  ├─ suspicion with real tick delta
-  └─ orientation and one-shot threat confirmation
-       ↓
-NPC behavior coordinator
-  ├─ interrupt current activity
-  ├─ dispatch local reflex
-  └─ enter tactical recovery state
-       ↓
-Reflex execution
-  ├─ select stable, cooldown-safe variant
-  ├─ command visible placeholder motion immediately
-  └─ emit dispatch event
-       ↓
-Visible-onset observer
-  └─ detect first actual motion and emit measured latency
+Test_Arena (implemented deterministic regression fixture)
+  Player.IsAiming
+    → structured aim-threat stimulus
+    → soft perception and one-shot threat confirmation
+    → synchronous activity interruption
+    → deterministic Flinch_StepBack command
+    → observed visible-motion onset
+    → buffered typed telemetry
 
-Optional later:
-cached barks / structured memory / slow bias updates
-  └─ affect future choices only
+Research_Basic (planned visual-control benchmark)
+  84×84 grayscale frame stack
+    → BDQ or baseline policy
+    → [lateral movement, shoot] action tuple
+    → shared fixed-forward hitscan actuator
+    → seeded reward/episode result
+
+Research_Strategic (planned factorial benchmark)
+  egocentric frame stack + categorical strategic goal
+    → goal-conditioned BDQ at 10 Hz
+    → shared action tuple held by the 50 Hz actuator
+    → optional event-driven evade reflex
+    → optional asynchronous local-LLM goal update at 0.5 Hz
+    → typed episode, timing, model, and system telemetry
 ```
 
-The default flow never maps a camera hit directly to a reflex. An explicit debug-only bypass may confirm a threat for isolated reflex testing.
+The default `Test_Arena` flow never maps a camera hit directly to a reflex. An explicit debug-only bypass may confirm a threat for isolated regression testing, but it is disabled in evaluation. The research actuator may use internal target geometry for the controlled aiming mechanic only because the exact same actuator and data are supplied to every condition.
 
 ## Modules and dependency direction
 
@@ -47,7 +43,12 @@ The default flow never maps a camera hit directly to a reflex. An explicit debug
 - `QuickDraw.AI.Reflex` — reaction selection and immediate motion command.
 - `QuickDraw.AI.Behavior` — explicit high-level state and recovery coordination.
 - `QuickDraw.Logging` — structured event buffering, serialization, and summaries.
-- `QuickDraw.AI.Memory` — optional later structured memory.
+- `QuickDraw.Research.Environment` — seeded episodes, observations, rewards, resets, and scenario parameters.
+- `QuickDraw.Research.Actuation` — the shared deterministic multi-branch action executor.
+- `QuickDraw.Research.Policy` — BDQ inference boundary and policy metadata; training remains in the pinned Python plugin.
+- `QuickDraw.Research.Reflex` — the optional imminent-shot evade preemption.
+- `QuickDraw.Research.Strategy` — strategic snapshots, directive validation, rule director, mock director, and local-LLM client.
+- `QuickDraw.Research.Telemetry` — research episode records and run manifests, building on the buffered logging pattern.
 
 Dependency rules:
 
@@ -56,11 +57,18 @@ Dependency rules:
 - Perception confirms threats but does not implement activities or tactical recovery.
 - The behavior coordinator owns interruption and state edges.
 - Reflex never calls logging file I/O, networking, tactical planning, or an LLM.
-- Optional slow systems publish data that future local decisions may read.
+- Existing deterministic AI components remain independent of the research scenes and ML dependencies.
+- The environment owns seed/reset/reward/terminal truth; the policy cannot modify those contracts.
+- The policy outputs a typed action intent and never presses keyboard/mouse controls.
+- The shared actuator is the only research component that translates intents into mechanics.
+- The reflex may preempt only movement for its bounded duration and never invokes policy, logging, networking, or LLM code before motion.
+- Strategy publishes validated future-facing categorical goals; it cannot call actuators or change rewards/action legality.
+- The local-LLM transport never touches Unity objects off the main thread.
+- Telemetry observes gameplay/model events without becoming a dependency of urgent control code.
 
-Assembly definitions are optional later and should not delay the first vertical slice.
+Use assembly boundaries when the research work begins so environment, actuator, policy, reflex, strategy, telemetry, editor, and tests can enforce these dependency directions. Do not retrofit the completed `Test_Arena` components merely to satisfy a speculative abstraction.
 
-## Component contracts
+## Implemented `Test_Arena` component contracts
 
 ### `SimpleFPSController`
 
@@ -189,7 +197,7 @@ Rules:
 - Emit an internal `reflex_commanded` event separately from observed motion.
 - Do not label `Animator.SetTrigger` time as visible onset.
 
-The implemented Task 7B selector replaces the original scaffold's name hashing, raw transform displacement, deferred hands-up animation, and direct logger dependency. `NPC_01` uses serialized seed `1001`, a `0.35 ± 0.05 m` step, and a deterministic yaw offset within `±30°`. It rotates on the horizontal plane and uses the existing `CharacterController.Move` path so arena colliders constrain displacement. Read-only command metadata and an editor-only live Inspector make command count, episode, timing, requested/applied movement, yaw, and collision flags observable. `ReflexCommanded` is a command event only; visible onset remains a separate Task 8 measurement.
+The implemented Task 7B selector replaces the original scaffold's name hashing, raw transform displacement, deferred hands-up animation, and direct logger dependency. `NPC_01` uses serialized seed `1001`, a `0.35 ± 0.05 m` step, and a deterministic yaw offset within `±30°`. It rotates on the horizontal plane and uses the existing `CharacterController.Move` path so arena colliders constrain displacement. Read-only command metadata and an editor-only live Inspector make command count, episode, timing, requested/applied movement, yaw, collision flags, and the pre-command root pose observable. `ReflexCommanded` remains a command event only.
 
 ### Visible-onset observer
 
@@ -203,7 +211,7 @@ Acceptable signals include:
 - the Animator enters the target state and advances;
 - an animation event explicitly marks first motion.
 
-The observer emits `visible_motion_started` once per reaction episode. The primary SLA is calculated from `threat_confirmed` to this event.
+The implemented `VisibleMotionObserver` stores the selector's pre-command root pose when `reflex_commanded` fires, then checks the actual root pose in `LateUpdate`. A position delta of at least `0.01 m` or rotation delta of at least `1°` emits `visible_motion_started` once for that threat episode. The event reports which root signal crossed threshold plus command-to-visible and confirmed-threat-to-visible timing. The observer has no logging, serialization, or file dependency; a live read-only custom Inspector exposes its measured state.
 
 ### `JsonlLogger`
 
@@ -219,7 +227,287 @@ Rules:
 - Reset singleton/static state safely when Domain Reload is disabled.
 - Use a session-unique file name or session identifier.
 
+The implemented Task 8B pipeline uses explicit Newtonsoft-serialized records in `LogEvents.cs`. A scene-wired `TelemetryRecorder` observes the existing emitter, perception, behavior, reflex, visible-onset, and patrol lifecycle events without adding a `QuickDraw.Logging` dependency to those gameplay components. Event handlers only construct and enqueue typed records. `JsonlLogger.Update` performs bounded serialization and periodic UTF-8 JSONL flushing, while quit handling drains the queue, appends per-stage summaries, and flushes once more.
+
+`JsonlLogger` resets its singleton through `SubsystemRegistration`, uses a session-unique path under `Application.persistentDataPath`, retains buffered lines after a failed write, and catches serialization or file exceptions so behavior continues. Its summaries contain count, min, max, mean, p50, p95, and population standard deviation. A read-only custom Inspector exposes the session path, queue/buffer counts, written and dropped records, failed flushes, and the last error.
+
+Task 8 records the perception `Recovering` edge as `threat_released` and records a real manual `activity_resumed` edge when it occurs. The former Task 9 tactical-recovery state machine was not implemented and is superseded by the research roadmap. Do not fabricate it in historical telemetry or make it a dependency of the research scenes.
+
+## Planned research contracts
+
+Everything in this section is planned until its corresponding `TASKS.md` research task is accepted. The contracts are fixed to make implementation and evaluation decision-complete.
+
+### Shared clocks and decision cadence
+
+- Unity physics and the shared actuator run with a `0.02 s` fixed timestep, or 50 Hz.
+- BDQ requests a new action once every five physics steps, or 10 Hz.
+- The actuator holds the last accepted action tuple between BDQ decisions.
+- A reflex may preempt the movement branch by the next physics step and returns control to the held BDQ movement intent when the bounded evade ends.
+- The strategic director captures at most one snapshot every two seconds, or 0.5 Hz.
+- Gameplay and cross-stage timestamps use `Time.realtimeSinceStartup`; training-step and episode counters are also recorded so wall-clock and simulation time are not conflated.
+
+### Visual observation contract
+
+The primary policy observation is one egocentric `84×84` grayscale image with four-frame stacking. All conditions associated with a benchmark use the same camera transform, projection, render settings, preprocessing, channel order, normalization, frame cadence, and reset behavior.
+
+Rules:
+
+- Clear and refill the entire four-frame stack at episode reset; no previous episode frame may leak into a new episode.
+- Record observation dimensions, grayscale conversion, stack order, and preprocessing version in the run manifest.
+- The Basic policy receives only the visual stack.
+- The strategic policy receives the same visual stack plus one validated categorical strategic-goal encoding.
+- The LLM never receives these frames. Its compact snapshot is a separate experimental intervention.
+- Debug sensors, labels, scene geometry, object IDs, or target coordinates may not be appended to the learned policy observation unless every condition receives them and the protocol is amended before final training.
+
+### Action tuple
+
+Use explicit stable enums and a typed value rather than raw magic indices:
+
+```csharp
+public enum MovementIntent
+{
+    Stay = 0,
+    Forward = 1,
+    Backward = 2,
+    Left = 3,
+    Right = 4
+}
+
+public enum CombatIntent
+{
+    Idle = 0,
+    Shoot = 1
+}
+
+public enum UtilityIntent
+{
+    Idle = 0,
+    Reload = 1,
+    Interact = 2
+}
+
+public readonly struct ResearchActionTuple
+{
+    public MovementIntent Movement { get; }
+    public CombatIntent Combat { get; }
+    public UtilityIntent Utility { get; }
+    public int DecisionStep { get; }
+}
+```
+
+The Basic scene maps its three-action movement branch to `[Stay, Left, Right]`, uses the complete two-action combat branch, and fixes utility to `Idle`. The strategic scene uses all `5 × 2 × 3` branch choices. Branch index tables are versioned and verified against exported-model outputs.
+
+### Shared research actuator
+
+One deterministic actuator executes `ResearchActionTuple` in every condition. It owns:
+
+- collision-conscious translation through a shared character-motion path;
+- action holding between decisions;
+- weapon cooldown, ammunition, hitscan, damage, and reload timing;
+- legal target resolution and one-frame look-at/snap in the strategic scene;
+- pickup interaction and mechanically impossible-action masks;
+- application and completion of a reflex movement override;
+- action-applied and action-rejected events.
+
+Basic aiming is intentionally different but equally controlled: a fixed forward crosshair fires the identical hitscan ray, and the learned policy must move laterally to align with the target.
+
+Strategic aiming is a controlled mechanical script. When `Shoot` is selected, it chooses the nearest visible legal target, reads the target hitbox position, applies the same one-frame look-at/snap, and resolves the same hitscan test for BDQ, BDQ+reflex, BDQ+LLM, full hybrid, and rule-director controls. No optional layer receives a different aim path or additional target data.
+
+The actuator does not inspect Q-values, prompts, LLM text, training rewards, or condition labels other than the explicit reflex-enable flag needed for the ablation.
+
+### Episode, seed, and reset ownership
+
+The research environment owns a typed episode context containing:
+
+- run ID, policy-training seed, scenario seed, episode index, and condition ID;
+- scene/configuration/model hashes;
+- start/end simulation and real times;
+- terminal reason: success, agent death, opponent death, timeout, or infrastructure-invalid;
+- cumulative training reward and the separately calculated evaluation outcome.
+
+Reset order is fixed:
+
+1. Stop and invalidate outstanding director requests for the prior episode.
+2. Reset episode and sequence IDs.
+3. Reset agent/opponent transforms, health, ammunition, cooldowns, pickups, cover state, and scripted schedules from the scenario seed.
+4. Reset actuator, reflex, BDQ recurrent/stack state if any, directive, counters, and telemetry observers.
+5. Render and fill the four-frame initial observation stack.
+6. Emit `episode_started` with the complete manifest references.
+
+Policy-training seeds control weight initialization, replay sampling, and exploration. Scenario seeds control environment/opponent variation. Final comparisons pair on scenario seed and never reuse training scenarios as held-out evaluation scenarios.
+
+### Unity Basic environment
+
+- Primitive long narrow room; agent fixed at the south start and target at a seeded random lateral position near the north end.
+- `84×84` grayscale four-frame observation.
+- movement `[Stay, Left, Right]`; combat `[Idle, Shoot]`; utility fixed `Idle`.
+- fixed forward crosshair and hitscan.
+- target hit ends the episode successfully; 300 decisions truncate it.
+- training reward: `+1` hit, `-0.01` each decision, `-0.02` miss.
+- random and scripted policies use the same observation-to-action and actuator path.
+- a joint-action Double DQN produces six tuple Q-values solely as a branch-factorization sanity control.
+
+### Strategic environment
+
+Mechanics are fixed before final training:
+
+- 100 maximum health for agent and opponent;
+- 20 damage per valid hitscan hit;
+- six-round magazine and 18 reserve rounds;
+- 0.25-second weapon cooldown;
+- 1.5-second reload;
+- 30-second episode limit;
+- named collision-valid cover objects and line-of-sight tests;
+- bounded health/ammunition pickups through `Interact`;
+- one seeded scripted opponent with fixed configuration and deterministic schedule;
+- one `ImminentShotEvent` exactly 400 ms before each scripted shot.
+
+The environment exposes physically impossible action masks only. Examples include reload with a full magazine/no reserve ammunition or interact with no legal object in range. It does not mask retreat, attack, firing, or movement merely to enforce a strategic directive.
+
+### Research reflex
+
+`EvadeTelegraphedShot` subscribes to `ImminentShotEvent` and, when enabled and off cooldown, preempts movement with one deterministic collision-safe `0.6 m` lateral evade. Cooldown is the registered one-second interval.
+
+Direction selection uses the same physics/clearance information available to the shared actuator. It cannot:
+
+- aim or shoot;
+- change combat or utility intent;
+- select or edit a strategic goal;
+- query LLM state or Q-values;
+- perform waits, coroutines, allocation-heavy serialization, file I/O, networking, or model inference before motion.
+
+Required events include telegraph observed, reflex accepted/suppressed, command issued, requested/applied displacement, collision flags, visible motion, damage outcome, preemption ended, and BDQ movement restored. Duplicate telegraphs and cooldown-suppressed events cannot move the agent twice.
+
+### Branching Double DQN (BDQ) inference and training boundary
+
+Unity uses ML-Agents `4.0.0` for sensors, branched action transport, episode boundaries, and exported-model inference. Training uses matching Python packages in Python 3.10.12 plus a version-pinned custom off-policy trainer plugin. Built-in PPO/SAC configuration is not a substitute for BDQ.
+
+Primary network:
+
+```text
+4 × 84 × 84 grayscale stack
+→ Conv(32, 8×8, stride 4)
+→ Conv(64, 4×4, stride 2)
+→ Conv(64, 3×3, stride 1)
+→ 512-unit shared representation (+ categorical goal in strategic policy)
+→ scalar dueling value V(s,g)
+→ one mean-centered advantage head A_i(s,g,a_i) per action branch
+→ branch Q_i = V + A_i - mean(A_i)
+```
+
+Use Double-DQN online action selection and target-network evaluation, replay capacity 100,000, replay warmup 10,000 decisions, batch 64, `gamma=0.99`, Adam `1e-4`, Huber loss averaged over selected branch values, update every four decisions, hard target synchronization every 10,000 optimizer updates, and epsilon decay `1.0 → 0.1`. Final evaluation is greedy.
+
+Train five independent policy seeds. Each seed has its own configuration, learning curves, checkpoint lineage, export-parity test, and SHA-256. The same final strategic checkpoint for a seed is loaded into all factorial conditions for that seed.
+
+Strategic training randomizes reflex availability and obtains directive labels from a deterministic teacher, not a live LLM. Goal-specific potential shaping may reward progress toward enemy pressure, cover, health, or ammunition while shared win/loss and damage rewards remain constant. Document every potential and coefficient before final training.
+
+### Strategic directive
+
+Use a closed categorical schema:
+
+```csharp
+public enum StrategicIntent
+{
+    Balanced = 0,
+    OffensiveRush = 1,
+    DefensiveRetreat = 2,
+    SeekHealth = 3,
+    ConserveAmmo = 4
+}
+
+public readonly struct StrategicDirective
+{
+    public StrategicIntent Intent { get; }
+    public PriorityTarget PriorityTarget { get; }
+    public EngagementRule EngagementRule { get; }
+    public long RequestSequence { get; }
+    public int EpisodeId { get; }
+    public float SnapshotTimestamp { get; }
+    public float CompletedTimestamp { get; }
+}
+```
+
+Only coherent fixed templates are accepted:
+
+- `BALANCED`;
+- `OFFENSIVE_RUSH` + enemy + engage;
+- `DEFENSIVE_RETREAT` + cover + hold fire unless threatened;
+- `SEEK_HEALTH` + health pickup + disengage when possible;
+- `CONSERVE_AMMO` + valid enemy opportunity + high-confidence fire only.
+
+The validated intent becomes a categorical BDQ input. `PriorityTarget` and `EngagementRule` support validation, telemetry, and deterministic-teacher/rule-director parity; they do not directly call the actuator.
+
+### Strategic snapshot and directors
+
+The main thread captures an immutable snapshot every two seconds containing quantized agent health/ammunition, visible-enemy count/distance/health categories, nearest cover and pickup availability/distance categories, current directive, episode ID, sequence ID, and timestamp. Raw images and continuous object matrices are excluded.
+
+All directors implement one request/result boundary:
+
+- fixed `BALANCED` director for LLM-off factorial conditions;
+- deterministic rule director receiving the same snapshot;
+- deterministic mock director supporting failure/delay cases;
+- local HTTP director for Qwen3-8B through `llama.cpp`.
+
+The local-model default is a quantized Qwen3-8B non-thinking/instruction model. Pin the `llama.cpp` version/commit, prefer a validated Vulkan backend, and record model source, quantization, SHA-256, prompt, JSON schema, context, temperature zero, seed, and output-token cap. Model weights remain outside Git.
+
+Transport rules:
+
+- capture snapshot on the Unity main thread;
+- perform HTTP waiting and parsing asynchronously without Unity API access;
+- publish results through a thread-safe queue;
+- validate and apply on the main thread;
+- request every two seconds, timeout after five seconds, and reject results older than four seconds;
+- reject malformed, incoherent, stale, timed-out, out-of-order, and prior-episode results;
+- retain the latest valid directive; default to `BALANCED` when none exists.
+
+The mock director must reproduce fixed output, invalid JSON, connection loss, timeout, out-of-order completion, and delays of `0`, `500`, `1000`, `2000`, and `3000 ms`.
+
+### Research outcome and factorial contract
+
+Primary combat utility is calculated after the episode and is not silently substituted for the training reward:
+
+```text
+U = episode_outcome
+  + 0.25 * (damage_dealt - damage_taken) / 100
+  - 0.05 * missed_shot_fraction
+  - 0.05 * wasted_resource_fraction
+```
+
+`episode_outcome` is `+1` opponent eliminated, `-1` agent death, and `0` timeout. Store all components separately.
+
+The main 2×2 conditions use identical checkpoints and paired scenario seeds:
+
+1. BDQ, fixed `BALANCED`, reflex off.
+2. BDQ + reflex, fixed `BALANCED`.
+3. BDQ + local LLM, reflex off.
+4. BDQ + reflex + local LLM.
+
+Secondary rule-director conditions run with reflex off/on and the same snapshot/directive contract. For each of five training seeds, run every condition on the same 100 held-out scenario seeds, producing 500 paired episodes per condition. Analysis uses a 10,000-resample hierarchical bootstrap over policy seed and then paired scenario seed.
+
+Registered thresholds:
+
+- full-hybrid utility improvement over BDQ-only at least `0.10`, with paired 95% confidence interval above zero;
+- reflex damage-per-telegraph difference below zero with paired 95% confidence interval below zero;
+- full-hybrid telegraph-to-visible-evade p95 at most `50 ms` and within `20 ms` of BDQ+reflex at every injected delay tier, at least 200 events per tier;
+- positive LLM factorial effect; strong LLM claim additionally requires at least `0.05` utility over the rule director with paired 95% confidence interval above zero.
+
+### Research telemetry and artifact boundary
+
+In addition to the existing stage timing, record:
+
+- run/episode/condition/policy/scenario identifiers and hashes;
+- observations/actions only in a bounded research-appropriate form, rewards, terminals, and resets;
+- training return, success, learning-curve area, loss, TD error, epsilon, replay size, Q summaries, throughput, and inference time;
+- health, damage, shots, hits, misses, reloads, pickups, survival, wasted actions, and directive occupancy;
+- every reflex timing stage, collision, damage outcome, and deadline miss;
+- every director request, first-token if available, completion, validation, application, discard reason, timeout, fallback, and goal change;
+- main-thread/fixed-step timing, allocations, logger pressure, dropped events, and write failures.
+
+Keep handler work bounded and enqueue typed records. Raw JSONL/CSV, checkpoints, weights, and generated files live under a project-local ignored artifact root. Track schemas, dependency locks, configurations, scripts, curated aggregates, plots, checksums, and conclusions. Every published number must trace to a run manifest and analysis command.
+
 ## Timing model
+
+### `Test_Arena` regression timing
 
 Use `Time.realtimeSinceStartup` consistently for cross-stage event timestamps.
 
@@ -245,6 +533,26 @@ Targets:
 
 Do not enforce an artificial delay to make reactions appear human. Variation should come from reaction parameters and later tactical choices, not from blocking initial acknowledgment.
 
+### Research timing
+
+Required research timing stages include:
+
+```text
+policy_observation_requested → policy_action_available
+policy_action_available → actuator_action_applied
+opponent_telegraph → reflex_commanded
+reflex_commanded → reflex_visible_motion
+opponent_telegraph → reflex_visible_motion
+reflex_visible_motion → preemption_ended
+strategy_snapshot → director_request_started
+director_request_started → first_token (when exposed)
+director_request_started → director_response_completed
+director_response_completed → directive_validated_or_rejected
+directive_validated → directive_applied
+```
+
+Record simulation-step counts alongside real time. Never interpret accelerated training wall time as player-visible latency. Reflex H3 uses real-time standalone or controlled Editor runs at the registered physics/frame conditions, not accelerated headless training.
+
 ## Event schema
 
 Representative records:
@@ -253,27 +561,28 @@ Representative records:
 {"t":"activity_started","ts":2.000,"npcId":"NPC_01","activity":"Patrol"}
 {"t":"aim_stimulus_started","ts":5.000,"sourceId":"Player"}
 {"t":"perception_notice","ts":5.050,"npcId":"NPC_01","angleDeg":62.4,"hasLos":true}
-{"t":"suspicion_threshold","ts":5.420,"npcId":"NPC_01","value":0.5}
+{"t":"suspicion_threshold","ts":5.420,"npcId":"NPC_01","suspicion":0.5,"notice_to_threshold_ms":370}
 {"t":"turn_started","ts":5.421,"npcId":"NPC_01"}
 {"t":"threat_confirmed","ts":5.650,"npcId":"NPC_01","episodeId":3}
-{"t":"activity_interrupted","ts":5.651,"npcId":"NPC_01","activity":"Patrol","reason":"Threat"}
-{"t":"reflex_commanded","ts":5.653,"npcId":"NPC_01","variant":"Flinch_StepBack"}
-{"t":"visible_motion_started","ts":5.690,"npcId":"NPC_01","signal":"root_delta","confirmation_to_visible_ms":40}
-{"t":"tactical_state_changed","ts":5.800,"npcId":"NPC_01","state":"RemainThreatened"}
+{"t":"activity_interrupted","ts":5.651,"npcId":"NPC_01","episodeId":3,"activity":"Patrol","reason":"ConfirmedAimThreat","outcome":"Suspended"}
+{"t":"reflex_commanded","ts":5.653,"npcId":"NPC_01","episodeId":3,"variant":"Flinch_StepBack","confirmation_to_command_ms":3}
+{"t":"visible_motion_started","ts":5.690,"npcId":"NPC_01","episodeId":3,"signal":"root_position_rotation","command_to_visible_ms":37,"confirmation_to_visible_ms":40}
+{"t":"threat_released","ts":6.100,"npcId":"NPC_01","episodeId":3}
+{"t":"activity_resumed","ts":6.200,"npcId":"NPC_01","activity":"Patrol","threat_release_to_resume_ms":100}
 ```
 
 Session summaries should include counts and descriptive statistics for each defined stage, including min, max, mean, p50, p95, and optional standard deviation. A single reflex summary is insufficient for the final evaluation.
 
 ## Arena responsibilities
 
-`Test_Arena` is a test fixture. Each object must support a named scenario:
+`Test_Arena` is the implemented deterministic test fixture. Each object must support a named regression scenario:
 
 - open lane for direct frontal threat;
 - visual edge for peripheral notice;
 - full-height divider for occlusion;
 - two patrol markers for ongoing activity;
 - interaction marker for interruption;
-- low block or exit marker for later recovery choices.
+- low block and interaction marker retained from the deterministic fixture.
 
 Required initial scenarios:
 
@@ -281,11 +590,13 @@ Required initial scenarios:
 2. Peripheral notice and orientation.
 3. Occluded player with no false detection.
 4. Patrol interrupted once.
-5. Threat release followed by controlled recovery or resume.
+5. Threat release and manual resume edge recording; the superseded automatic recovery FSM is not required.
 
-## Expected first file map
+`Research_Basic` is a separate minimal learning fixture. Every object must support lateral alignment, visual observation, deterministic target placement, hitscan resolution, reward, or reset. It contains no cover, health, reload, pickup, LLM, or opponent complexity.
 
-Names marked “possible” are not fixed contracts.
+`Research_Strategic` is a separate factorial fixture. Every object must support a named mechanic or experimental condition: spawn, cover, pickup, opponent schedule, telegraph, action execution, reflex clearance, or observation. Decorative objects and unregistered random effects are excluded.
+
+## File-map boundaries
 
 ```text
 Assets/_Project/
@@ -308,9 +619,29 @@ Assets/_Project/
         VisibleMotionObserver.cs         (possible)
     Logging/
       JsonlLogger.cs
-      LogEvents.cs                       (possible DTOs)
+      LogEvents.cs
+      TelemetryRecorder.cs
+    Research/                            (planned; exact subfolders follow assembly boundaries)
+      Environment/
+      Actuation/
+      Policy/
+      Reflex/
+      Strategy/
+      Telemetry/
   Scenes/
     Test_Arena.unity
+    Research_Basic.unity                 (planned)
+    Research_Strategic.unity             (planned)
+  Tests/
+    PlayMode/
+
+Research/                                (planned non-Unity training/analysis source)
+  trainer/
+  configs/
+  analysis/
+  schemas/
+
+Artifacts/Experiments/                   (planned generated/ignored root)
 ```
 
 There is no required `ThreatRaycaster.cs` in the canonical runtime architecture.
@@ -329,3 +660,19 @@ There is no required `ThreatRaycaster.cs` in the canonical runtime architecture.
 - Dispatch timestamp is reported as visible motion.
 - Logging serialization allocates or writes from the urgent path.
 - Static singleton state survives incorrectly with Domain Reload disabled.
+- An old episode frame leaks into the new four-frame observation stack.
+- Branch indices differ between Unity, trainer, checkpoint, and exported inference.
+- A joint-action interaction is lost by BDQ's additive branch factorization and goes unreported.
+- Training and evaluation reuse the same scenario seeds.
+- Episode reset leaves health, ammunition, cooldown, opponent schedule, directive, request, reflex, or replay-facing state behind.
+- Optional conditions receive a different camera, actuator, aim resolver, target data, action mask, checkpoint, or opponent schedule.
+- The LLM directly outputs actuator commands or changes inference rewards.
+- Strategic masks forbid legal actions and create an artificial performance gain.
+- An asynchronous task touches Unity objects off the main thread.
+- A stale or prior-episode LLM result is applied after reset.
+- LLM timeout, invalid JSON, out-of-order response, or server loss blocks physics, BDQ, or reflex work.
+- A cached/local-model response is counted as live inference without being labeled.
+- Accelerated training wall time is reported as player-visible response latency.
+- Only aggregate combat utility is reported, hiding deaths, damage, misses, or resource waste.
+- Final thresholds or exclusions are changed after results without an exploratory label.
+- Raw checkpoints, model weights, proprietary assets, or large logs are committed accidentally.
