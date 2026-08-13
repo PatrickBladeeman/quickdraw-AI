@@ -29,12 +29,16 @@ namespace QuickDraw.AI.Reflex
         public float LastAppliedStepDistance { get; private set; }
         public float LastYawOffset { get; private set; }
         public CollisionFlags LastCollisionFlags { get; private set; }
+        public Vector3 LastCommandStartPosition { get; private set; }
+        public Quaternion LastCommandStartRotation { get; private set; }
 
         public event Action ReflexCommanded;
 
         private void Awake()
         {
             ResolveReferences();
+            LastCommandStartPosition = transform.position;
+            LastCommandStartRotation = transform.rotation;
         }
 
         public bool TryCommandFlinchStepBack(int threatEpisodeId, float confirmedThreatTime)
@@ -69,10 +73,11 @@ namespace QuickDraw.AI.Reflex
 
             horizontalForward.Normalize();
             Vector3 flinchForward = Quaternion.AngleAxis(yawOffset, Vector3.up) * horizontalForward;
+            Vector3 positionBeforeCommand = transform.position;
+            Quaternion rotationBeforeCommand = transform.rotation;
+            float commandTime = Time.realtimeSinceStartup;
             transform.rotation = Quaternion.LookRotation(flinchForward, Vector3.up);
 
-            Vector3 positionBeforeCommand = transform.position;
-            float commandTime = Time.realtimeSinceStartup;
             CollisionFlags collisionFlags = _characterController.Move(
                 -flinchForward * requestedDistance);
             float appliedDistance = Vector3.ProjectOnPlane(
@@ -87,6 +92,8 @@ namespace QuickDraw.AI.Reflex
             LastAppliedStepDistance = appliedDistance;
             LastYawOffset = yawOffset;
             LastCollisionFlags = collisionFlags;
+            LastCommandStartPosition = positionBeforeCommand;
+            LastCommandStartRotation = rotationBeforeCommand;
             CommandCount++;
             ReflexCommanded?.Invoke();
             return true;
@@ -104,6 +111,8 @@ namespace QuickDraw.AI.Reflex
             LastAppliedStepDistance = 0f;
             LastYawOffset = 0f;
             LastCollisionFlags = CollisionFlags.None;
+            LastCommandStartPosition = transform.position;
+            LastCommandStartRotation = transform.rotation;
         }
 
         private float Sample01(int threatEpisodeId, uint salt)

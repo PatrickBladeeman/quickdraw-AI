@@ -31,18 +31,18 @@ namespace QuickDraw.AI.Stimuli
         {
             ResolveReferences();
             _wasAiming = controller != null && controller.IsAiming;
-            CurrentStimulus = BuildStimulus(Time.time, _wasAiming);
+            CurrentStimulus = BuildStimulus(Time.realtimeSinceStartup, _wasAiming);
         }
 
         private void LateUpdate()
         {
-            RefreshStimulus(Time.time);
+            RefreshStimulus(Time.realtimeSinceStartup);
         }
 
         private void OnDisable()
         {
             _wasAiming = false;
-            CurrentStimulus = BuildStimulus(Time.time, false);
+            CurrentStimulus = BuildStimulus(Time.realtimeSinceStartup, false);
         }
 
         private void RefreshStimulus(float timestamp)
@@ -102,4 +102,3 @@ namespace QuickDraw.AI.Stimuli
 #endif
     }
 }
-

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace QuickDraw.AI.Activity
@@ -30,6 +31,11 @@ namespace QuickDraw.AI.Activity
         public string InterruptionReason { get; private set; } = string.Empty;
         public float InterruptionTime { get; private set; } = -1f;
         public float ResumeTime { get; private set; } = -1f;
+
+        public event Action<PatrolActivity> ActivityStarted;
+        public event Action<PatrolActivity> ActivityInterrupted;
+        public event Action<PatrolActivity> ActivityResumed;
+        public event Action<PatrolActivity> ActivityCancelled;
 
         private void Awake()
         {
@@ -70,6 +76,7 @@ namespace QuickDraw.AI.Activity
             IsCancelled = false;
             InterruptionReason = string.Empty;
             StartTime = Time.realtimeSinceStartup;
+            ActivityStarted?.Invoke(this);
         }
 
         public void TickActivity(float deltaTime)
@@ -115,6 +122,7 @@ namespace QuickDraw.AI.Activity
             IsInterrupted = true;
             InterruptionReason = string.IsNullOrWhiteSpace(reason) ? "Unspecified" : reason;
             InterruptionTime = Time.realtimeSinceStartup;
+            ActivityInterrupted?.Invoke(this);
         }
 
         [ContextMenu("Resume Activity")]
@@ -128,14 +136,21 @@ namespace QuickDraw.AI.Activity
             IsRunning = true;
             IsInterrupted = false;
             ResumeTime = Time.realtimeSinceStartup;
+            ActivityResumed?.Invoke(this);
         }
 
         [ContextMenu("Cancel Activity")]
         public void CancelActivity()
         {
+            if (IsCancelled && !IsRunning && !IsInterrupted)
+            {
+                return;
+            }
+
             IsRunning = false;
             IsInterrupted = false;
             IsCancelled = true;
+            ActivityCancelled?.Invoke(this);
         }
 
         [ContextMenu("Reset Activity")]

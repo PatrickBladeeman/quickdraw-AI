@@ -50,6 +50,12 @@ namespace QuickDraw.EditorTools
                 EditorGUILayout.EnumFlagsField(
                     "Collision Flags",
                     selector.LastCollisionFlags);
+                EditorGUILayout.Vector3Field(
+                    "Command Start Position",
+                    selector.LastCommandStartPosition);
+                EditorGUILayout.Vector3Field(
+                    "Command Start Rotation",
+                    selector.LastCommandStartRotation.eulerAngles);
             }
         }
 
