@@ -1,0 +1,205 @@
+{
+  "schema_version": "quickdraw.research-contracts.v1",
+  "status": "frozen_for_r1_smoke",
+  "immutability": {
+    "hash_algorithm": "sha256",
+    "rule": "Any breaking field, enum-index, preprocessing, reward, reset, or timing change requires a new major contract version and new comparison runs."
+  },
+  "timing": {
+    "physics_fixed_delta_seconds": 0.02,
+    "actuator_hz": 50,
+    "policy_decision_interval_fixed_steps": 5,
+    "policy_hz": 10,
+    "strategy_snapshot_interval_seconds": 2.0,
+    "strategy_hz": 0.5,
+    "gameplay_clock": "Time.realtimeSinceStartup",
+    "record_simulation_step": true
+  },
+  "observation": {
+    "preprocessing_version": "quickdraw.gray-stack.v1",
+    "camera": {
+      "width": 84,
+      "height": 84,
+      "channels_per_frame": 1,
+      "frame_stack": 4,
+      "wire_layout": "HWC",
+      "trainer_layout": "CHW",
+      "wire_dtype": "float32",
+      "value_range": [0.0, 1.0],
+      "grayscale_conversion": "rec601_luma",
+      "stack_order": "oldest_to_newest",
+      "compression": "none"
+    },
+    "reset": "Capture one post-reset frame and copy it into all four stack slots before the first decision.",
+    "basic_policy_inputs": ["visual_stack"],
+    "strategic_policy_inputs": ["visual_stack", "strategic_intent_one_hot"],
+    "strategic_intent_one_hot_size": 5,
+    "prohibited_inputs": [
+      "object_ids",
+      "target_coordinates",
+      "debug_labels",
+      "raw_scene_matrices",
+      "llm_snapshot"
+    ]
+  },
+  "actions": {
+    "semantic_enums": {
+      "movement": {
+        "Stay": 0,
+        "Forward": 1,
+        "Backward": 2,
+        "Left": 3,
+        "Right": 4
+      },
+      "combat": {
+        "Idle": 0,
+        "Shoot": 1
+      },
+      "utility": {
+        "Idle": 0,
+        "Reload": 1,
+        "Interact": 2
+      }
+    },
+    "basic_branch_indices": {
+      "movement": {
+        "0": "Stay",
+        "1": "Left",
+        "2": "Right"
+      },
+      "combat": {
+        "0": "Idle",
+        "1": "Shoot"
+      },
+      "utility_fixed": "Idle"
+    },
+    "strategic_branch_indices": {
+      "movement": {
+        "0": "Stay",
+        "1": "Forward",
+        "2": "Backward",
+        "3": "Left",
+        "4": "Right"
+      },
+      "combat": {
+        "0": "Idle",
+        "1": "Shoot"
+      },
+      "utility": {
+        "0": "Idle",
+        "1": "Reload",
+        "2": "Interact"
+      }
+    },
+    "mask_rule": "Only mechanically impossible actions may be masked.",
+    "hold_rule": "Hold the last accepted tuple between policy decisions; an enabled reflex may preempt movement only."
+  },
+  "rewards": {
+    "basic_training": {
+      "hit": 1.0,
+      "per_decision": -0.01,
+      "missed_shot": -0.02,
+      "composition": "additive"
+    },
+    "strategic_training": {
+      "status": "coefficients_must_be_registered_in_r4_before_training",
+      "invariants": [
+        "Shared terminal and damage rewards are identical across conditions.",
+        "A live LLM never supplies or changes a reward.",
+        "Potential-based goal shaping coefficients are fixed before final training."
+      ]
+    },
+    "evaluation_utility": {
+      "formula": "episode_outcome + 0.25 * (damage_dealt - damage_taken) / 100 - 0.05 * missed_shot_fraction - 0.05 * wasted_resource_fraction",
+      "episode_outcome": {
+        "opponent_eliminated": 1.0,
+        "agent_death": -1.0,
+        "timeout": 0.0
+      },
+      "store_components_separately": true
+    }
+  },
+  "episode_end": {
+    "basic": {
+      "terminal_reasons": ["target_hit"],
+      "truncation_reason": "decision_limit",
+      "decision_limit": 300
+    },
+    "strategic": {
+      "terminal_reasons": ["agent_death", "opponent_death"],
+      "truncation_reason": "time_limit",
+      "time_limit_seconds": 30.0
+    },
+    "infrastructure_invalid_is_outcome": false
+  },
+  "seeds": {
+    "type": "signed_31_bit_integer",
+    "minimum": 0,
+    "maximum": 2147483647,
+    "categories": [
+      "policy_initialization",
+      "replay_sampling",
+      "exploration",
+      "scenario",
+      "opponent",
+      "evaluation",
+      "analysis_bootstrap"
+    ],
+    "rules": [
+      "Every category is stored explicitly in the run manifest.",
+      "Do not derive a seed from an object name or runtime hash.",
+      "Training and held-out evaluation scenario seeds are disjoint.",
+      "Conditions paired for evaluation reuse the same policy and scenario seeds."
+    ]
+  },
+  "reset_order": [
+    "Invalidate outstanding director requests from the prior episode.",
+    "Reset episode and sequence identifiers.",
+    "Reset transforms, health, ammunition, cooldowns, pickups, cover state, and opponent schedule from explicit seeds.",
+    "Reset actuator, reflex, policy state, frame state, directive, counters, and telemetry observers.",
+    "Capture one post-reset frame and fill all four initial observation slots.",
+    "Emit episode_started with manifest references."
+  ],
+  "side_channel": {
+    "schema_version": "quickdraw.research-side-channel.v1",
+    "channel_uuid": "fb54c591-19fe-502a-8714-7ebc3a49a0b5",
+    "encoding": "utf8_json",
+    "envelope_fields": [
+      "schema_version",
+      "message_type",
+      "run_id",
+      "episode_id",
+      "sequence",
+      "payload"
+    ],
+    "python_to_unity_messages": ["configure_run", "configure_episode"],
+    "unity_to_python_messages": ["run_ready", "episode_started", "episode_ended", "infrastructure_error"],
+    "ordering": "Sequence is strictly increasing per direction and episode.",
+    "rejection_rules": [
+      "Reject unknown schema versions or message types.",
+      "Reject duplicate, out-of-order, and prior-episode messages.",
+      "Reject a run or episode configuration after its first decision."
+    ],
+    "prohibited_payloads": ["raw_frames", "continuous_scene_matrices", "secrets"]
+  },
+  "artifact_boundary": {
+    "generated_root": "Artifacts/Experiments",
+    "tracked_roots": [
+      "Research/environment",
+      "Research/configs",
+      "Research/schemas",
+      "Research/trainer",
+      "Research/analysis"
+    ],
+    "generated_content": [
+      "raw_jsonl",
+      "raw_csv",
+      "run_manifests",
+      "checkpoints",
+      "models",
+      "caches",
+      "generated_plots",
+      "disposable_environments"
+    ]
+  }
+}

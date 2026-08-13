@@ -33,6 +33,9 @@ sysinfo.txt
 *.key
 *.pem
 
+# Generated research artifacts and disposable environments
+/Artifacts/Experiments/
+
 # Local AI/session memory
 CONTEXT.md
 QUICKDRAW_SESSION_HANDOFF.md

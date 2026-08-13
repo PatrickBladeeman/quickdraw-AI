@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PatrickBladeeman/quickdraw-AI/Research/schemas/run-manifest.schema.json",
+  "title": "quickdraw-AI research run manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_kind",
+    "created_utc",
+    "identity",
+    "git",
+    "software",
+    "hardware",
+    "contracts",
+    "artifacts",
+    "backend",
+    "seeds",
+    "hashes",
+    "validation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "quickdraw.run-manifest.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "run_kind": {
+      "enum": ["dependency_preflight", "smoke", "training", "evaluation", "latency"]
+    },
+    "created_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition_id", "policy_id", "scenario_set_id", "episode_count"],
+      "properties": {
+        "condition_id": {"type": ["string", "null"]},
+        "policy_id": {"type": ["string", "null"]},
+        "scenario_set_id": {"type": ["string", "null"]},
+        "episode_count": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "dirty"],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      }
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unity", "python", "trainer_plugin"],
+      "properties": {
+        "unity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["editor_version", "editor_revision", "ml_agents_package"],
+          "properties": {
+            "editor_version": {
+              "const": "6000.0.57f1"
+            },
+            "editor_revision": {
+              "type": "string",
+              "minLength": 7
+            },
+            "ml_agents_package": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["version", "installed"],
+              "properties": {
+                "version": {
+                  "const": "4.0.0"
+                },
+                "installed": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "python": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "implementation", "packages"],
+          "properties": {
+            "version": {
+              "const": "3.10.12"
+            },
+            "implementation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "packages": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required": [
+                "mlagents",
+                "mlagents-envs",
+                "torch",
+                "numpy",
+                "matplotlib",
+                "pytest",
+                "jsonschema"
+              ]
+            }
+          }
+        },
+        "trainer_plugin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["installed", "version"],
+          "properties": {
+            "installed": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "cpu", "memory_bytes", "gpus"],
+      "properties": {
+        "os": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version", "build"],
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "version": {"type": "string", "minLength": 1},
+            "build": {"type": "string", "minLength": 1}
+          }
+        },
+        "cpu": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "gpus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "driver_version"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "driver_version": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "sha256"],
+      "properties": {
+        "schema_version": {
+          "const": "quickdraw.research-contracts.v1"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "run_relative_path"],
+      "properties": {
+        "root": {
+          "const": "Artifacts/Experiments"
+        },
+        "run_relative_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "selected", "accelerator_candidate", "accelerator_status", "reason"],
+      "properties": {
+        "reference": {
+          "const": "cpu"
+        },
+        "selected": {
+          "enum": ["cpu", "directml", "rocm", "cuda", "other"]
+        },
+        "accelerator_candidate": {
+          "type": ["string", "null"]
+        },
+        "accelerator_status": {
+          "enum": ["not_tested", "deferred", "rejected", "accepted"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "seeds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_initialization",
+        "replay_sampling",
+        "exploration",
+        "scenario",
+        "opponent",
+        "evaluation",
+        "analysis_bootstrap"
+      ],
+      "properties": {
+        "policy_initialization": {"$ref": "#/$defs/seed"},
+        "replay_sampling": {"$ref": "#/$defs/seed"},
+        "exploration": {"$ref": "#/$defs/seed"},
+        "scenario": {"$ref": "#/$defs/seed"},
+        "opponent": {"$ref": "#/$defs/seed"},
+        "evaluation": {"$ref": "#/$defs/seed"},
+        "analysis_bootstrap": {"$ref": "#/$defs/seed"}
+      }
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scene", "configuration", "policy", "model"],
+      "properties": {
+        "scene": {"$ref": "#/$defs/nullableSha256"},
+        "configuration": {"$ref": "#/$defs/nullableSha256"},
+        "policy": {"$ref": "#/$defs/nullableSha256"},
+        "model": {"$ref": "#/$defs/nullableSha256"}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dependency_imports", "pip_check", "manifest_schema", "unity_communication", "notes"],
+      "properties": {
+        "dependency_imports": {"type": "boolean"},
+        "pip_check": {"type": "boolean"},
+        "manifest_schema": {"type": "boolean"},
+        "unity_communication": {"type": "boolean"},
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "run_kind": {"not": {"const": "dependency_preflight"}}
+        }
+      },
+      "then": {
+        "properties": {
+          "software": {
+            "properties": {
+              "unity": {
+                "properties": {
+                  "ml_agents_package": {
+                    "properties": {
+                      "installed": {"const": true}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "validation": {
+            "properties": {
+              "unity_communication": {"const": true}
+            }
+          },
+          "identity": {
+            "properties": {
+              "condition_id": {"type": "string", "minLength": 1},
+              "policy_id": {"type": "string", "minLength": 1},
+              "scenario_set_id": {"type": "string", "minLength": 1},
+              "episode_count": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    }
+  }
+}

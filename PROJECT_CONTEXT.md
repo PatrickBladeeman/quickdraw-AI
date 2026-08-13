@@ -59,12 +59,12 @@ Implemented and previously verified:
 - Typed buffered JSONL telemetry, stage summaries, failure containment, and Domain-Reload-safe lifecycle.
 - Forty-one Play Mode tests covering Tasks 1–8.
 
-Task 8 is committed and pushed as two consecutive Task 8-only commits: `ac1274e` (`task 8 : Logging and telemetry`) and `b5532e1` (`task 8 continued`). `main`, `origin/main`, and `origin/HEAD` resolve to `b5532e1`. The checkpoint passed all 41 Play Mode tests and a Windows standalone build in Unity `6000.0.57f1` and contains no ML-Agents/research-gameplay/combat/LLM integration. Research Task R0 is complete.
+Task 8 is committed and pushed as two consecutive Task 8-only commits: `ac1274e` (`task 8 : Logging and telemetry`) and `b5532e1` (`task 8 continued`). The deterministic checkpoint remains `b5532e1`; `main`, `origin/main`, and `origin/HEAD` advanced together to documentation-synchronization commit `7a65432` before R1A began. The checkpoint passed all 41 Play Mode tests and a Windows standalone build in Unity `6000.0.57f1` and contains no ML-Agents/research-gameplay/combat/LLM integration. Research Task R0 and the separately approved R1A contract-and-dependency preflight are complete. R1A added a validated Python 3.10.12 CPU reference lock, frozen versioned research contracts, a run-manifest schema/example, and the ignored `Artifacts/Experiments/` boundary without changing Unity packages or runtime/gameplay code.
 
 Not implemented:
 
-- Unity ML-Agents or a pinned Python training environment.
-- Basic or strategic research scenes, episode/reward/reset contracts, BDQ training, replay, model export, or trained policies.
+- The Unity ML-Agents package and communicator or a retained project-local Python environment; R1A provides only the clean-validated pinned environment specification.
+- Basic or strategic research scenes, runtime implementations of the frozen episode/reward/reset/observation/action/terminal/truncation/side-channel contracts, BDQ training, replay, model export, or trained policies.
 - Combat, cover, the scripted opponent, or `EvadeTelegraphedShot` research reflex.
 - Qwen3/`llama.cpp`, the local HTTP client, strategic directives, failure injection, or LLM evaluation.
 - The seeded factorial runner, confidence-interval analysis, or curated research report.
@@ -141,7 +141,7 @@ Training defaults:
 
 One strategic checkpoint per training seed is reused unchanged across runtime ablations. Training randomizes reflex availability and uses a deterministic teacher to provide every strategic goal. Potential-based goal shaping may guide attack, cover, health, or ammunition behavior without replacing shared terminal and damage rewards. Live LLM calls are excluded from policy training.
 
-Run a 10,000-step deterministic CPU/backend parity and throughput gate before long training. CPU is the reference; AMD acceleration is accepted only when seeded traces, returns, checkpoint reload, model export, and floating-point tolerances pass and throughput improves. The development system has an AMD Radeon RX 7900 XT and 32 GB RAM but no configured ML Python environment yet.
+Run a 10,000-step deterministic CPU/backend parity and throughput gate before long training. CPU is the reference; AMD acceleration is accepted only when seeded traces, returns, checkpoint reload, model export, and floating-point tolerances pass and throughput improves. The development system has an AMD Radeon RX 7900 XT and 32 GB RAM. R1A validated a disposable CPU reference environment, but no project-local ML environment or accelerated backend is configured or accepted yet.
 
 ### Local LLM contract
 
@@ -174,7 +174,7 @@ Raw JSONL, CSV, checkpoints, and model outputs live under an ignored project-loc
 
 ### Ordered next work and non-goals
 
-The next phase is Research Task R1: establish the version-locked Unity/Python boundary, immutable environment contracts, seed and manifest conventions, ignored experiment-artifact boundary, and deterministic backend smoke gate. Before editing, decompose R1 into a separately approved smallest safe next task. The recommended first subtask is contract-and-dependency preflight for Unity ML-Agents `4.0.0` and the matching Python 3.10.12 environment; it must not add research gameplay, combat, BDQ training, or LLM runtime code.
+Research Task R0 and R1A are complete. R1A verified the Unity ML-Agents `4.0.0`/Python package `1.1.0`/Python 3.10.12 compatibility set from primary sources, clean-installed the exact Windows CPU dependency lock, froze the versioned research/seed contracts, validated a machine-readable run-manifest schema/example, and established the ignored experiment-artifact boundary. It made no Unity package, scene, runtime, trainer, combat, or LLM change. The remaining R1 work still requires separate approval; the next candidate is R1B, limited to installing and locking the Unity package and adding a minimal deterministic Unity/Python communicator smoke environment for seeded reset/step/terminal cycles.
 
 Current non-goals are survival/extraction systems, crafting or loot economies, multiplayer/networking, production art, procedural worlds, group AI, speech/TTS, unrestricted conversation, LLM training/fine-tuning, LLM frame-level control, hybrid-only privileged mechanics, tactical masks for legal actions, unobserved visible-latency claims, and post-hoc changes to registered thresholds without an exploratory label.
 

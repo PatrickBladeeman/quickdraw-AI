@@ -233,9 +233,9 @@ The implemented Task 8B pipeline uses explicit Newtonsoft-serialized records in 
 
 Task 8 records the perception `Recovering` edge as `threat_released` and records a real manual `activity_resumed` edge when it occurs. The former Task 9 tactical-recovery state machine was not implemented and is superseded by the research roadmap. Do not fabricate it in historical telemetry or make it a dependency of the research scenes.
 
-## Planned research contracts
+## Research contracts
 
-Everything in this section is planned until its corresponding `TASKS.md` research task is accepted. The contracts are fixed to make implementation and evaluation decision-complete.
+R1A freezes the machine-readable pre-runtime contract in `Research/configs/research-contracts-v1.json`. The Unity and trainer implementations remain planned until their corresponding `TASKS.md` research tasks are separately accepted. A breaking contract change requires a new major contract version; implementations must not silently diverge from the tracked contract.
 
 ### Shared clocks and decision cadence
 
@@ -635,13 +635,14 @@ Assets/_Project/
   Tests/
     PlayMode/
 
-Research/                                (planned non-Unity training/analysis source)
-  trainer/
-  configs/
-  analysis/
-  schemas/
+Research/                                (non-Unity research source and contracts)
+  environment/                           (R1A dependency lock and setup record)
+  configs/                               (R1A versioned contracts)
+  schemas/                               (R1A run-manifest schema/example)
+  trainer/                               (planned)
+  analysis/                              (planned)
 
-Artifacts/Experiments/                   (planned generated/ignored root)
+Artifacts/Experiments/                   (generated/ignored root established by R1A)
 ```
 
 There is no required `ThreatRaycaster.cs` in the canonical runtime architecture.

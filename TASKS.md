@@ -360,25 +360,38 @@ Acceptance:
 
 Goal: create a version-locked Unity/Python boundary and prove deterministic environment communication before implementing the full learned task.
 
-Steps:
+Progress:
 
-- Add `com.unity.ml-agents` version `4.0.0`, compatible with Unity 6, and track the package-lock change.
-- Create a Python 3.10.12 environment specification with matching `mlagents`/`mlagents-envs`, PyTorch, numerical, plotting, and test dependencies pinned.
-- Record package versions, operating system, Unity version, Python version, CPU/GPU, driver, and trainer-plugin version in a machine-readable run manifest.
-- Define stable episode, policy-training, opponent, and evaluation seeds. Never derive seeds from runtime object names or unstable hashes.
-- Define immutable observation, action, reward, terminal, truncation, and side-channel contracts.
-- Add a trainer/backend smoke environment before adding combat complexity.
-- Run a deterministic 10,000-step CPU reference trace and throughput measurement.
-- Test an available supported AMD backend against the same trace. Accept it only if observations, actions, seeded returns, checkpoint reload, and exported inference agree within documented floating-point tolerance and measured steps per second improve; otherwise retain CPU.
-- Create an ignored project-local experiment-artifact root for raw JSONL, CSV, checkpoints, model files, and run manifests. Track schemas, scripts, and configurations, not large generated artifacts.
+- [ ] Add `com.unity.ml-agents` version `4.0.0`, compatible with Unity 6, and track the package-lock change.
+- [x] Create a Python 3.10.12 environment specification with matching `mlagents`/`mlagents-envs`, PyTorch, numerical, plotting, and test dependencies pinned.
+- [x] Record package versions, operating system, Unity version, Python version, CPU/GPU, driver, and trainer-plugin status in a machine-readable run-manifest schema/example.
+- [x] Define stable episode, policy-training, opponent, and evaluation seeds. Never derive seeds from runtime object names or unstable hashes.
+- [x] Define immutable observation, action, reward, terminal, truncation, and side-channel contracts.
+- [ ] Add a trainer/backend smoke environment before adding combat complexity.
+- [ ] Run a deterministic 10,000-step CPU reference trace and throughput measurement.
+- [ ] Test an available supported AMD backend against the same trace. Accept it only if observations, actions, seeded returns, checkpoint reload, and exported inference agree within documented floating-point tolerance and measured steps per second improve; otherwise retain CPU.
+- [x] Create an ignored project-local experiment-artifact root for raw JSONL, CSV, checkpoints, model files, and run manifests. Track schemas, scripts, and configurations, not large generated artifacts.
 
 Acceptance:
 
-- A fresh documented Python environment connects to an Editor or standalone Unity environment and completes seeded reset/step/terminal cycles.
-- Repeating the same smoke seed produces the same initial observation, action legality, reward sequence, and terminal reason.
-- Package and environment versions are pinned rather than inferred from a developer machine.
-- Backend selection is recorded as a measured decision, with CPU remaining the reference.
-- No learned model or LLM claim is made in this infrastructure task.
+- [ ] A fresh documented Python environment connects to an Editor or standalone Unity environment and completes seeded reset/step/terminal cycles.
+- [ ] Repeating the same smoke seed produces the same initial observation, action legality, reward sequence, and terminal reason.
+- [x] Package and environment versions are pinned rather than inferred from a developer machine.
+- [ ] Backend selection is recorded as a measured decision, with CPU remaining the reference.
+- [x] No learned model or LLM claim is made in this infrastructure task.
+
+### R1A. Contract-and-dependency preflight — completed
+
+Scope completed without installing a Unity package or adding runtime/gameplay code:
+
+- [x] Verified from primary sources that Release 23 pairs `com.unity.ml-agents` `4.0.0` with `mlagents`/`mlagents-envs` `1.1.0` on Python 3.10.12.
+- [x] Added and clean-installed the exact Windows CPU reference lock, including the reproducible bootstrap versions required by ML-Agents' `pkg_resources` import.
+- [x] Added versioned machine-readable observation, action, reward, terminal, truncation, reset, seed, side-channel, and artifact contracts.
+- [x] Added a Draft 2020-12 run-manifest schema plus a validated preflight example containing repository, software, hardware, backend, seed, contract-hash, and validation state.
+- [x] Added and verified the ignored `Artifacts/Experiments/` root while keeping environment/config/schema sources tracked.
+- [x] Confirmed the Unity package manifest/lock, scenes, gameplay, trainer, combat, and LLM code were untouched.
+
+Remaining R1 work begins only after a separately approved SSNT. R1A does not satisfy the Unity communicator, deterministic trace, throughput, or AMD parity acceptance gates.
 
 ## R2. Implement the Unity Basic visual-control benchmark
 

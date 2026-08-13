@@ -37,7 +37,7 @@ Timing stages are recorded separately in structured telemetry so model latency, 
 
 ## Status
 
-The deterministic Unity fixture currently implements player control, NPC patrol and perception, one-shot interruption, a measurable reflex, visible-motion observation, and buffered JSONL telemetry. The learned-agent environments, BDQ trainer, strategic combat benchmark, and local-model integration are the next research phases.
+The deterministic Unity fixture currently implements player control, NPC patrol and perception, one-shot interruption, a measurable reflex, visible-motion observation, and buffered JSONL telemetry. Research preflight now pins and validates the Python 3.10.12 CPU dependency set, versioned environment contracts, run-manifest schema, and ignored artifact boundary. The Unity ML-Agents package/communicator, learned-agent environments, BDQ trainer, strategic combat benchmark, and local-model integration remain future research phases.
 
 ## Technology
 
@@ -45,7 +45,7 @@ The deterministic Unity fixture currently implements player control, NPC patrol 
 - Universal Render Pipeline
 - Unity Input System
 - Unity ML-Agents (planned research bridge)
-- Python and PyTorch (planned BDQ trainer)
+- Python 3.10.12 and PyTorch (pinned CPU reference; BDQ trainer planned)
 - Qwen3-8B through a local `llama.cpp` server (planned strategic layer)
 - ProBuilder
 - Structured JSONL telemetry
