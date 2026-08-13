@@ -591,6 +591,7 @@ GameObject:
   - component: {fileID: 399708016}
   - component: {fileID: 399708021}
   - component: {fileID: 399708022}
+  - component: {fileID: 399708023}
   m_Layer: 8
   m_Name: NPC_01
   m_TagString: Untagged
@@ -676,6 +677,21 @@ MonoBehaviour:
   stepBackDistance: 0.35
   stepDistanceVariation: 0.05
   maximumYawOffset: 30
+--- !u!114 &399708023
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 399708007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afc1c944814b4a13a5d25f2aebf17d76, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  reflexSelector: {fileID: 399708022}
+  positionThreshold: 0.01
+  rotationThresholdDegrees: 1
 --- !u!23 &399708009
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1645,6 +1661,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1418775474}
+  - component: {fileID: 1418775475}
+  - component: {fileID: 1418775476}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -1667,6 +1685,42 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1418775475
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1418775473}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c65d80b801f481849913e7d399974f48, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  flushIntervalSeconds: 1
+  maxEventsPerFrame: 64
+  maxQueuedEvents: 4096
+  writeToDisk: 1
+  outputDirectoryOverride:
+--- !u!114 &1418775476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1418775473}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4b4d490eb8d48919e84801505a1f57a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  logger: {fileID: 1418775475}
+  aimThreatEmitter: {fileID: 1062353844}
+  perception: {fileID: 399708016}
+  patrolActivity: {fileID: 399708008}
+  behaviorController: {fileID: 399708021}
+  reflexSelector: {fileID: 399708022}
+  visibleMotionObserver: {fileID: 399708023}
 --- !u!1 &1532682507
 GameObject:
   m_ObjectHideFlags: 0

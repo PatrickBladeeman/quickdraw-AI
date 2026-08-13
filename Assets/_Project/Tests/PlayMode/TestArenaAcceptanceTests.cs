@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -83,7 +84,13 @@ namespace QuickDraw.Tests.PlayMode
             }
 
             GameObject systems = RequireObject("Systems");
-            Assert.That(systems.GetComponents<Component>().Length, Is.EqualTo(1), "Systems remains an empty container until diagnostics are ready.");
+            Type loggerType = Type.GetType("QuickDraw.Logging.JsonlLogger, Assembly-CSharp");
+            Type recorderType = Type.GetType("QuickDraw.Logging.TelemetryRecorder, Assembly-CSharp");
+            Assert.That(loggerType, Is.Not.Null);
+            Assert.That(recorderType, Is.Not.Null);
+            Assert.That(systems.GetComponents<Component>().Length, Is.EqualTo(3));
+            Assert.That(systems.GetComponent(loggerType), Is.Not.Null);
+            Assert.That(systems.GetComponent(recorderType), Is.Not.Null);
         }
 
         [Test]
