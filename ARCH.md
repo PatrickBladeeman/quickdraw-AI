@@ -2,7 +2,7 @@
 
 ## Authority and status
 
-`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena` fixture from the approved but unimplemented learned-agent research architecture; planned contracts must not be described as existing runtime behavior.
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena` fixture and R1B communicator smoke from the approved but unimplemented learned-agent benchmark architecture; planned contracts must not be described as existing runtime behavior.
 
 ## System overview
 
@@ -236,6 +236,14 @@ Task 8 records the perception `Recovering` edge as `threat_released` and records
 ## Research contracts
 
 R1A freezes the machine-readable pre-runtime contract in `Research/configs/research-contracts-v1.json`. The Unity and trainer implementations remain planned until their corresponding `TASKS.md` research tasks are separately accepted. A breaking contract change requires a new major contract version; implementations must not silently diverge from the tracked contract.
+
+### Implemented R1B communicator boundary
+
+`Research_Smoke` is an isolated, abstract ML-Agents transport fixture. It contains one `ResearchSmokeAgent`, one `ResearchSmokeCoordinator`, a four-float vector observation, discrete branches `[3, 2]`, and the frozen custom side-channel UUID. It deliberately contains no visual sensor, player/NPC component, combat mechanic, trainer, model, reflex, or LLM integration.
+
+The coordinator accepts one ordered run configuration and ordered per-episode configurations, rejects wrong schema/hash/run/sequence data, and reports `run_ready`, `episode_started`, `episode_ended`, or `infrastructure_error`. The state machine owns its explicit seed, mechanically legal action masks, additive smoke rewards, `smoke_goal` terminal, and `decision_limit` truncation. `EndEpisode` and `EpisodeInterrupted` preserve terminal versus truncation semantics across the ML-Agents low-level API.
+
+`Research/smoke/run_smoke.py` launches the standalone player, verifies behavior specifications, drives one terminal and one truncated episode, records the complete canonical transition/side-channel trace, validates the run manifest, and compares a second same-seed trace exactly. This proves the communicator contract only; it is not evidence for sample efficiency, throughput, learned behavior, or the research hypotheses.
 
 ### Shared clocks and decision cadence
 
@@ -621,24 +629,27 @@ Assets/_Project/
       JsonlLogger.cs
       LogEvents.cs
       TelemetryRecorder.cs
-    Research/                            (planned; exact subfolders follow assembly boundaries)
-      Environment/
-      Actuation/
-      Policy/
-      Reflex/
-      Strategy/
-      Telemetry/
+    Research/
+      Environment/                       (R1B communicator smoke only)
+      Actuation/                         (planned)
+      Policy/                            (planned)
+      Reflex/                            (planned)
+      Strategy/                          (planned)
+      Telemetry/                         (planned)
   Scenes/
     Test_Arena.unity
+    Research_Smoke.unity                  (R1B communicator fixture)
     Research_Basic.unity                 (planned)
     Research_Strategic.unity             (planned)
   Tests/
+    EditMode/                             (R1B smoke contract tests)
     PlayMode/
 
 Research/                                (non-Unity research source and contracts)
   environment/                           (R1A dependency lock and setup record)
   configs/                               (R1A versioned contracts)
   schemas/                               (R1A run-manifest schema/example)
+  smoke/                                 (R1B config, driver, and instructions)
   trainer/                               (planned)
   analysis/                              (planned)
 

@@ -79,6 +79,14 @@ Validated on 2026-08-12 using:
 The Unity package and Unity/Python communicator were intentionally not
 installed or exercised in R1A.
 
+## R1B continuation
+
+R1B subsequently installed and locked `com.unity.ml-agents==4.0.0` and used
+this exact Python reference environment to drive two identical fixed-seed
+standalone communicator traces. See `Research/smoke/README.md` for the isolated
+fixture, commands, evidence, and deliberate exclusions. R1B did not install a
+trainer plugin or test an accelerated backend.
+
 ## Accelerator decision
 
 CPU remains the reference backend. PyTorch 2.2.1 publishes ROCm wheels for

@@ -1,0 +1,62 @@
+{
+  "schema_version": "quickdraw.communicator-smoke.v1",
+  "purpose": "Deterministic Unity/Python transport validation only; this is not a policy-training benchmark.",
+  "behavior_name": "QuickDrawResearchSmoke",
+  "side_channel": {
+    "schema_version": "quickdraw.research-side-channel.v1",
+    "channel_uuid": "fb54c591-19fe-502a-8714-7ebc3a49a0b5",
+    "contract_sha256": "b6777d7a3b45a8134358c5946c9284c37c3414aad85c8e763dbdf0faf9e33523"
+  },
+  "observation": {
+    "dtype": "float32",
+    "size": 4,
+    "fields": [
+      "position",
+      "target",
+      "step_fraction",
+      "seed_mod_997_fraction"
+    ]
+  },
+  "actions": {
+    "dtype": "int32",
+    "discrete_branches": [3, 2],
+    "movement": {
+      "0": "stay",
+      "1": "decrement",
+      "2": "increment"
+    },
+    "submit": {
+      "0": "continue",
+      "1": "submit"
+    },
+    "mask_rule": "Only outward movement at a boundary and submit in a truncation-only episode are mechanically unavailable."
+  },
+  "reward": {
+    "per_decision": -0.01,
+    "correct_submit": 1.0,
+    "incorrect_submit": -0.02,
+    "composition": "additive"
+  },
+  "episodes": [
+    {
+      "episode_id": 1,
+      "seed_offset": 0,
+      "decision_limit": 4,
+      "expected_end": "terminal",
+      "reason": "smoke_goal",
+      "interrupted": false
+    },
+    {
+      "episode_id": 2,
+      "seed_offset": 1,
+      "decision_limit": 4,
+      "expected_end": "truncation",
+      "reason": "decision_limit",
+      "interrupted": true
+    }
+  ],
+  "comparison": {
+    "runs": 2,
+    "rule": "The canonical traces must be structurally and numerically identical for the same base seed."
+  }
+}
