@@ -368,7 +368,7 @@ Progress:
 - [x] Define stable episode, policy-training, opponent, and evaluation seeds. Never derive seeds from runtime object names or unstable hashes.
 - [x] Define immutable observation, action, reward, terminal, truncation, and side-channel contracts.
 - [x] Add a communicator/backend smoke environment before adding combat complexity.
-- [ ] Run a deterministic 10,000-step CPU reference trace and throughput measurement.
+- [x] Run a deterministic 10,000-step CPU reference trace and throughput measurement.
 - [ ] Test an available supported AMD backend against the same trace. Accept it only if observations, actions, seeded returns, checkpoint reload, and exported inference agree within documented floating-point tolerance and measured steps per second improve; otherwise retain CPU.
 - [x] Create an ignored project-local experiment-artifact root for raw JSONL, CSV, checkpoints, model files, and run manifests. Track schemas, scripts, and configurations, not large generated artifacts.
 
@@ -406,7 +406,21 @@ Scope completed without starting a research benchmark or trainer:
 - [x] Kept all generated players, logs, traces, and run manifests under ignored `Artifacts/Experiments/`.
 - [x] Added no `Research_Basic`, combat, trainer, replay, learned model, AMD acceleration, or LLM implementation and made no model-effectiveness claim.
 
-R1B does not satisfy the 10,000-step CPU trace/throughput or AMD parity gates. Those remain separately approved work.
+R1B alone did not satisfy the 10,000-step CPU trace/throughput or AMD parity gates. R1C subsequently satisfied the CPU trace/throughput gate below; AMD parity remains separately approved work.
+
+### R1C. Deterministic 10,000-decision CPU reference trace — completed
+
+Scope completed by extending only the abstract communicator fixture:
+
+- [x] Added a separate tracked CPU-reference contract with one base-seed-`21001`, 10,000-decision truncation; the original two-episode R1B smoke contract and default runner behavior remain unchanged.
+- [x] Bounded accepted decision limits at 10,000 in both the pure episode state machine and coordinator validation, with a focused test proving decisions 1–9,999 remain active, decision 10,000 truncates, and 10,001 is rejected.
+- [x] Timed only synchronous Python LLAPI action-to-Unity-step round trips with `time.perf_counter_ns`; player startup, exact trace comparison, and JSON serialization are excluded.
+- [x] Completed two standalone CPU runs. Both contained exactly 10,000 transitions, ended with `decision_limit` and `interrupted=true`, and produced the same canonical trace SHA-256 `d5080b62ea3cc6c33a18567461f690a568339d2168f9d253ea3134b7c85572c5`.
+- [x] Recorded 92.0502828 s / 108.636 decisions/s and 93.0801134 s / 107.434 decisions/s in schema-validated run manifests. These are communicator-transport measurements, not training or model-inference throughput.
+- [x] Passed six focused Edit Mode tests, all 41 existing Play Mode tests, the isolated smoke-player build, the normal `Test_Arena` Windows build, and the unchanged R1B two-run exact-trace regression.
+- [x] Kept generated players, logs, traces, and manifests ignored and added no AMD backend, `Research_Basic`, combat, trainer, replay, learned model, or LLM implementation.
+
+R1C does not satisfy AMD/backend parity, checkpoint reload, model export, either learned benchmark, or any research-effectiveness gate. CPU remains the measured reference.
 
 ## R2. Implement the Unity Basic visual-control benchmark
 

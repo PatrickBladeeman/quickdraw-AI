@@ -217,7 +217,7 @@ namespace QuickDraw.Research.Environment
                 payload.Seed.Value < 0 ||
                 !payload.DecisionLimit.HasValue ||
                 payload.DecisionLimit.Value <= 0 ||
-                payload.DecisionLimit.Value > 32 ||
+                payload.DecisionLimit.Value > ResearchSmokeEpisode.MaximumDecisionLimit ||
                 (payload.ExpectedEnd != ResearchSmokeEpisode.TerminalMode &&
                  payload.ExpectedEnd != ResearchSmokeEpisode.TruncationMode))
             {

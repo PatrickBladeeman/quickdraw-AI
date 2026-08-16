@@ -96,3 +96,8 @@ DirectML is therefore not part of this environment and no AMD acceleration
 claim is made. A later backend task must use an isolated lock and pass the
 registered trace, return, checkpoint, export, tolerance, and throughput gates
 before it can replace CPU.
+
+R1C used this pinned CPU environment to record two exactly matching
+10,000-decision Unity/Python LLAPI transport traces. Their measured rates were
+108.636 and 107.434 decisions/s. This establishes the CPU transport reference;
+it does not validate a trainer, checkpoint, export path, or accelerated backend.

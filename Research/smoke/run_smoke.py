@@ -8,11 +8,12 @@ import os
 import platform
 import subprocess
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from jsonschema import Draft202012Validator, FormatChecker
@@ -27,6 +28,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT_ROOT = (REPO_ROOT / "Artifacts" / "Experiments").resolve()
 CONTRACT_PATH = REPO_ROOT / "Research" / "configs" / "research-contracts-v1.json"
 SMOKE_CONTRACT_PATH = Path(__file__).with_name("smoke-contract-v1.json")
+CPU_REFERENCE_CONTRACT_PATH = Path(__file__).with_name(
+    "cpu-reference-contract-v1.json"
+)
 MANIFEST_SCHEMA_PATH = REPO_ROOT / "Research" / "schemas" / "run-manifest.schema.json"
 SCENE_PATH = REPO_ROOT / "Assets" / "_Project" / "Scenes" / "Research_Smoke.unity"
 UNITY_VERSION = "6000.0.57f1"
@@ -221,7 +225,7 @@ def execute_trace(
     base_seed: int,
     output_directory: Path,
     smoke_contract: Dict[str, Any],
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     side_channel = ResearchSmokeSideChannel(run_id, smoke_contract)
     side_channel.send(
         "configure_run",
@@ -268,6 +272,20 @@ def execute_trace(
     pending: Dict[int, Dict[str, Any]] = {}
     completed_episodes = 0
     total_iterations = 0
+    maximum_iterations = (
+        sum(int(spec["decision_limit"]) for spec in episode_specs.values())
+        + len(episode_specs)
+        + 2
+    )
+    measurement = smoke_contract.get("measurement")
+    expected_decision_count = (
+        int(measurement["decision_count"])
+        if measurement is not None
+        else None
+    )
+    decisions_sent = 0
+    timing_started_ns: Optional[int] = None
+    timing_ended_ns: Optional[int] = None
 
     try:
         environment.reset()
@@ -288,8 +306,10 @@ def execute_trace(
 
         while completed_episodes < len(episode_specs):
             total_iterations += 1
-            if total_iterations > 64:
-                raise RuntimeError("Smoke trace exceeded its bounded iteration count.")
+            if total_iterations > maximum_iterations:
+                raise RuntimeError(
+                    "Communicator trace exceeded its contract-derived iteration bound."
+                )
 
             decision_steps, terminal_steps = environment.get_steps(behavior_name)
 
@@ -340,13 +360,29 @@ def execute_trace(
                 }
 
             if len(decision_steps) > 0:
+                if measurement is not None and timing_started_ns is None:
+                    timing_started_ns = time.perf_counter_ns()
                 actions = np.zeros((len(decision_steps), 2), dtype=np.int32)
                 for decision_index, raw_agent_id in enumerate(decision_steps.agent_id):
                     selected = pending[int(raw_agent_id)]["action"]
                     actions[decision_index] = selected
                 environment.set_actions(behavior_name, ActionTuple(discrete=actions))
+                decisions_sent += len(decision_steps)
+                if (
+                    expected_decision_count is not None
+                    and decisions_sent > expected_decision_count
+                ):
+                    raise RuntimeError(
+                        "CPU reference trace exceeded its registered decision count."
+                    )
 
             environment.step()
+            if (
+                expected_decision_count is not None
+                and decisions_sent == expected_decision_count
+                and timing_ended_ns is None
+            ):
+                timing_ended_ns = time.perf_counter_ns()
 
         if pending:
             raise RuntimeError(f"Unfinished transitions remain: {sorted(pending)}")
@@ -363,8 +399,29 @@ def execute_trace(
             if final["interrupted"] != bool(episode["interrupted"]):
                 raise RuntimeError(f"Episode {episode_id} has the wrong interrupted result.")
 
-        return {
-            "trace_format": TRACE_FORMAT,
+        performance = None
+        if measurement is not None:
+            if decisions_sent != expected_decision_count:
+                raise RuntimeError(
+                    f"CPU reference trace recorded {decisions_sent} decisions, "
+                    f"expected {expected_decision_count}."
+                )
+            if timing_started_ns is None or timing_ended_ns is None:
+                raise RuntimeError("CPU reference timing boundary was not observed.")
+            elapsed_seconds = (timing_ended_ns - timing_started_ns) / 1_000_000_000
+            if elapsed_seconds <= 0:
+                raise RuntimeError("CPU reference elapsed time must be positive.")
+            performance = {
+                "measurement_scope": measurement["scope"],
+                "decision_count": decisions_sent,
+                "elapsed_seconds": round(elapsed_seconds, 9),
+                "decisions_per_second": round(decisions_sent / elapsed_seconds, 3),
+                "startup_excluded": True,
+                "timing_clock": "time.perf_counter_ns",
+            }
+
+        trace = {
+            "trace_format": smoke_contract.get("trace_format", TRACE_FORMAT),
             "base_seed": base_seed,
             "behavior": {
                 "name": smoke_contract["behavior_name"],
@@ -377,6 +434,7 @@ def execute_trace(
                 for episode_id in sorted(episode_traces)
             ],
         }
+        return trace, performance
     finally:
         environment.close()
 
@@ -464,6 +522,9 @@ def create_manifest(
     base_seed: int,
     output_directory: Path,
     compared: bool,
+    smoke_contract: Dict[str, Any],
+    smoke_contract_path: Path,
+    performance: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
     relative_output = output_directory.resolve().relative_to(ARTIFACT_ROOT).as_posix()
     git_commit = run_command(["git", "rev-parse", "HEAD"])
@@ -479,17 +540,26 @@ def create_manifest(
 
     os_name, os_version, os_build, cpu = windows_system_identity()
     seed_values = [base_seed + offset for offset in range(7)]
+    is_cpu_reference = performance is not None
 
-    return {
+    manifest = {
         "schema_version": "quickdraw.run-manifest.v1",
         "run_id": run_id,
-        "run_kind": "smoke",
+        "run_kind": "latency" if is_cpu_reference else "smoke",
         "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "identity": {
-            "condition_id": "r1b-communicator-smoke",
+            "condition_id": (
+                "r1c-cpu-reference-trace"
+                if is_cpu_reference
+                else "r1b-communicator-smoke"
+            ),
             "policy_id": "scripted-smoke-driver-v1",
-            "scenario_set_id": f"communicator-smoke-seed-{base_seed}",
-            "episode_count": 2,
+            "scenario_set_id": (
+                f"cpu-reference-seed-{base_seed}"
+                if is_cpu_reference
+                else f"communicator-smoke-seed-{base_seed}"
+            ),
+            "episode_count": len(smoke_contract["episodes"]),
         },
         "git": {"commit": git_commit, "dirty": git_dirty},
         "software": {
@@ -535,7 +605,11 @@ def create_manifest(
             "selected": "cpu",
             "accelerator_candidate": "torch-directml",
             "accelerator_status": "deferred",
-            "reason": "R1B validates communication only; backend parity and throughput remain deferred.",
+            "reason": (
+                "R1C records the CPU LLAPI transport reference only; accelerator parity is deferred."
+                if is_cpu_reference
+                else "R1B validates communication only; backend parity and throughput remain deferred."
+            ),
         },
         "seeds": {
             "policy_initialization": seed_values[0],
@@ -548,7 +622,7 @@ def create_manifest(
         },
         "hashes": {
             "scene": sha256_file(SCENE_PATH),
-            "configuration": sha256_file(SMOKE_CONTRACT_PATH),
+            "configuration": sha256_file(smoke_contract_path),
             "policy": None,
             "model": None,
         },
@@ -557,22 +631,42 @@ def create_manifest(
             "pip_check": True,
             "manifest_schema": True,
             "unity_communication": True,
-            "notes": [
-                "Completed one terminal and one truncated deterministic communicator episode.",
-                "Canonical trace comparison passed." if compared else "Canonical trace captured for comparison.",
-                "No trainer, learned model, combat, Basic benchmark, AMD parity, or LLM code was exercised.",
-            ],
+            "notes": (
+                [
+                    "Completed one deterministic 10,000-decision truncation trace.",
+                    "Measured CPU LLAPI transport round trips; process startup and trace serialization were excluded.",
+                    "Canonical trace comparison passed." if compared else "Canonical trace captured for comparison.",
+                    "No trainer, learned model, combat, Basic benchmark, AMD parity, or LLM code was exercised.",
+                ]
+                if is_cpu_reference
+                else [
+                    "Completed one terminal and one truncated deterministic communicator episode.",
+                    "Canonical trace comparison passed." if compared else "Canonical trace captured for comparison.",
+                    "No trainer, learned model, combat, Basic benchmark, AMD parity, or LLM code was exercised.",
+                ]
+            ),
         },
     }
+    if performance is not None:
+        manifest["performance"] = performance
+    return manifest
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the deterministic R1B communicator smoke gate.")
+    parser = argparse.ArgumentParser(
+        description="Run a deterministic communicator or CPU-reference trace."
+    )
     parser.add_argument("--env", required=True, type=Path, help="Path to the smoke player executable.")
     parser.add_argument("--output", required=True, type=Path, help="Ignored run artifact directory.")
     parser.add_argument("--run-id", required=True, help="Run-manifest identifier.")
     parser.add_argument("--seed", required=True, type=int, help="Signed 31-bit base seed.")
     parser.add_argument("--compare-to", type=Path, help="Canonical trace from the first run.")
+    parser.add_argument(
+        "--mode",
+        choices=("smoke", "cpu-reference"),
+        default="smoke",
+        help="Trace contract to run; defaults to the R1B smoke regression.",
+    )
     return parser.parse_args()
 
 
@@ -588,11 +682,16 @@ def main() -> int:
         raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
 
     output_directory.mkdir(parents=True, exist_ok=True)
-    smoke_contract = json.loads(SMOKE_CONTRACT_PATH.read_text(encoding="utf-8"))
+    smoke_contract_path = (
+        CPU_REFERENCE_CONTRACT_PATH
+        if arguments.mode == "cpu-reference"
+        else SMOKE_CONTRACT_PATH
+    )
+    smoke_contract = json.loads(smoke_contract_path.read_text(encoding="utf-8"))
     if smoke_contract["side_channel"]["contract_sha256"] != sha256_file(CONTRACT_PATH):
         raise RuntimeError("The smoke config and frozen research-contract hash differ.")
 
-    trace = execute_trace(
+    trace, performance = execute_trace(
         executable,
         arguments.run_id,
         arguments.seed,
@@ -618,6 +717,9 @@ def main() -> int:
         arguments.seed,
         output_directory,
         compared,
+        smoke_contract,
+        smoke_contract_path,
+        performance,
     )
     schema = json.loads(MANIFEST_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
@@ -634,6 +736,10 @@ def main() -> int:
     print(f"trace={trace_path}")
     print(f"manifest={manifest_path}")
     print(f"comparison={'pass' if compared else 'reference-captured'}")
+    if performance is not None:
+        print(f"decision_count={performance['decision_count']}")
+        print(f"elapsed_seconds={performance['elapsed_seconds']}")
+        print(f"decisions_per_second={performance['decisions_per_second']}")
     return 0
 
 

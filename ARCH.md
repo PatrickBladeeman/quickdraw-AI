@@ -237,13 +237,13 @@ Task 8 records the perception `Recovering` edge as `threat_released` and records
 
 R1A freezes the machine-readable pre-runtime contract in `Research/configs/research-contracts-v1.json`. The Unity and trainer implementations remain planned until their corresponding `TASKS.md` research tasks are separately accepted. A breaking contract change requires a new major contract version; implementations must not silently diverge from the tracked contract.
 
-### Implemented R1B communicator boundary
+### Implemented R1B/R1C communicator boundary
 
 `Research_Smoke` is an isolated, abstract ML-Agents transport fixture. It contains one `ResearchSmokeAgent`, one `ResearchSmokeCoordinator`, a four-float vector observation, discrete branches `[3, 2]`, and the frozen custom side-channel UUID. It deliberately contains no visual sensor, player/NPC component, combat mechanic, trainer, model, reflex, or LLM integration.
 
 The coordinator accepts one ordered run configuration and ordered per-episode configurations, rejects wrong schema/hash/run/sequence data, and reports `run_ready`, `episode_started`, `episode_ended`, or `infrastructure_error`. The state machine owns its explicit seed, mechanically legal action masks, additive smoke rewards, `smoke_goal` terminal, and `decision_limit` truncation. `EndEpisode` and `EpisodeInterrupted` preserve terminal versus truncation semantics across the ML-Agents low-level API.
 
-`Research/smoke/run_smoke.py` launches the standalone player, verifies behavior specifications, drives one terminal and one truncated episode, records the complete canonical transition/side-channel trace, validates the run manifest, and compares a second same-seed trace exactly. This proves the communicator contract only; it is not evidence for sample efficiency, throughput, learned behavior, or the research hypotheses.
+`Research/smoke/run_smoke.py` launches the standalone player, verifies behavior specifications, records complete canonical transition/side-channel traces, validates run manifests, and compares a second same-seed trace exactly. Its default R1B mode drives one terminal and one truncated smoke episode. Its dedicated R1C CPU-reference mode drives one 10,000-decision truncation and times the synchronous low-level-API decision loop with `time.perf_counter_ns`, including scripted action selection and in-memory transition capture; process startup, trace comparison, and JSON serialization are excluded. The two R1C base-seed-`21001` traces were byte-identical, while their separately recorded rates were 108.636 and 107.434 decisions/s. This is CPU communicator-transport throughput, not training throughput, model-inference throughput, sample-efficiency evidence, or support for the research hypotheses.
 
 ### Shared clocks and decision cadence
 

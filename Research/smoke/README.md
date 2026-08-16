@@ -1,4 +1,4 @@
-# R1B communicator smoke
+# R1B communicator smoke and R1C CPU reference
 
 R1B proves the version-locked Unity/Python communication boundary without
 starting either learned benchmark. The fixture is a deterministic abstract
@@ -20,8 +20,10 @@ claims.
   observations, terminal flags, side-channel events, and a schema-validated run
   manifest.
 
-The tracked smoke definition is `smoke-contract-v1.json`. Generated builds,
-logs, traces, and manifests remain below ignored `Artifacts/Experiments/`.
+The tracked smoke definition is `smoke-contract-v1.json`. The separate
+`cpu-reference-contract-v1.json` registers one 10,000-decision truncation and
+its timing boundary. Generated builds, logs, traces, and manifests remain below
+ignored `Artifacts/Experiments/`.
 
 ## Rebuild and test
 
@@ -70,8 +72,38 @@ numerically identical to the first. The runner also fails on a contract-hash,
 behavior-shape, side-channel sequence, end-reason, manifest-schema, dependency,
 or artifact-boundary mismatch.
 
+## Run the R1C CPU reference
+
+Use the same player and Python environment, adding the dedicated mode:
+
+```powershell
+$runRoot = "$project\Artifacts\Experiments\r1c-cpu-reference"
+
+& $python Research/smoke/run_smoke.py --mode cpu-reference `
+  --env $smokePlayer --output "$runRoot\run-1" `
+  --run-id r1c-cpu-reference-1 --seed 21001
+
+& $python Research/smoke/run_smoke.py --mode cpu-reference `
+  --env $smokePlayer --output "$runRoot\run-2" `
+  --run-id r1c-cpu-reference-2 --seed 21001 `
+  --compare-to "$runRoot\run-1\trace.json"
+```
+
+Timing begins immediately before the first LLAPI action submission and ends
+when the 10,000th `environment.step()` returns. The measured synchronous driver
+loop includes scripted action selection and in-memory transition capture.
+Player startup, trace comparison, and JSON serialization are excluded. The
+canonical trace also excludes timing so deterministic state evidence can be
+compared exactly while each run manifest retains its own performance result.
+
+The two accepted base-seed-`21001` runs both produced trace SHA-256
+`d5080b62ea3cc6c33a18567461f690a568339d2168f9d253ea3134b7c85572c5`.
+They recorded 108.636 and 107.434 decisions/s. This is CPU Unity/Python LLAPI
+transport throughput, not trainer or model-inference throughput.
+
 ## Deliberate exclusions
 
-R1B does not add `Research_Basic`, visual observations, combat, a replay buffer,
-a trainer, a learned model, the 10,000-step throughput gate, AMD acceleration,
-or LLM integration. It provides no model-quality evidence.
+R1B/R1C do not add `Research_Basic`, visual observations, combat, a replay
+buffer, a trainer, a learned model, AMD acceleration, or LLM integration. The
+10,000-decision CPU result provides a deterministic transport baseline and no
+model-quality evidence.

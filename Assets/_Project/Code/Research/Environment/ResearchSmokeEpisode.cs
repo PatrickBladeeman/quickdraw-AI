@@ -31,6 +31,7 @@ namespace QuickDraw.Research.Environment
         public const int ObservationSize = 4;
         public const int MovementBranchSize = 3;
         public const int SubmitBranchSize = 2;
+        public const int MaximumDecisionLimit = 10000;
         public const string TerminalMode = "terminal";
         public const string TruncationMode = "truncation";
         public const string GoalReason = "smoke_goal";
@@ -65,7 +66,7 @@ namespace QuickDraw.Research.Environment
                 throw new ArgumentOutOfRangeException(nameof(seed));
             }
 
-            if (decisionLimit <= 0)
+            if (decisionLimit <= 0 || decisionLimit > MaximumDecisionLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(decisionLimit));
             }

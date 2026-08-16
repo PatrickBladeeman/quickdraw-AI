@@ -63,6 +63,44 @@ namespace QuickDraw.Tests.EditMode
         }
 
         [Test]
+        public void CpuReferenceTraceEndsAtExactlyTenThousandDecisions()
+        {
+            var episode = new ResearchSmokeEpisode();
+            episode.Reset(
+                1,
+                21001,
+                ResearchSmokeEpisode.MaximumDecisionLimit,
+                ResearchSmokeEpisode.TruncationMode);
+
+            ResearchSmokeStepResult result = default;
+            for (int index = 0;
+                 index < ResearchSmokeEpisode.MaximumDecisionLimit - 1;
+                 index++)
+            {
+                result = episode.Step(0, 0);
+                Assert.That(result.EndKind, Is.EqualTo(ResearchSmokeEndKind.None));
+            }
+
+            Assert.That(episode.IsActive, Is.True);
+            Assert.That(
+                episode.StepCount,
+                Is.EqualTo(ResearchSmokeEpisode.MaximumDecisionLimit - 1));
+
+            result = episode.Step(0, 0);
+
+            Assert.That(result.EndKind, Is.EqualTo(ResearchSmokeEndKind.Truncated));
+            Assert.That(result.Reason, Is.EqualTo(ResearchSmokeEpisode.DecisionLimitReason));
+            Assert.That(episode.StepCount, Is.EqualTo(ResearchSmokeEpisode.MaximumDecisionLimit));
+            Assert.That(episode.IsActive, Is.False);
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => episode.Reset(
+                    1,
+                    21001,
+                    ResearchSmokeEpisode.MaximumDecisionLimit + 1,
+                    ResearchSmokeEpisode.TruncationMode));
+        }
+
+        [Test]
         public void MechanicalBoundaryMasksPreventOutwardMovement()
         {
             var episode = new ResearchSmokeEpisode();

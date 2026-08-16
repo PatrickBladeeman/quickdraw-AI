@@ -271,6 +271,26 @@
         "unity_communication": {"type": "boolean"},
         "notes": {"type": "array", "items": {"type": "string"}}
       }
+    },
+    "performance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_scope",
+        "decision_count",
+        "elapsed_seconds",
+        "decisions_per_second",
+        "startup_excluded",
+        "timing_clock"
+      ],
+      "properties": {
+        "measurement_scope": {"type": "string", "minLength": 1},
+        "decision_count": {"type": "integer", "minimum": 1},
+        "elapsed_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "decisions_per_second": {"type": "number", "exclusiveMinimum": 0},
+        "startup_excluded": {"const": true},
+        "timing_clock": {"const": "time.perf_counter_ns"}
+      }
     }
   },
   "allOf": [
