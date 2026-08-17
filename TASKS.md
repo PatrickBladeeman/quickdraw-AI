@@ -544,6 +544,18 @@ Acceptance:
 - The BDQ-versus-joint-action result is reported even if BDQ performs worse; do not hide branch-factorization limitations.
 - Every reported model is traceable to a seed, configuration, training curve, checkpoint, and hash.
 
+### Deferred post-R3 scenario: gradual-motion Basic variant
+
+Begin this scenario only after the canonical slot-based Basic benchmark satisfies
+the R3 Q-learning acceptance gates. Do not change the implemented R2A contract
+in place; retain it as the deterministic control environment.
+
+- [ ] Keep the same discrete movement `[Stay, Left, Right]` and combat `[Idle, Shoot]` branches so continuous motion is not confused with a continuous action space.
+- [ ] Replace one-slot teleportation only in the new variant with a held lateral movement intent integrated on every fixed physics step. `Left` and `Right` use the negative and positive agent-right axis; forward motion is outside this scenario.
+- [ ] Freeze a separately versioned contract covering movement speed, fixed timestep, decision period, action persistence, continuous bounds, raycast alignment, reset behavior, and terminal/truncation semantics.
+- [ ] Train and evaluate a separate checkpoint with the same accepted Q-learning architecture, then compare success, sample efficiency, return, and throughput against the canonical discrete benchmark.
+- [ ] Label any zero-shot transfer of a slot-trained checkpoint into gradual motion as exploratory; do not treat it as a substitute for training and held-out evaluation under the new dynamics.
+
 ## R4. Implement the strategic combat benchmark and goal-conditioned policy
 
 Goal: create a controlled combat decision problem with enough resource and positioning tradeoffs for reflex and strategic-director evaluation.
