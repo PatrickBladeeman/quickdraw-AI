@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PatrickBladeeman/quickdraw-AI/Research/schemas/backend-parity-result.schema.json",
+  "title": "quickdraw-AI AMD backend parity result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "executed_utc", "status", "procedure", "contract", "implementation", "fixture", "runs", "correctness", "throughput", "decision", "qualifications"],
+  "properties": {
+    "schema_version": {"const": "quickdraw.amd-backend-parity-result.v1"},
+    "executed_utc": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["accepted", "rejected"]},
+    "procedure": {"$ref": "#/$defs/pathHash"},
+    "contract": {"$ref": "#/$defs/pathHash"},
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixed_policy", "fixture_preparer", "parity_evaluator", "smoke_runner", "result_schema", "run_manifest_schema", "cpu_additions_lock", "python_support_lock"],
+      "properties": {
+        "fixed_policy": {"$ref": "#/$defs/pathHash"},
+        "fixture_preparer": {"$ref": "#/$defs/pathHash"},
+        "parity_evaluator": {"$ref": "#/$defs/pathHash"},
+        "smoke_runner": {"$ref": "#/$defs/pathHash"},
+        "result_schema": {"$ref": "#/$defs/pathHash"},
+        "run_manifest_schema": {"$ref": "#/$defs/pathHash"},
+        "cpu_additions_lock": {"$ref": "#/$defs/pathHash"},
+        "python_support_lock": {"$ref": "#/$defs/pathHash"}
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_seed", "checkpoint_path", "checkpoint_sha256", "state_dict_sha256", "onnx_path", "onnx_sha256", "parameters", "training_performed"],
+      "properties": {
+        "policy_seed": {"$ref": "#/$defs/seed"},
+        "checkpoint_path": {"$ref": "#/$defs/path"},
+        "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+        "state_dict_sha256": {"$ref": "#/$defs/sha256"},
+        "onnx_path": {"$ref": "#/$defs/path"},
+        "onnx_sha256": {"$ref": "#/$defs/sha256"},
+        "parameters": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "shape", "dtype"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "shape": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
+              "dtype": {"const": "float32"}
+            }
+          }
+        },
+        "training_performed": {"const": false}
+      }
+    },
+    "runs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordering", "background_load_note", "cpu_decisions_per_second", "rocm_decisions_per_second"],
+      "properties": {
+        "ordering": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["backend", "path"],
+            "properties": {"backend": {"enum": ["cpu", "rocm"]}, "path": {"$ref": "#/$defs/path"}}
+          }
+        },
+        "background_load_note": {"type": "string", "minLength": 1},
+        "cpu_decisions_per_second": {"$ref": "#/$defs/twoRates"},
+        "rocm_decisions_per_second": {"$ref": "#/$defs/twoRates"}
+      }
+    },
+    "correctness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "checks", "float32_max_abs_tolerance", "maximum_absolute_differences", "seeded_returns", "registered_trace"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "checks": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "boolean"}},
+        "float32_max_abs_tolerance": {"type": "number", "exclusiveMinimum": 0},
+        "maximum_absolute_differences": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpu_repeat", "rocm_repeat", "cpu_rocm", "onnx_cpu"],
+          "properties": {
+            "cpu_repeat": {"type": "number", "minimum": 0},
+            "rocm_repeat": {"type": "number", "minimum": 0},
+            "cpu_rocm": {"type": "number", "minimum": 0},
+            "onnx_cpu": {"type": "number", "minimum": 0}
+          }
+        },
+        "seeded_returns": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
+        "registered_trace": {"$ref": "#/$defs/pathHash"}
+      }
+    },
+    "throughput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "decision_count_per_run", "warmup_decisions", "cpu_median_decisions_per_second", "rocm_median_decisions_per_second", "rocm_to_cpu_ratio", "rule"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "decision_count_per_run": {"const": 10000},
+        "warmup_decisions": {"const": 1000},
+        "cpu_median_decisions_per_second": {"type": "number", "exclusiveMinimum": 0},
+        "rocm_median_decisions_per_second": {"type": "number", "exclusiveMinimum": 0},
+        "rocm_to_cpu_ratio": {"type": "number", "exclusiveMinimum": 0},
+        "rule": {"type": "string", "minLength": 1}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_backend", "selected_backend", "backend_accepted", "cpu_reference_retained", "no_partial_acceptance", "reason"],
+      "properties": {
+        "candidate_backend": {"const": "rocm"},
+        "selected_backend": {"enum": ["cpu", "rocm"]},
+        "backend_accepted": {"type": "boolean"},
+        "cpu_reference_retained": {"type": "boolean"},
+        "no_partial_acceptance": {"const": true},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "qualifications": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "seed": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "path": {"type": "string", "pattern": "^[A-Za-z0-9._/-]+$"},
+    "pathHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "twoRates": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "exclusiveMinimum": 0}}
+  }
+}

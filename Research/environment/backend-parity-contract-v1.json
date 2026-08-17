@@ -1,0 +1,79 @@
+{
+  "schema_version": "quickdraw.backend-parity-trace.v1",
+  "trace_format": "quickdraw.backend-parity-trace.v1",
+  "purpose": "R1F fixed-policy CPU-versus-ROCm correctness and end-to-end synchronous throughput gate; this is inference only, never training.",
+  "behavior_name": "QuickDrawResearchSmoke",
+  "scenario_base_seed": 21001,
+  "side_channel": {
+    "schema_version": "quickdraw.research-side-channel.v1",
+    "channel_uuid": "fb54c591-19fe-502a-8714-7ebc3a49a0b5",
+    "contract_sha256": "b6777d7a3b45a8134358c5946c9284c37c3414aad85c8e763dbdf0faf9e33523"
+  },
+  "observation": {
+    "dtype": "float32",
+    "size": 4,
+    "fields": [
+      "position",
+      "target",
+      "step_fraction",
+      "seed_mod_997_fraction"
+    ]
+  },
+  "actions": {
+    "dtype": "int32",
+    "discrete_branches": [3, 2],
+    "movement": {"0": "stay", "1": "decrement", "2": "increment"},
+    "submit": {"0": "continue", "1": "submit"},
+    "mask_rule": "Only outward movement at a boundary and submit in a truncation-only episode are mechanically unavailable."
+  },
+  "reward": {
+    "per_decision": -0.01,
+    "correct_submit": 1.0,
+    "incorrect_submit": -0.02,
+    "composition": "additive"
+  },
+  "policy": {
+    "schema_version": "quickdraw.r1f-fixed-policy.v1",
+    "seed": 11001,
+    "dtype": "float32",
+    "architecture": "4 inputs, 32 ReLU hidden units, separate 3-logit movement and 2-logit submit heads",
+    "action_rule": "Argmax per branch after applying mechanical masks",
+    "expected_online_action": [0, 0],
+    "expected_rocm_device": "AMD Radeon RX 7900 XT"
+  },
+  "episodes": [
+    {
+      "episode_id": 1,
+      "role": "warmup",
+      "seed_offset": 0,
+      "decision_limit": 1000,
+      "expected_end": "truncation",
+      "reason": "decision_limit",
+      "interrupted": true
+    },
+    {
+      "episode_id": 2,
+      "role": "measured",
+      "seed_offset": 0,
+      "decision_limit": 10000,
+      "expected_end": "truncation",
+      "reason": "decision_limit",
+      "interrupted": true
+    }
+  ],
+  "measurement": {
+    "episode_id": 2,
+    "decision_count": 10000,
+    "warmup_episode_id": 1,
+    "warmup_decision_count": 1000,
+    "scope": "End-to-end synchronous fixed-policy inference, mask-and-argmax action selection, in-memory trace capture, and Unity/Python LLAPI step loop",
+    "excluded": ["process startup", "warmup episode", "file serialization", "trace comparison"]
+  },
+  "comparison": {
+    "runs_per_backend": 2,
+    "ordering": ["cpu-1", "rocm-1", "cpu-2", "rocm-2"],
+    "logit_max_abs_tolerance": 0.00001,
+    "throughput_statistic": "median decisions per second",
+    "acceptance": "All correctness checks pass and the ROCm median is strictly greater than the CPU median."
+  }
+}

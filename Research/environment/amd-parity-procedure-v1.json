@@ -1,7 +1,14 @@
 {
   "schema_version": "quickdraw.amd-backend-parity-procedure.v1",
-  "status": "registered_not_executed",
-  "purpose": "Later CPU-versus-ROCm correctness and throughput gate. R1E retains this registered procedure but does not execute or accept it.",
+  "status": "executed_accepted",
+  "purpose": "R1F CPU-versus-ROCm fixed-policy correctness and throughput gate.",
+  "execution": {
+    "contract": "Research/environment/backend-parity-contract-v1.json",
+    "result": "Research/environment/amd-backend-parity-result-v1.json",
+    "evidence_root": "Artifacts/Experiments/r1f-backend-parity/validation-20260817",
+    "executed_utc_date": "2026-08-17",
+    "outcome": "accepted"
+  },
   "reference": {
     "backend": "cpu",
     "transport_contract": "Research/smoke/cpu-reference-contract-v1.json",

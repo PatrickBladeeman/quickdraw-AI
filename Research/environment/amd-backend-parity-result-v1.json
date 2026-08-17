@@ -1,0 +1,170 @@
+{
+  "contract": {
+    "path": "Research/environment/backend-parity-contract-v1.json",
+    "sha256": "71c2519b97440899828aede94c087ed0b7da9b03a479a9929499a0f2c5e487b3"
+  },
+  "correctness": {
+    "checks": {
+      "action_masks_and_actions": true,
+      "checkpoint_reload": true,
+      "cpu_repeat_logits": true,
+      "cpu_rocm_logits": true,
+      "cross_backend_trace": true,
+      "decision_counts": true,
+      "finite_logits": true,
+      "onnx_actions": true,
+      "onnx_cpu_logits": true,
+      "pytorch_masked_argmax": true,
+      "registered_observation_trace": true,
+      "rocm_repeat_logits": true,
+      "seeded_return": true,
+      "terminal_and_interrupted": true,
+      "warmup_trace": true
+    },
+    "float32_max_abs_tolerance": 1e-05,
+    "maximum_absolute_differences": {
+      "cpu_repeat": 0.0,
+      "cpu_rocm": 9.5367431640625e-07,
+      "onnx_cpu": 9.5367431640625e-07,
+      "rocm_repeat": 0.0
+    },
+    "passed": true,
+    "registered_trace": {
+      "path": "Artifacts/Experiments/r1c-cpu-reference/validation-20260815/cpu-1/trace.json",
+      "sha256": "d5080b62ea3cc6c33a18567461f690a568339d2168f9d253ea3134b7c85572c5"
+    },
+    "seeded_returns": [
+      -100.0,
+      -100.0,
+      -100.0,
+      -100.0
+    ]
+  },
+  "decision": {
+    "backend_accepted": true,
+    "candidate_backend": "rocm",
+    "cpu_reference_retained": false,
+    "no_partial_acceptance": true,
+    "reason": "ROCm passed every correctness gate and had strictly higher median throughput.",
+    "selected_backend": "rocm"
+  },
+  "executed_utc": "2026-08-17T04:05:16.622376Z",
+  "fixture": {
+    "checkpoint_path": "Artifacts/Experiments/r1f-backend-parity/fixture/fixed-policy.pt",
+    "checkpoint_sha256": "fc1b19eb0abe2122c0d3b12a58cf312998049cd21c429a43c856e503aa51b519",
+    "onnx_path": "Artifacts/Experiments/r1f-backend-parity/fixture/fixed-policy.onnx",
+    "onnx_sha256": "6c15f3fa2686ea7dee2f3ab6c056b1d20685aab2fd1f090df449eb713e9e0b1f",
+    "parameters": [
+      {
+        "dtype": "float32",
+        "name": "hidden.weight",
+        "shape": [32, 4]
+      },
+      {
+        "dtype": "float32",
+        "name": "hidden.bias",
+        "shape": [32]
+      },
+      {
+        "dtype": "float32",
+        "name": "movement_head.weight",
+        "shape": [3, 32]
+      },
+      {
+        "dtype": "float32",
+        "name": "movement_head.bias",
+        "shape": [3]
+      },
+      {
+        "dtype": "float32",
+        "name": "submit_head.weight",
+        "shape": [2, 32]
+      },
+      {
+        "dtype": "float32",
+        "name": "submit_head.bias",
+        "shape": [2]
+      }
+    ],
+    "policy_seed": 11001,
+    "state_dict_sha256": "7351ce3de0d9bc3ec77cb3242324d16f66aa5b7c12bd62d516afb6376385192f",
+    "training_performed": false
+  },
+  "implementation": {
+    "cpu_additions_lock": {
+      "path": "Research/environment/requirements-r1f-parity-lock.txt",
+      "sha256": "c9ab76297bf1f23f80702be47c11e4be89ec5cf9dfd506cd19a323c4b4aeb7db"
+    },
+    "fixed_policy": {
+      "path": "Research/environment/r1f_fixed_policy.py",
+      "sha256": "d870480e3b6e6ed5e4d06ff8e3942a87849506bdb843d8185be24a0afe34b929"
+    },
+    "fixture_preparer": {
+      "path": "Research/environment/prepare_r1f_policy.py",
+      "sha256": "f3b99b1a214d67332f94b2870df45c827c4400d3d11e82e251c08e4d5392d11e"
+    },
+    "parity_evaluator": {
+      "path": "Research/environment/evaluate_r1f_parity.py",
+      "sha256": "13585c5b7a592dbc8c5cc329e6488b44e3d7dad444cbb0843e3c8862a5bcf97a"
+    },
+    "python_support_lock": {
+      "path": "Research/environment/requirements-rocm-py311-support-lock.txt",
+      "sha256": "2ec004895be5f601bdb57619381695a0c975414a8518fa3992f8ce1efa4df8ff"
+    },
+    "result_schema": {
+      "path": "Research/schemas/backend-parity-result.schema.json",
+      "sha256": "cb42a81616783b6205f56e715d887e62bf7f4991a2a3705431798ca06666cd64"
+    },
+    "run_manifest_schema": {
+      "path": "Research/schemas/run-manifest.schema.json",
+      "sha256": "daf7be9cffe7f310d81b27b18ed0bde460cd4d7d503a42b6dc377ddba58ad120"
+    },
+    "smoke_runner": {
+      "path": "Research/smoke/run_smoke.py",
+      "sha256": "f6500f012591ec7c1a93a2eb91077421ab9de4204441029d7d132bf98b1dab5d"
+    }
+  },
+  "procedure": {
+    "path": "Research/environment/amd-parity-procedure-v1.json",
+    "sha256": "ec7908dc9212d8bce86cf32827edeb2f91ee44d7c0760034fe52df6c1b831c15"
+  },
+  "qualifications": [
+    "The runs use batch-size-one synchronous inference in the Research_Smoke LLAPI fixture.",
+    "This result does not establish training throughput or larger-model performance.",
+    "No trainer, replay buffer, learned weights, combat system, or LLM runtime was exercised."
+  ],
+  "runs": {
+    "background_load_note": "No intentional foreground workload; ordinary Windows background services remained enabled.",
+    "cpu_decisions_per_second": [81.321, 105.108],
+    "ordering": [
+      {
+        "backend": "cpu",
+        "path": "Artifacts/Experiments/r1f-backend-parity/validation-20260817/cpu-1"
+      },
+      {
+        "backend": "rocm",
+        "path": "Artifacts/Experiments/r1f-backend-parity/validation-20260817/rocm-1"
+      },
+      {
+        "backend": "cpu",
+        "path": "Artifacts/Experiments/r1f-backend-parity/validation-20260817/cpu-2"
+      },
+      {
+        "backend": "rocm",
+        "path": "Artifacts/Experiments/r1f-backend-parity/validation-20260817/rocm-2"
+      }
+    ],
+    "rocm_decisions_per_second": [96.43, 100.213]
+  },
+  "schema_version": "quickdraw.amd-backend-parity-result.v1",
+  "status": "accepted",
+  "throughput": {
+    "cpu_median_decisions_per_second": 93.2145,
+    "decision_count_per_run": 10000,
+    "passed": true,
+    "rocm_median_decisions_per_second": 98.3215,
+    "rocm_to_cpu_ratio": 1.0547876135150647,
+    "rule": "ROCm median decisions per second must be strictly greater than CPU median after every correctness gate passes.",
+    "warmup_decisions": 1000
+  }
+}

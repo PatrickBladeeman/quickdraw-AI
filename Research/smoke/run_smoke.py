@@ -31,12 +31,29 @@ SMOKE_CONTRACT_PATH = Path(__file__).with_name("smoke-contract-v1.json")
 CPU_REFERENCE_CONTRACT_PATH = Path(__file__).with_name(
     "cpu-reference-contract-v1.json"
 )
+BACKEND_PARITY_CONTRACT_PATH = (
+    REPO_ROOT / "Research" / "environment" / "backend-parity-contract-v1.json"
+)
 MANIFEST_SCHEMA_PATH = REPO_ROOT / "Research" / "schemas" / "run-manifest.schema.json"
 SCENE_PATH = REPO_ROOT / "Assets" / "_Project" / "Scenes" / "Research_Smoke.unity"
 UNITY_VERSION = "6000.0.57f1"
 UNITY_REVISION = "b7b9860b7bbd"
 UNITY_ML_AGENTS_VERSION = "4.0.0"
 TRACE_FORMAT = "quickdraw.communicator-smoke-trace.v1"
+
+
+def load_fixed_policy_driver(
+    checkpoint_path: Path,
+    model_path: Path,
+    backend: str,
+) -> Any:
+    environment_directory = REPO_ROOT / "Research" / "environment"
+    sys.path.insert(0, str(environment_directory))
+    try:
+        from r1f_fixed_policy import FixedPolicyDriver
+    finally:
+        sys.path.pop(0)
+    return FixedPolicyDriver(checkpoint_path, model_path, backend)
 
 
 def sha256_file(path: Path) -> str:
@@ -225,6 +242,7 @@ def execute_trace(
     base_seed: int,
     output_directory: Path,
     smoke_contract: Dict[str, Any],
+    policy_driver: Optional[Any] = None,
 ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     side_channel = ResearchSmokeSideChannel(run_id, smoke_contract)
     side_channel.send(
@@ -283,7 +301,12 @@ def execute_trace(
         if measurement is not None
         else None
     )
-    decisions_sent = 0
+    measurement_episode_id = (
+        int(measurement["episode_id"])
+        if measurement is not None and "episode_id" in measurement
+        else None
+    )
+    measured_decisions_sent = 0
     timing_started_ns: Optional[int] = None
     timing_ended_ns: Optional[int] = None
 
@@ -329,7 +352,21 @@ def execute_trace(
             if completed_episodes >= len(episode_specs):
                 break
 
-            active_episode_id = completed_episodes + 1
+            active_episode_id = sorted(episode_specs)[completed_episodes]
+            is_measured_episode = (
+                measurement is not None
+                and (
+                    measurement_episode_id is None
+                    or active_episode_id == measurement_episode_id
+                )
+            )
+            if (
+                policy_driver is not None
+                and is_measured_episode
+                and len(decision_steps) > 0
+                and timing_started_ns is None
+            ):
+                timing_started_ns = time.perf_counter_ns()
             for decision_index, raw_agent_id in enumerate(decision_steps.agent_id):
                 agent_id = int(raw_agent_id)
                 observation = decision_steps.obs[0][decision_index]
@@ -344,9 +381,15 @@ def execute_trace(
                         episode_traces,
                     )
 
-                spec = episode_specs[active_episode_id]
-                movement, submit = choose_action(observation, spec["expected_end"])
                 masks = action_masks_for_agent(decision_steps, decision_index)
+                spec = episode_specs[active_episode_id]
+                policy_logits = None
+                if policy_driver is None:
+                    movement, submit = choose_action(observation, spec["expected_end"])
+                else:
+                    movement, submit, policy_logits = policy_driver.act(
+                        observation, masks
+                    )
                 if masks[0][movement] or masks[1][submit]:
                     raise RuntimeError(
                         f"Driver selected a masked action {(movement, submit)} from {masks}."
@@ -358,28 +401,35 @@ def execute_trace(
                     "action_masks": masks,
                     "action": [movement, submit],
                 }
+                if policy_logits is not None:
+                    pending[agent_id]["policy_logits"] = policy_logits
 
             if len(decision_steps) > 0:
-                if measurement is not None and timing_started_ns is None:
+                if (
+                    policy_driver is None
+                    and is_measured_episode
+                    and timing_started_ns is None
+                ):
                     timing_started_ns = time.perf_counter_ns()
                 actions = np.zeros((len(decision_steps), 2), dtype=np.int32)
                 for decision_index, raw_agent_id in enumerate(decision_steps.agent_id):
                     selected = pending[int(raw_agent_id)]["action"]
                     actions[decision_index] = selected
                 environment.set_actions(behavior_name, ActionTuple(discrete=actions))
-                decisions_sent += len(decision_steps)
+                if is_measured_episode:
+                    measured_decisions_sent += len(decision_steps)
                 if (
                     expected_decision_count is not None
-                    and decisions_sent > expected_decision_count
+                    and measured_decisions_sent > expected_decision_count
                 ):
                     raise RuntimeError(
-                        "CPU reference trace exceeded its registered decision count."
+                        "Measured trace exceeded its registered decision count."
                     )
 
             environment.step()
             if (
                 expected_decision_count is not None
-                and decisions_sent == expected_decision_count
+                and measured_decisions_sent == expected_decision_count
                 and timing_ended_ns is None
             ):
                 timing_ended_ns = time.perf_counter_ns()
@@ -401,9 +451,9 @@ def execute_trace(
 
         performance = None
         if measurement is not None:
-            if decisions_sent != expected_decision_count:
+            if measured_decisions_sent != expected_decision_count:
                 raise RuntimeError(
-                    f"CPU reference trace recorded {decisions_sent} decisions, "
+                    f"Measured trace recorded {measured_decisions_sent} decisions, "
                     f"expected {expected_decision_count}."
                 )
             if timing_started_ns is None or timing_ended_ns is None:
@@ -413,9 +463,11 @@ def execute_trace(
                 raise RuntimeError("CPU reference elapsed time must be positive.")
             performance = {
                 "measurement_scope": measurement["scope"],
-                "decision_count": decisions_sent,
+                "decision_count": measured_decisions_sent,
                 "elapsed_seconds": round(elapsed_seconds, 9),
-                "decisions_per_second": round(decisions_sent / elapsed_seconds, 3),
+                "decisions_per_second": round(
+                    measured_decisions_sent / elapsed_seconds, 3
+                ),
                 "startup_excluded": True,
                 "timing_clock": "time.perf_counter_ns",
             }
@@ -434,6 +486,8 @@ def execute_trace(
                 for episode_id in sorted(episode_traces)
             ],
         }
+        if policy_driver is not None:
+            trace["policy"] = policy_driver.metadata()
         return trace, performance
     finally:
         environment.close()
@@ -526,6 +580,8 @@ def create_manifest(
     smoke_contract_path: Path,
     performance: Optional[Dict[str, Any]],
     accelerator_candidate: Optional[str],
+    mode: str,
+    policy_driver: Optional[Any],
 ) -> Dict[str, Any]:
     relative_output = output_directory.resolve().relative_to(ARTIFACT_ROOT).as_posix()
     git_commit = run_command(["git", "rev-parse", "HEAD"])
@@ -540,25 +596,42 @@ def create_manifest(
         raise RuntimeError(f"pip check failed: {pip_check.stdout}{pip_check.stderr}")
 
     os_name, os_version, os_build, cpu = windows_system_identity()
+    is_cpu_reference = mode == "cpu-reference"
+    is_backend_parity = mode == "backend-parity"
     seed_values = [base_seed + offset for offset in range(7)]
-    is_cpu_reference = performance is not None
+    if is_backend_parity:
+        seed_values[0] = int(smoke_contract["policy"]["seed"])
+    selected_backend = policy_driver.backend if policy_driver is not None else "cpu"
+    policy_metadata = policy_driver.metadata() if policy_driver is not None else None
 
     manifest = {
         "schema_version": "quickdraw.run-manifest.v1",
         "run_id": run_id,
-        "run_kind": "latency" if is_cpu_reference else "smoke",
+        "run_kind": "latency" if performance is not None else "smoke",
         "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "identity": {
             "condition_id": (
-                "r1c-cpu-reference-trace"
-                if is_cpu_reference
-                else "r1b-communicator-smoke"
+                f"r1f-{selected_backend}-fixed-policy-parity"
+                if is_backend_parity
+                else (
+                    "r1c-cpu-reference-trace"
+                    if is_cpu_reference
+                    else "r1b-communicator-smoke"
+                )
             ),
-            "policy_id": "scripted-smoke-driver-v1",
+            "policy_id": (
+                "r1f-fixed-policy-v1"
+                if is_backend_parity
+                else "scripted-smoke-driver-v1"
+            ),
             "scenario_set_id": (
-                f"cpu-reference-seed-{base_seed}"
-                if is_cpu_reference
-                else f"communicator-smoke-seed-{base_seed}"
+                f"backend-parity-seed-{base_seed}"
+                if is_backend_parity
+                else (
+                    f"cpu-reference-seed-{base_seed}"
+                    if is_cpu_reference
+                    else f"communicator-smoke-seed-{base_seed}"
+                )
             ),
             "episode_count": len(smoke_contract["episodes"]),
         },
@@ -603,19 +676,23 @@ def create_manifest(
         },
         "backend": {
             "reference": "cpu",
-            "selected": "cpu",
-            "accelerator_candidate": accelerator_candidate,
+            "selected": selected_backend,
+            "accelerator_candidate": "rocm" if is_backend_parity else accelerator_candidate,
             "accelerator_status": "deferred",
             "reason": (
-                "R1C records the CPU LLAPI transport reference only; "
-                "accelerator parity is deferred."
-                if is_cpu_reference
+                "R1F per-run evidence is pending the all-or-nothing aggregate decision."
+                if is_backend_parity
                 else (
-                    "R1E validates the Python 3.11 Unity communicator boundary "
-                    "only; ROCm inference parity and throughput remain deferred."
-                    if accelerator_candidate == "rocm"
-                    else "R1B validates communication only; backend parity and "
-                    "throughput remain deferred."
+                    "R1C records the CPU LLAPI transport reference only; "
+                    "accelerator parity is deferred."
+                    if is_cpu_reference
+                    else (
+                        "R1E validates the Python 3.11 Unity communicator boundary "
+                        "only; ROCm inference parity and throughput remain deferred."
+                        if accelerator_candidate == "rocm"
+                        else "R1B validates communication only; backend parity and "
+                        "throughput remain deferred."
+                    )
                 )
             ),
         },
@@ -631,8 +708,16 @@ def create_manifest(
         "hashes": {
             "scene": sha256_file(SCENE_PATH),
             "configuration": sha256_file(smoke_contract_path),
-            "policy": None,
-            "model": None,
+            "policy": (
+                policy_metadata["checkpoint_sha256"]
+                if policy_metadata is not None
+                else None
+            ),
+            "model": (
+                policy_metadata["onnx_sha256"]
+                if policy_metadata is not None
+                else None
+            ),
         },
         "validation": {
             "dependency_imports": True,
@@ -641,17 +726,26 @@ def create_manifest(
             "unity_communication": True,
             "notes": (
                 [
+                    "Completed a real 1,000-decision warmup episode followed by a separately timed 10,000-decision fixed-policy episode.",
+                    "Timing includes synchronous policy inference, mask-and-argmax action selection, in-memory trace capture, and the Unity/Python LLAPI loop.",
+                    f"Loaded the registered checkpoint independently on {selected_backend} and recorded every unmasked logit and action.",
+                    "No training, replay, learned weights, gameplay benchmark, combat, or LLM code was exercised.",
+                ]
+                if is_backend_parity
+                else (
+                    [
                     "Completed one deterministic 10,000-decision truncation trace.",
                     "Measured CPU LLAPI transport round trips; process startup and trace serialization were excluded.",
                     "Canonical trace comparison passed." if compared else "Canonical trace captured for comparison.",
                     "No trainer, learned model, combat, Basic benchmark, AMD parity, or LLM code was exercised.",
-                ]
-                if is_cpu_reference
-                else [
-                    "Completed one terminal and one truncated deterministic communicator episode.",
-                    "Canonical trace comparison passed." if compared else "Canonical trace captured for comparison.",
-                    "No trainer, learned model, combat, Basic benchmark, AMD parity, or LLM code was exercised.",
-                ]
+                    ]
+                    if is_cpu_reference
+                    else [
+                        "Completed one terminal and one truncated deterministic communicator episode.",
+                        "Canonical trace comparison passed." if compared else "Canonical trace captured for comparison.",
+                        "No trainer, learned model, combat, Basic benchmark, AMD parity, or LLM code was exercised.",
+                    ]
+                )
             ),
         },
     }
@@ -662,7 +756,7 @@ def create_manifest(
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a deterministic communicator or CPU-reference trace."
+        description="Run a deterministic communicator, CPU reference, or R1F parity trace."
     )
     parser.add_argument("--env", required=True, type=Path, help="Path to the smoke player executable.")
     parser.add_argument("--output", required=True, type=Path, help="Ignored run artifact directory.")
@@ -671,7 +765,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--compare-to", type=Path, help="Canonical trace from the first run.")
     parser.add_argument(
         "--mode",
-        choices=("smoke", "cpu-reference"),
+        choices=("smoke", "cpu-reference", "backend-parity"),
         default="smoke",
         help="Trace contract to run; defaults to the R1B smoke regression.",
     )
@@ -680,6 +774,21 @@ def parse_arguments() -> argparse.Namespace:
         choices=("rocm",),
         default=None,
         help="Candidate recorded in the manifest; the scripted smoke stays on CPU.",
+    )
+    parser.add_argument(
+        "--policy-checkpoint",
+        type=Path,
+        help="Registered fixed-policy checkpoint; required for backend-parity mode.",
+    )
+    parser.add_argument(
+        "--policy-model",
+        type=Path,
+        help="Registered ONNX export; required for backend-parity mode.",
+    )
+    parser.add_argument(
+        "--policy-backend",
+        choices=("cpu", "rocm"),
+        help="Fixed-policy inference backend; required for backend-parity mode.",
     )
     return parser.parse_args()
 
@@ -696,12 +805,47 @@ def main() -> int:
         raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
 
     output_directory.mkdir(parents=True, exist_ok=True)
-    smoke_contract_path = (
-        CPU_REFERENCE_CONTRACT_PATH
-        if arguments.mode == "cpu-reference"
-        else SMOKE_CONTRACT_PATH
-    )
+    if arguments.mode == "backend-parity":
+        if (
+            arguments.policy_checkpoint is None
+            or arguments.policy_model is None
+            or arguments.policy_backend is None
+        ):
+            raise ValueError(
+                "backend-parity mode requires --policy-checkpoint, --policy-model, "
+                "and --policy-backend."
+            )
+        smoke_contract_path = BACKEND_PARITY_CONTRACT_PATH
+        policy_driver = load_fixed_policy_driver(
+            arguments.policy_checkpoint.resolve(),
+            arguments.policy_model.resolve(),
+            arguments.policy_backend,
+        )
+    else:
+        if any(
+            value is not None
+            for value in (
+                arguments.policy_checkpoint,
+                arguments.policy_model,
+                arguments.policy_backend,
+            )
+        ):
+            raise ValueError("Policy arguments are only valid in backend-parity mode.")
+        smoke_contract_path = (
+            CPU_REFERENCE_CONTRACT_PATH
+            if arguments.mode == "cpu-reference"
+            else SMOKE_CONTRACT_PATH
+        )
+        policy_driver = None
     smoke_contract = json.loads(smoke_contract_path.read_text(encoding="utf-8"))
+    if (
+        arguments.mode == "backend-parity"
+        and arguments.seed != int(smoke_contract["scenario_base_seed"])
+    ):
+        raise ValueError(
+            "backend-parity mode requires the registered scenario base seed "
+            f"{smoke_contract['scenario_base_seed']}."
+        )
     if smoke_contract["side_channel"]["contract_sha256"] != sha256_file(CONTRACT_PATH):
         raise RuntimeError("The smoke config and frozen research-contract hash differ.")
 
@@ -711,6 +855,7 @@ def main() -> int:
         arguments.seed,
         output_directory,
         smoke_contract,
+        policy_driver,
     )
     trace_path = output_directory / "trace.json"
     trace_path.write_text(
@@ -735,6 +880,8 @@ def main() -> int:
         smoke_contract_path,
         performance,
         arguments.accelerator_candidate,
+        arguments.mode,
+        policy_driver,
     )
     schema = json.loads(MANIFEST_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)

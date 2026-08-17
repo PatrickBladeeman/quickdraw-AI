@@ -430,8 +430,8 @@ reference. The current ROCm `7.14.0` matrix subsequently established exact RX
 7900 XT / `gfx1100` / Windows 11 25H2 support. Revised R1E replaced the
 exploratory candidate with ROCm, and the obsolete R1D executable probe, package
 lock, contract, result schema, curated result, and focused tests were retired
-during repository cleanup. The registered parity procedure remains active for
-R1F.
+during repository cleanup. The registered parity procedure was subsequently
+executed by R1F.
 
 ### R1E. Python 3.11 / ROCm 7.14 / ML-Agents 1.1 compatibility — completed
 
@@ -448,7 +448,22 @@ Scope completed without training or executing the full AMD parity benchmark:
 - [x] Recorded `conditional_go`, `backend_acceptance=not_accepted`, `cpu_reference_retained=true`, and `full_parity_executed=false`. No driver, Windows security, Unity runtime, or gameplay change was made.
 - [x] Retired the superseded exploratory R1D files, removed stale cloud/manifest examples, removed the disposable reproduction environments after preserving their evidence, and retained the primary ROCm environment for R1F.
 
-The next bounded R1 task is R1F: execute the already frozen fixed-policy, checkpoint, export, exact-trace/action/return, tolerance, and repeated 10,000-decision CPU-versus-ROCm throughput gate. It still requires explicit approval. R1E does not establish training support, model-quality evidence, full correctness parity, or a ROCm throughput advantage.
+R1E did not establish training support, model-quality evidence, full correctness parity, or a ROCm throughput advantage; R1F evaluated the latter two claims separately.
+
+### R1F. Fixed-policy CPU-versus-ROCm parity and throughput — completed
+
+Scope completed without training or research-gameplay expansion:
+
+- [x] Registered a distinct scenario seed (`21001`) and policy-initialization seed (`11001`), a real 1,000-decision warmup episode, and a separately timed 10,000-decision episode.
+- [x] Generated one deterministic float32 4→32 ReLU policy with separate 3-logit and 2-logit heads, saved it once, independently reloaded it on CPU and ROCm, and exported it once to ONNX.
+- [x] Ran the required alternating CPU-1, ROCm-1, CPU-2, ROCm-2 order in isolated Python 3.11.13 environments. Both environments passed `pip check`; ROCm selected the exact AMD Radeon RX 7900 XT.
+- [x] Matched the registered R1C observation trace exactly and passed every action-mask, discrete-action, terminal/interrupted, seeded-return, checkpoint, finiteness, and ONNX action gate.
+- [x] Recorded exact repeat logits on each backend. CPU-versus-ROCm and ONNX-versus-CPU maximum absolute differences were both `9.5367431640625e-07`, below the registered `1e-5` tolerance.
+- [x] Recorded CPU throughput of 81.321 and 105.108 decisions/s (median 93.2145) and ROCm throughput of 96.430 and 100.213 decisions/s (median 98.3215), a ROCm/CPU median ratio of `1.0547876135150647`.
+- [x] Applied the frozen no-partial-acceptance rule: every correctness gate passed and ROCm median throughput was strictly higher, so ROCm is accepted for this batch-size-one synchronous inference fixture.
+- [x] Added the fixed-policy implementation, parity runner mode, evaluator, strict Draft 2020-12 result schema, curated result, reproducibility documentation, and four focused R1F tests. Generated checkpoint, ONNX, traces, manifests, environments, and diagnostic evidence remain ignored.
+
+R1F does not prove training throughput, larger-model performance, learned-policy quality, `Research_Basic`, combat, or LLM behavior. The next bounded candidate is an R2A environment-only slice: implement and test the deterministic `Research_Basic` scene/observation/action/reset contract without starting BDQ training.
 
 ## R2. Implement the Unity Basic visual-control benchmark
 

@@ -27,6 +27,7 @@ PROBE_PATH = ENVIRONMENT_ROOT / "probe_rocm_mlagents_compatibility.py"
 SMOKE_RUNNER_PATH = REPO_ROOT / "Research" / "smoke" / "run_smoke.py"
 MANIFEST_SCHEMA_PATH = SCHEMA_ROOT / "run-manifest.schema.json"
 PARITY_PATH = ENVIRONMENT_ROOT / "amd-parity-procedure-v1.json"
+PARITY_RESULT_PATH = ENVIRONMENT_ROOT / "amd-backend-parity-result-v1.json"
 
 
 def read_json(path: Path) -> dict:
@@ -54,11 +55,15 @@ def test_curated_result_validates_and_hashes_exact_inputs() -> None:
         "probe_sha256": PROBE_PATH,
         "result_schema_sha256": RESULT_SCHEMA_PATH,
         "manifest_schema_sha256": MANIFEST_SCHEMA_PATH,
-        "smoke_runner_sha256": SMOKE_RUNNER_PATH,
         "cpu_lock_sha256": CPU_LOCK_PATH,
     }
     for field, path in paths.items():
         assert result["inputs"][field] == sha256_file(path)
+    # R1E records the historical runner it executed. R1F extends that runner
+    # without rewriting the already-curated R1E evidence hash.
+    assert result["inputs"]["smoke_runner_sha256"] == (
+        "99c833672fb1b3b9cc941f7ccf3815d771813574b6c678d6da5cedb4e9e2074f"
+    )
 
 
 def test_compatibility_is_conditional_and_never_accepts_rocm() -> None:
@@ -102,18 +107,22 @@ def test_cpu_and_multisource_locks_remain_separate() -> None:
     assert sha256_file(CPU_LOCK_PATH) != sha256_file(SUPPORT_LOCK_PATH)
 
 
-def test_official_rocm_support_and_later_parity_boundary_are_synchronized() -> None:
+def test_official_rocm_support_and_executed_parity_boundary_are_synchronized() -> None:
     contract = read_json(CONTRACT_PATH)
     parity = read_json(PARITY_PATH)
+    parity_result = read_json(PARITY_RESULT_PATH)
     support = contract["official_support"]
     assert support["gpu_listed_exactly"] is True
     assert support["matrix_release"] == "7.14.0"
-    assert parity["status"] == "registered_not_executed"
+    assert parity["status"] == "executed_accepted"
+    assert parity["execution"]["outcome"] == "accepted"
     assert parity["candidate_preconditions"]["primary_backend"] == "rocm"
     assert parity["candidate_preconditions"]["compatibility_contract"] == (
         "Research/environment/mlagents-rocm-compatibility-contract-v1.json"
     )
     assert parity["decision"]["no_partial_acceptance"] is True
+    assert parity_result["status"] == "accepted"
+    assert parity_result["decision"]["selected_backend"] == "rocm"
 
 
 def test_run_manifest_schema_registers_both_python_environments() -> None:

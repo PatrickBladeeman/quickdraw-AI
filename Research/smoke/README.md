@@ -1,4 +1,4 @@
-# R1B communicator smoke, R1C CPU reference, and R1E compatibility reuse
+# R1B communicator smoke, R1C CPU reference, R1E reuse, and R1F parity
 
 R1B proves the version-locked Unity/Python communication boundary without
 starting either learned benchmark. The fixture is a deterministic abstract
@@ -135,11 +135,32 @@ and successful Unity communication. This proves the revised Python package
 boundary can drive the Unity communicator; the separate R1E tensor probe proves
 the GPU path.
 
+## R1F fixed-policy parity mode
+
+`--mode backend-parity` selects the registered two-episode R1F contract. The
+first 1,000-decision truncation is an untimed in-process warmup. Timing starts
+before fixed-policy inference on the first decision of the second episode and
+ends after its 10,000th `environment.step()` returns. It therefore includes
+synchronous backend inference, mask-and-argmax action selection, in-memory
+transition/logit capture, and the LLAPI loop while excluding process startup,
+warmup, serialization, and aggregate comparison.
+
+The mode requires `--policy-checkpoint`, `--policy-model`, and
+`--policy-backend cpu|rocm`. The registered scenario seed is `21001`; policy
+weights use the distinct seed `11001`. Each trace records checkpoint, canonical
+state-dictionary, ONNX, backend, PyTorch/HIP, and exact-device metadata. The
+aggregate evaluator compares the registered R1C trace, all four R1F traces,
+PyTorch logits/actions, and CPU ONNX Runtime output before applying the frozen
+median-throughput decision.
+
+The accepted R1F runs and qualifications are summarized in
+`Research/environment/amd-backend-parity-result-v1.json`. ROCm is accepted for
+this batch-size-one inference fixture only.
+
 ## Deliberate exclusions
 
-R1B/R1C/R1E do not add `Research_Basic`, visual observations, combat, a replay
-buffer, a trainer, a learned model, or LLM integration. R1E verifies ROCm tensor
-access but does not train through the communicator or execute full CPU-versus-
-ROCm policy, checkpoint, export, or throughput parity. The 10,000-decision CPU
-result remains the deterministic transport baseline and provides no model-quality
-evidence.
+R1B/R1C/R1E/R1F do not add `Research_Basic`, visual observations, combat, a
+replay buffer, a trainer, learned weights, or LLM integration. R1F executes the
+fixed-policy checkpoint/export/throughput procedure but does not establish
+training throughput or model-quality evidence. The R1C CPU result remains the
+deterministic transport baseline.

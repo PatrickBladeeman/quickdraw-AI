@@ -1,9 +1,10 @@
-# R1A CPU environment and R1E ROCm compatibility
+# R1A CPU environment, R1E ROCm compatibility, and R1F parity
 
-This directory records the R1A CPU dependency decision and the separately
-isolated R1E Python 3.11 / ROCm / ML-Agents compatibility gate. Neither slice
-adds research gameplay, implements a trainer, accepts an accelerated backend,
-or makes a model-effectiveness claim.
+This directory records the R1A CPU dependency decision, the separately
+isolated R1E Python 3.11 / ROCm / ML-Agents compatibility gate, and the R1F
+fixed-policy parity result. R1F accepts ROCm only for the registered
+batch-size-one synchronous inference fixture. None of these slices adds
+research gameplay, implements training, or makes a model-effectiveness claim.
 
 ## Compatibility decision
 
@@ -91,13 +92,15 @@ trainer plugin or test an accelerated backend.
 
 ## ROCm support decision
 
-CPU remains the accepted reference backend. The ROCm `7.14.0` matrix, dated
+R1A/R1C remain the historical CPU reference. The ROCm `7.14.0` matrix, dated
 2026-07-16, explicitly lists the Radeon RX 7900 XT, its `gfx1100` architecture,
 Windows 11 25H2, and Python 3.11. The superseded exploratory DirectML lane was
 removed during repository cleanup so the active environment surface has one
 accelerator candidate. R1C's two exactly matching 10,000-decision CPU
 communicator traces and their 108.636 and 107.434 decisions/s measurements
-remain the reference; R1E does not replace it.
+remain the transport reference; R1E did not replace it. R1F separately accepts
+ROCm for its fixed-policy inference scope after exact correctness and repeated
+throughput gates.
 
 ## R1E Python 3.11 / ROCm / ML-Agents gate
 
@@ -175,4 +178,39 @@ The schema-validated R1E result is `conditional_go`, with
 `full_parity_executed=false`. It proves that the ML-Agents 1.1 communicator and
 ROCm tensor path can coexist on Python 3.11. It does not prove training,
 checkpoint/export parity, end-to-end policy parity, or a throughput advantage.
-Those remain the registered next task in `amd-parity-procedure-v1.json`.
+Those claims are evaluated separately by R1F.
+
+## R1F fixed-policy parity result
+
+`backend-parity-contract-v1.json` registers a real 1,000-decision warmup
+episode followed in the same Unity/Python process by a separately timed
+10,000-decision episode. `r1f_fixed_policy.py` creates one deterministic
+float32 4→32 ReLU MLP with two discrete heads from policy seed `11001`.
+`prepare_r1f_policy.py` saves that checkpoint once and exports it once to ONNX.
+CPU and ROCm independently reload the same checkpoint, apply the same masks and
+argmax rule, and retain every logit and transition for the aggregate evaluator.
+The Unity scenario seed remains the registered R1C value `21001`; the runner
+rejects accidental substitution of the policy seed for the scenario seed.
+
+The accepted alternating order was CPU-1, ROCm-1, CPU-2, ROCm-2. Every exact
+trace/action/mask/outcome/return check passed, both repeat-logit comparisons
+were exact, and the CPU-versus-ROCm and ONNX-versus-CPU maximum absolute errors
+were both `9.5367431640625e-07`, below `1e-5`. Throughput was:
+
+| Backend | Runs (decisions/s) | Median |
+| --- | --- | --- |
+| CPU | `81.321`, `105.108` | `93.2145` |
+| ROCm | `96.430`, `100.213` | `98.3215` |
+
+The ROCm/CPU median ratio is `1.0547876135150647`; therefore the frozen
+all-or-nothing rule accepts ROCm for this fixture. The curated result is
+`amd-backend-parity-result-v1.json`, validated by
+`backend-parity-result.schema.json`. Raw traces, manifests, checkpoint, ONNX
+file, environments, and diagnostic runs remain ignored below
+`Artifacts/Experiments/r1f-backend-parity/`.
+
+The CPU runner uses a separate Python 3.11.13 venv with the R1E support stack,
+`torch==2.12.0+cpu`, and `onnxruntime==1.23.2`; the candidate environment remains
+the retained `2.12.0+rocm7.14.0` environment. Both pass `pip check`. R1F does
+not prove training throughput, larger-model performance, learned-policy
+quality, or any `Research_Basic`/combat/LLM behavior.
