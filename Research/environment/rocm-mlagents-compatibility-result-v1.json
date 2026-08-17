@@ -1,0 +1,98 @@
+{
+  "communicator": {
+    "manifests_valid": true,
+    "run_count": 2,
+    "trace_sha256": "5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5",
+    "traces_identical": true,
+    "unity_communication": true
+  },
+  "created_utc": "2026-08-17T02:34:09.273982Z",
+  "decision": {
+    "backend_acceptance": "not_accepted",
+    "cpu_reference_retained": true,
+    "full_parity_executed": false,
+    "status": "conditional_go"
+  },
+  "errors": [],
+  "inputs": {
+    "builder_sha256": "2f86799321bf17cbd2d4e5908c432d8e7209d3412d43f30a5fc5ed14ee206934",
+    "contract_sha256": "6312ac8b0a5a78f07b550a5612f323bdf6c6903034ae3d76aa0a017ec8420771",
+    "cpu_lock_sha256": "46d4ff6c54738cab733bfdb19aa89705f71ca36c9f3b1e877a46684c7cfb2c8b",
+    "manifest_schema_sha256": "daf7be9cffe7f310d81b27b18ed0bde460cd4d7d503a42b6dc377ddba58ad120",
+    "preparer_sha256": "7370c3dc730963f5584ff3be45d9d0bd19bf152c9ada4a55bcf1a43cadba0001",
+    "probe_sha256": "6339ba42d8f55a9ef6ffaa447c4011e2e72cbf132126d892a3e41702907e55da",
+    "result_schema_sha256": "d82877200125a40ccdffaa01026d4dec272e6d93806c92e68df90ff03de86770",
+    "smoke_runner_sha256": "99c833672fb1b3b9cc941f7ccf3815d771813574b6c678d6da5cedb4e9e2074f",
+    "support_lock_sha256": "2ec004895be5f601bdb57619381695a0c975414a8518fa3992f8ce1efa4df8ff"
+  },
+  "repository": {
+    "commit": "5bae5f1c35555606015c96eb04b8277b70f8196c",
+    "dirty": true
+  },
+  "rocm": {
+    "available": true,
+    "devices": [
+      "AMD Radeon RX 7900 XT",
+      "AMD Radeon(TM) Graphics"
+    ],
+    "finite": true,
+    "forward_max_abs": 4.76837158203125e-07,
+    "hip_version": "7.14.60850",
+    "input_gradient_max_abs": 0.0,
+    "selected_device": {
+      "index": 0,
+      "mlagents_default_device": "cuda:0",
+      "name": "AMD Radeon RX 7900 XT",
+      "torch_device": "cuda:0"
+    },
+    "tolerances_passed": true,
+    "weight_gradient_max_abs": 0.0
+  },
+  "run_id": "r1e-rocm-mlagents-compatibility-cleanup-authoritative-20260816",
+  "schema_version": "quickdraw.r1e-rocm-mlagents-compatibility-result.v1",
+  "software": {
+    "imports": {
+      "mlagents": true,
+      "mlagents_envs": true,
+      "torch": true,
+      "torchaudio": true,
+      "torchvision": true
+    },
+    "mlagents_cli": true,
+    "overlay_valid": true,
+    "packages": {
+      "PettingZoo": "1.15.0",
+      "grpcio": "1.53.2",
+      "mlagents": "1.1.0",
+      "mlagents-envs": "1.1.0",
+      "numpy": "1.23.5",
+      "rocm": "7.14.0",
+      "torch": "2.12.0+rocm7.14.0",
+      "torchaudio": "2.11.0+rocm7.14.0",
+      "torchvision": "0.27.0+rocm7.14.0"
+    },
+    "pip_check": true,
+    "python_version": "3.11.13"
+  },
+  "system": {
+    "amd_software": "26.7.1",
+    "cpu": "AMD Ryzen 5 9600X 6-Core Processor",
+    "gpus": [
+      {
+        "driver_version": "32.0.21045.1000",
+        "name": "AMD Radeon(TM) Graphics"
+      },
+      {
+        "driver_version": "32.0.31035.1003",
+        "name": "AMD Radeon RX 7900 XT"
+      }
+    ],
+    "memory_bytes": 33377591296,
+    "os": {
+      "build": "26200",
+      "display_version": "25H2",
+      "name": "Microsoft Windows 11 Home",
+      "version": "10.0.26200"
+    }
+  }
+}

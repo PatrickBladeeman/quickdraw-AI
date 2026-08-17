@@ -422,6 +422,34 @@ Scope completed by extending only the abstract communicator fixture:
 
 R1C does not satisfy AMD/backend parity, checkpoint reload, model export, either learned benchmark, or any research-effectiveness gate. CPU remains the measured reference.
 
+### R1D. AMD support exploration and parity-contract preflight — superseded
+
+R1D investigated an exploratory Windows accelerator path and froze the later
+all-or-nothing parity procedure without accepting a backend or modifying the CPU
+reference. The current ROCm `7.14.0` matrix subsequently established exact RX
+7900 XT / `gfx1100` / Windows 11 25H2 support. Revised R1E replaced the
+exploratory candidate with ROCm, and the obsolete R1D executable probe, package
+lock, contract, result schema, curated result, and focused tests were retired
+during repository cleanup. The registered parity procedure remains active for
+R1F.
+
+### R1E. Python 3.11 / ROCm 7.14 / ML-Agents 1.1 compatibility — completed
+
+Scope completed without training or executing the full AMD parity benchmark:
+
+- [x] Registered the exact Windows 11 25H2, RX 7900 XT / `gfx1100`, Python 3.11.13, ROCm 7.14.0, PyTorch `2.12.0+rocm7.14.0`, and ML-Agents 1.1.0 target.
+- [x] Proved why the published ML-Agents 1.1.0 metadata blocks Python 3.11: its Python upper bound is 3.10.12 and its `grpcio<=1.48.2` dependency has no CPython 3.11 Windows wheel.
+- [x] Added a deterministic, metadata-only wheel overlay that retains every official ML-Agents runtime file byte-for-byte, widens the Python range only through 3.11, and uses the Release 23-compatible `grpcio==1.53.2` wheel. Official and overlay wheel hashes are frozen.
+- [x] Disclosed and source-hashed the transitive `PettingZoo==1.15.0` Python-metadata exception without modifying its runtime source.
+- [x] Added the isolated support lock, preparation pipeline, strict compatibility probe, Draft 2020-12 result schema, curated result, and six focused R1E tests.
+- [x] Clean-installed two independent ignored Python 3.11.13 environments. Both had identical 71-distribution inventories and passed `pip check`, imports, and `mlagents-learn --help`.
+- [x] Selected the exact RX 7900 XT as ROCm device 0 through ML-Agents and passed the fixed CPU-versus-ROCm float32 forward/backward probe: forward maximum absolute difference `4.76837158203125e-07`, both gradient differences `0.0`, all finite, registered tolerance `1e-5`.
+- [x] Ran two Unity communicator traces from each independent environment. All four passed and shared canonical trace SHA-256 `5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`.
+- [x] Recorded `conditional_go`, `backend_acceptance=not_accepted`, `cpu_reference_retained=true`, and `full_parity_executed=false`. No driver, Windows security, Unity runtime, or gameplay change was made.
+- [x] Retired the superseded exploratory R1D files, removed stale cloud/manifest examples, removed the disposable reproduction environments after preserving their evidence, and retained the primary ROCm environment for R1F.
+
+The next bounded R1 task is R1F: execute the already frozen fixed-policy, checkpoint, export, exact-trace/action/return, tolerance, and repeated 10,000-decision CPU-versus-ROCm throughput gate. It still requires explicit approval. R1E does not establish training support, model-quality evidence, full correctness parity, or a ROCm throughput advantage.
+
 ## R2. Implement the Unity Basic visual-control benchmark
 
 Goal: create a small Unity hitscan analogue of the ViZDoom Basic Scenario that can validate visual Q-learning before strategic or LLM complexity.

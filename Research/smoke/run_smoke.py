@@ -525,6 +525,7 @@ def create_manifest(
     smoke_contract: Dict[str, Any],
     smoke_contract_path: Path,
     performance: Optional[Dict[str, Any]],
+    accelerator_candidate: Optional[str],
 ) -> Dict[str, Any]:
     relative_output = output_directory.resolve().relative_to(ARTIFACT_ROOT).as_posix()
     git_commit = run_command(["git", "rev-parse", "HEAD"])
@@ -603,12 +604,19 @@ def create_manifest(
         "backend": {
             "reference": "cpu",
             "selected": "cpu",
-            "accelerator_candidate": "torch-directml",
+            "accelerator_candidate": accelerator_candidate,
             "accelerator_status": "deferred",
             "reason": (
-                "R1C records the CPU LLAPI transport reference only; accelerator parity is deferred."
+                "R1C records the CPU LLAPI transport reference only; "
+                "accelerator parity is deferred."
                 if is_cpu_reference
-                else "R1B validates communication only; backend parity and throughput remain deferred."
+                else (
+                    "R1E validates the Python 3.11 Unity communicator boundary "
+                    "only; ROCm inference parity and throughput remain deferred."
+                    if accelerator_candidate == "rocm"
+                    else "R1B validates communication only; backend parity and "
+                    "throughput remain deferred."
+                )
             ),
         },
         "seeds": {
@@ -667,6 +675,12 @@ def parse_arguments() -> argparse.Namespace:
         default="smoke",
         help="Trace contract to run; defaults to the R1B smoke regression.",
     )
+    parser.add_argument(
+        "--accelerator-candidate",
+        choices=("rocm",),
+        default=None,
+        help="Candidate recorded in the manifest; the scripted smoke stays on CPU.",
+    )
     return parser.parse_args()
 
 
@@ -720,6 +734,7 @@ def main() -> int:
         smoke_contract,
         smoke_contract_path,
         performance,
+        arguments.accelerator_candidate,
     )
     schema = json.loads(MANIFEST_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)

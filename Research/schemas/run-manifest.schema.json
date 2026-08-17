@@ -101,7 +101,7 @@
           "required": ["version", "implementation", "packages"],
           "properties": {
             "version": {
-              "const": "3.10.12"
+              "enum": ["3.10.12", "3.11.13"]
             },
             "implementation": {
               "type": "string",
@@ -213,7 +213,7 @@
           "const": "cpu"
         },
         "selected": {
-          "enum": ["cpu", "directml", "rocm", "cuda", "other"]
+          "enum": ["cpu", "rocm", "cuda", "other"]
         },
         "accelerator_candidate": {
           "type": ["string", "null"]

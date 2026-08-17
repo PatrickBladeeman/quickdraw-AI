@@ -1,9 +1,9 @@
-# R1A environment preflight
+# R1A CPU environment and R1E ROCm compatibility
 
-This directory records the dependency decision for the first research
-infrastructure slice. R1A is configuration and contract work only: it does not
-install a Unity package, add a research scene, implement a trainer, or make a
-model-effectiveness claim.
+This directory records the R1A CPU dependency decision and the separately
+isolated R1E Python 3.11 / ROCm / ML-Agents compatibility gate. Neither slice
+adds research gameplay, implements a trainer, accepts an accelerated backend,
+or makes a model-effectiveness claim.
 
 ## Compatibility decision
 
@@ -33,7 +33,9 @@ Primary sources:
 - `mlagents-envs` 1.1.0 metadata: <https://pypi.org/pypi/mlagents-envs/1.1.0/json>
 - PyTorch 2.2.1 CPU command: <https://pytorch.org/get-started/previous-versions/#v221>
 - ML-Agents `pkg_resources` import: <https://github.com/Unity-Technologies/ml-agents/blob/release_23/ml-agents/mlagents/torch_utils/torch.py>
-- DirectML package metadata: <https://pypi.org/pypi/torch-directml/json>
+- AMD RX 7900 XT Windows ROCm compatibility matrix: <https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html?fam=radeon&w=compute&gpu=rx-7900-xt&gfx=gfx1100&os=windows>
+- AMD ROCm installation guide: <https://rocm.docs.amd.com/en/latest/install/rocm.html>
+- AMD ROCm PyTorch guide: <https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html>
 
 The PyPI `mlagents==1.1.0` metadata constrains `grpcio` to `<=1.48.2`.
 Release 23 source widened that bound to `<=1.53.2` without publishing a new
@@ -87,17 +89,90 @@ standalone communicator traces. See `Research/smoke/README.md` for the isolated
 fixture, commands, evidence, and deliberate exclusions. R1B did not install a
 trainer plugin or test an accelerated backend.
 
-## Accelerator decision
+## ROCm support decision
 
-CPU remains the reference backend. PyTorch 2.2.1 publishes ROCm wheels for
-Linux, not native Windows. The current `torch-directml` preview package pins
-`torch==2.4.1`, which conflicts with this verified `torch==2.2.1+cpu` lock.
-DirectML is therefore not part of this environment and no AMD acceleration
-claim is made. A later backend task must use an isolated lock and pass the
-registered trace, return, checkpoint, export, tolerance, and throughput gates
-before it can replace CPU.
+CPU remains the accepted reference backend. The ROCm `7.14.0` matrix, dated
+2026-07-16, explicitly lists the Radeon RX 7900 XT, its `gfx1100` architecture,
+Windows 11 25H2, and Python 3.11. The superseded exploratory DirectML lane was
+removed during repository cleanup so the active environment surface has one
+accelerator candidate. R1C's two exactly matching 10,000-decision CPU
+communicator traces and their 108.636 and 107.434 decisions/s measurements
+remain the reference; R1E does not replace it.
 
-R1C used this pinned CPU environment to record two exactly matching
-10,000-decision Unity/Python LLAPI transport traces. Their measured rates were
-108.636 and 107.434 decisions/s. This establishes the CPU transport reference;
-it does not validate a trainer, checkpoint, export path, or accelerated backend.
+## R1E Python 3.11 / ROCm / ML-Agents gate
+
+The official `mlagents==1.1.0` and `mlagents-envs==1.1.0` wheels contain runtime
+code that works in the tested Python 3.11 stack, but their published metadata
+blocks it: `Requires-Python` ends at 3.10.12 and `grpcio` ends at 1.48.2, for
+which no CPython 3.11 Windows wheel exists. Release 23 source widened `grpcio`
+to 1.53.2, which does have that wheel, but identifies itself as `1.2.0.dev0`.
+R1E therefore does not silently install Release 23 under the public 1.1.0 name.
+
+Instead, `build_mlagents_py311_overlay.py` deterministically reconstructs the
+two official 1.1.0 wheels with only these metadata changes:
+
+- `Requires-Python`: `>=3.10.1,<=3.10.12` to `>=3.10.1,<3.12`;
+- `grpcio`: maximum `1.48.2` to `1.53.2`;
+- wheel build tag `1py311compat` and explicit QuickDraw metadata headers.
+
+Every runtime file is checked byte-for-byte against the official wheel. The
+official and reconstructed wheel hashes are frozen in
+`mlagents-rocm-compatibility-contract-v1.json`. The old transitive
+`PettingZoo==1.15.0` source also declares Python `<3.11`; R1E records its
+official source hash and bypasses only that metadata check, without changing
+its runtime source.
+
+R1E clean-installed the stack twice in independent ignored environments. The
+repository cleanup retained the primary environment for R1F and removed the
+disposable reproduction environment after its result was recorded:
+
+| Component | Validated version |
+| --- | --- |
+| Python | `3.11.13` |
+| ROCm | `7.14.0` |
+| PyTorch / HIP | `2.12.0+rocm7.14.0` / `7.14.60850` |
+| torchvision / torchaudio | `0.27.0+rocm7.14.0` / `2.11.0+rocm7.14.0` |
+| ML-Agents | official-runtime `1.1.0` metadata overlays |
+| grpcio | `1.53.2` |
+
+Both original constructions had identical 71-distribution inventories and
+passed `pip check`, imports, `mlagents-learn --help`, exact RX 7900 XT selection,
+and the fixed CPU-versus-ROCm forward/backward probe. The forward maximum absolute
+difference was `4.76837158203125e-07`; input- and weight-gradient differences
+were both `0.0`, below the registered `1e-5` tolerance. Two communicator runs
+from each environment also passed, and all four canonical traces had SHA-256
+`5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`.
+
+The installed AMD Software `26.7.1` is newer than the matrix-validated `26.6.4`.
+That is recorded as a support qualification; no driver or Windows security
+setting was changed. The functional ROCm checks passed on the installed driver.
+
+Create a Python 3.11.13 environment, then prepare it with the tracked pipeline:
+
+```powershell
+$environment = 'Artifacts\Experiments\.venvs\r1e-rocm-mlagents-py311'
+$artifacts = 'Artifacts\Experiments\r1e-rocm-mlagents\environment-1'
+micromamba create -y -p $environment -c conda-forge python=3.11.13
+
+$python = Join-Path $environment 'python.exe'
+& $python Research/environment/prepare_rocm_mlagents_py311.py `
+  --python $python --artifact-directory $artifacts
+```
+
+Run `Research/smoke/run_smoke.py` twice with
+`--accelerator-candidate rocm`, then validate those two run directories:
+
+```powershell
+& $python Research/environment/probe_rocm_mlagents_compatibility.py `
+  --run-id r1e-rocm-mlagents-compatibility `
+  --output 'Artifacts/Experiments/r1e-rocm-mlagents/raw-result.json' `
+  --communicator-run 'Artifacts/Experiments/r1e-rocm-mlagents/communicator-run-1' `
+  --communicator-run 'Artifacts/Experiments/r1e-rocm-mlagents/communicator-run-2'
+```
+
+The schema-validated R1E result is `conditional_go`, with
+`backend_acceptance=not_accepted`, `cpu_reference_retained=true`, and
+`full_parity_executed=false`. It proves that the ML-Agents 1.1 communicator and
+ROCm tensor path can coexist on Python 3.11. It does not prove training,
+checkpoint/export parity, end-to-end policy parity, or a throughput advantage.
+Those remain the registered next task in `amd-parity-procedure-v1.json`.

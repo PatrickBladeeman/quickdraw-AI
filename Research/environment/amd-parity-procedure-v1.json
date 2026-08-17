@@ -1,0 +1,61 @@
+{
+  "schema_version": "quickdraw.amd-backend-parity-procedure.v1",
+  "status": "registered_not_executed",
+  "purpose": "Later CPU-versus-ROCm correctness and throughput gate. R1E retains this registered procedure but does not execute or accept it.",
+  "reference": {
+    "backend": "cpu",
+    "transport_contract": "Research/smoke/cpu-reference-contract-v1.json",
+    "transport_trace_sha256": "d5080b62ea3cc6c33a18567461f690a568339d2168f9d253ea3134b7c85572c5",
+    "recorded_transport_decisions_per_second": [108.636, 107.434]
+  },
+  "candidate_preconditions": {
+    "primary_backend": "rocm",
+    "compatibility_contract": "Research/environment/mlagents-rocm-compatibility-contract-v1.json",
+    "compatibility_result": "Research/environment/rocm-mlagents-compatibility-result-v1.json",
+    "required_compatibility_status": "conditional_go",
+    "candidate_environment_isolated_from_cpu": true,
+    "exact_adapter_selection_required": "AMD Radeon RX 7900 XT",
+    "mlagents_metadata_overlay_must_be_disclosed": true
+  },
+  "deterministic_policy_fixture": {
+    "training": false,
+    "input": "The four-float observations from the registered 10,000-decision transport trace.",
+    "architecture": "Fixed-weight float32 MLP: 4 inputs, 32 ReLU hidden units, separate 3-logit movement and 2-logit submit heads.",
+    "weights": "Generated once from a registered signed 31-bit seed and hashed; the same state dictionary is used by both backends.",
+    "action_rule": "Argmax per branch after applying the environment's mechanical masks. Registered biases must keep the online trace on stay/continue so the R1C truncation path remains comparable.",
+    "checkpoint": "Save once, reload independently on CPU and candidate, and require identical parameter names, shapes, dtypes, and SHA-256.",
+    "export": "Export once to ONNX, hash the file, compare CPU ONNX Runtime outputs against PyTorch CPU outputs, and require ROCm PyTorch to match the same registered logits and actions."
+  },
+  "correctness_gates": {
+    "observation_trace": "exact",
+    "action_masks": "exact",
+    "discrete_actions": "exact",
+    "terminal_and_interrupted": "exact",
+    "seeded_return": "exact",
+    "checkpoint_reload": "exact parameters and actions; logits within tolerance",
+    "exported_inference": "exact actions; logits within tolerance",
+    "float32_max_abs_tolerance": 0.00001,
+    "nan_or_infinity": "automatic rejection"
+  },
+  "throughput_gate": {
+    "decision_count_per_run": 10000,
+    "warmup_decisions": 1000,
+    "measured_runs_per_backend": 2,
+    "timing_scope": "End-to-end synchronous policy inference, action selection, in-memory trace capture, and Unity/Python LLAPI step loop; process startup, warmup, file serialization, and trace comparison excluded.",
+    "ordering": "Alternate CPU and candidate runs on the same machine and record background-load notes.",
+    "comparison_statistic": "median decisions per second across the two measured runs",
+    "improvement_rule": "Candidate median decisions per second must be strictly greater than CPU median after every correctness gate passes."
+  },
+  "decision": {
+    "accept": "All correctness gates pass and the throughput improvement rule passes.",
+    "reject": "Any correctness gate fails or candidate throughput does not improve.",
+    "fallback": "Retain the verified CPU backend and preserve all negative/null evidence.",
+    "no_partial_acceptance": true
+  },
+  "non_goals": [
+    "Research_Basic or Research_Strategic implementation",
+    "BDQ training, replay, or learned weights",
+    "combat or reflex mechanics",
+    "LLM runtime integration"
+  ]
+}

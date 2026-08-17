@@ -1,0 +1,109 @@
+{
+  "schema_version": "quickdraw.r1e-rocm-mlagents-compatibility-contract.v1",
+  "purpose": "R1E compatibility gate for the official ML-Agents 1.1.0 runtime on Python 3.11 with the official Windows ROCm 7.14 gfx1100 PyTorch stack. This contract does not train a model or accept an accelerated backend.",
+  "checked_utc": "2026-08-16T00:00:00Z",
+  "target": {
+    "os": "Windows 11 25H2",
+    "gpu_name_exact": "AMD Radeon RX 7900 XT",
+    "gpu_architecture": "gfx1100",
+    "python_version": "3.11.13",
+    "unity_ml_agents_version": "4.0.0",
+    "mlagents_public_version": "1.1.0",
+    "mlagents_envs_public_version": "1.1.0",
+    "rocm_version": "7.14.0",
+    "torch_version": "2.12.0+rocm7.14.0",
+    "torchvision_version": "0.27.0+rocm7.14.0",
+    "torchaudio_version": "2.11.0+rocm7.14.0"
+  },
+  "official_support": {
+    "compatibility_matrix": "https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html?fam=radeon&w=compute&gpu=rx-7900-xt&gfx=gfx1100&os=windows",
+    "rocm_installation": "https://rocm.docs.amd.com/en/latest/install/rocm.html",
+    "pytorch_installation": "https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html",
+    "matrix_release": "7.14.0",
+    "matrix_date": "2026-07-16",
+    "gpu_listed_exactly": true,
+    "supported_windows_version": "Windows 11 25H2",
+    "validated_adrenalin_driver": "26.6.4",
+    "installed_adrenalin_driver": "26.7.1",
+    "installed_driver_store_version": "32.0.31035.1003",
+    "supported_python_versions": ["3.11", "3.12", "3.13", "3.14"],
+    "supported_pytorch_version": "2.12.0"
+  },
+  "official_wheels": {
+    "mlagents": {
+      "filename": "mlagents-1.1.0-py3-none-any.whl",
+      "sha256": "0671e40fb4e4da8740d18bbce47d5a5ef1c58a0db9d109846fbe3d98d712b4f4"
+    },
+    "mlagents-envs": {
+      "filename": "mlagents_envs-1.1.0-py3-none-any.whl",
+      "sha256": "fbb7e54c6327a53f0b7dd615de49414af496e5f766ccc10f175d3731b32bb985"
+    }
+  },
+  "compatibility_evidence": {
+    "published_requires_python": ">=3.10.1,<=3.10.12",
+    "published_grpcio_constraint": ">=1.11.0,<=1.48.2",
+    "python_311_grpcio_1482_windows_wheel_exists": false,
+    "release_23_commit": "a2777719560e4676be99e2ea128c5eb1fbeb3dbb",
+    "release_23_grpcio_constraint": ">=1.11.0,<=1.53.2",
+    "grpcio_1532_python_311_windows_wheel_exists": true,
+    "release_23_source_distribution_version": "1.2.0.dev0"
+  },
+  "transitive_metadata_exception": {
+    "package": "PettingZoo",
+    "version": "1.15.0",
+    "published_requires_python": ">=3.7,<3.11",
+    "source_filename": "PettingZoo-1.15.0.tar.gz",
+    "source_sha256": "cded4074aa94bad9733d5c55c73ed27e50c6bfd525e07f0e6f7c4d0a379bb249",
+    "runtime_code_changes": false
+  },
+  "metadata_overlay": {
+    "build_tag": "1py311compat",
+    "runtime_code_changes": false,
+    "requires_python_before": ">=3.10.1,<=3.10.12",
+    "requires_python_after": ">=3.10.1,<3.12",
+    "grpcio_before": "grpcio<=1.48.2,>=1.11.0",
+    "grpcio_after": "grpcio<=1.53.2,>=1.11.0",
+    "selected_grpcio": "1.53.2",
+    "wheel_output_must_be_ignored": true,
+    "overlay_wheels": {
+      "mlagents-1.1.0-1py311compat-py3-none-any.whl": "2a925b2fdad701c9ac7f56d961b408e7b8362efa49345ae10cdbc348aa79dca6",
+      "mlagents_envs-1.1.0-1py311compat-py3-none-any.whl": "0b7022ebdbceaea826abbf0329f1e6345adcdeab6c750f7614beae4166397c10"
+    }
+  },
+  "tensor_probe": {
+    "dtype": "float32",
+    "operation": "relu(x @ weight + bias) with summed-loss backward gradients",
+    "forward_max_abs_tolerance": 0.00001,
+    "input_gradient_max_abs_tolerance": 0.00001,
+    "weight_gradient_max_abs_tolerance": 0.00001,
+    "require_finite": true,
+    "measure_throughput": false
+  },
+  "acceptance_gates": {
+    "official_wheel_hashes_match": true,
+    "runtime_files_unchanged": true,
+    "pip_check": true,
+    "required_imports": true,
+    "mlagents_cli": true,
+    "unity_communicator_runs": 2,
+    "unity_communicator_trace_comparison": "exact",
+    "rocm_available": true,
+    "exact_gpu_selected": true,
+    "tensor_tolerances": true
+  },
+  "decision_rules": {
+    "conditional_go": "Every compatibility gate passes in two independently constructed ignored environments. This permits a later full CPU-versus-ROCm parity and throughput task.",
+    "no_go": "Any compatibility gate fails.",
+    "backend_acceptance": "Never granted by R1E. Correctness, checkpoint, export, trace, return, and throughput parity remain required."
+  },
+  "boundaries": {
+    "cpu_lock_must_remain_unchanged": true,
+    "system_driver_changes": false,
+    "windows_security_changes": false,
+    "unity_runtime_changes": false,
+    "model_training": false,
+    "full_backend_parity": false,
+    "research_basic_or_combat": false,
+    "llm_runtime": false
+  }
+}

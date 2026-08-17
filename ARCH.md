@@ -245,6 +245,14 @@ The coordinator accepts one ordered run configuration and ordered per-episode co
 
 `Research/smoke/run_smoke.py` launches the standalone player, verifies behavior specifications, records complete canonical transition/side-channel traces, validates run manifests, and compares a second same-seed trace exactly. Its default R1B mode drives one terminal and one truncated smoke episode. Its dedicated R1C CPU-reference mode drives one 10,000-decision truncation and times the synchronous low-level-API decision loop with `time.perf_counter_ns`, including scripted action selection and in-memory transition capture; process startup, trace comparison, and JSON serialization are excluded. The two R1C base-seed-`21001` traces were byte-identical, while their separately recorded rates were 108.636 and 107.434 decisions/s. This is CPU communicator-transport throughput, not training throughput, model-inference throughput, sample-efficiency evidence, or support for the research hypotheses.
 
+### Implemented R1E backend-compatibility boundary
+
+The current AMD ROCm `7.14.0` matrix explicitly lists the exact RX 7900 XT / `gfx1100` / Windows 11 25H2 combination. The earlier exploratory DirectML lane was retired after this support correction; it is not an active candidate, dependency, schema, probe, or manifest option. `Research/environment/requirements-lock.txt` remains the untouched CPU reference, and the registered future parity procedure compares that reference only with ROCm.
+
+R1E adds a separate ignored Python 3.11.13 environment for ROCm 7.14.0 and PyTorch `2.12.0+rocm7.14.0`. ML-Agents 1.1.0's official runtime files are retained byte-for-byte; a deterministic wheel overlay changes only the published Python upper bound and the `grpcio` maximum to the Release 23-compatible 1.53.2. The overlay, the transitive PettingZoo metadata exception, all source hashes, and the fact that no runtime code changed are explicit contract data.
+
+Two independently constructed environments passed dependency, import, CLI, exact-device, and CPU-versus-ROCm forward/backward gates. Two Unity communicator runs in each environment produced the same canonical trace SHA-256 `5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`. The tensor forward maximum absolute difference was `4.76837158203125e-07`, with zero input- and weight-gradient differences. R1E therefore records `conditional_go` but `backend_acceptance=not_accepted`; CPU remains the sole reference until the separately frozen checkpoint, export, trace, return, tolerance, and 10,000-decision throughput gates all pass.
+
 ### Shared clocks and decision cadence
 
 - Unity physics and the shared actuator run with a `0.02 s` fixed timestep, or 50 Hz.

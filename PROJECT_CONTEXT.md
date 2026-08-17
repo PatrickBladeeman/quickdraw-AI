@@ -58,13 +58,13 @@ Implemented and previously verified:
 - Separate `ReflexCommanded` and observed `visible_motion_started` events.
 - Typed buffered JSONL telemetry, stage summaries, failure containment, and Domain-Reload-safe lifecycle.
 - Forty-one Play Mode tests covering Tasks 1–8.
-- Unity ML-Agents `4.0.0`, its locked Inference Engine `2.2.1` dependency, and an isolated R1B/R1C Unity/Python communicator fixture with six focused Edit Mode tests.
+- Unity ML-Agents `4.0.0`, its locked Inference Engine `2.2.1` dependency, an isolated R1B/R1C Unity/Python communicator fixture with six focused Edit Mode tests, and an isolated R1E Python 3.11 / ROCm / ML-Agents compatibility gate with six focused environment-contract tests.
 
-Task 8 is committed and pushed as two consecutive Task 8-only commits: `ac1274e` (`task 8 : Logging and telemetry`) and `b5532e1` (`task 8 continued`). R1A was committed and pushed as `7117b81`; R1B was committed and pushed as `4863153`, which is the current `main`, `origin/main`, and `origin/HEAD`. R1C is implemented and verified locally but remains uncommitted. Research Tasks R0, R1A, R1B, and R1C are complete at the working-tree level. R1C preserves the R1B exact-trace regression, completes two byte-identical 10,000-decision CPU traces, records 108.636 and 107.434 decisions/s, passes six focused Edit Mode tests plus all 41 existing Play Mode tests, and passes both isolated-smoke and normal Windows builds.
+Task 8 is committed and pushed as two consecutive Task 8-only commits: `ac1274e` (`task 8 : Logging and telemetry`) and `b5532e1` (`task 8 continued`). R1A was committed and pushed as `7117b81`; R1B was committed and pushed as `4863153`; R1C was committed and pushed as `5bae5f1`, which is the current `main`, `origin/main`, and `origin/HEAD`. Revised R1E and its repository cleanup are implemented and verified locally but remain uncommitted; the exploratory R1D lane is superseded and its obsolete DirectML files are retired. Research Tasks R0, R1A, R1B, R1C, and R1E are complete at the working-tree level. Current AMD documentation explicitly supports the RX 7900 XT / `gfx1100` on Windows 11 25H2 with ROCm 7.14. R1E leaves the CPU lock unchanged, proves the ML-Agents 1.1.0 communicator and exact RX 7900 XT ROCm tensor path in two independent Python 3.11.13 environment constructions, explicitly does not accept the backend, and keeps CPU as the reference.
 
 Not implemented:
 
-- Basic or strategic research scenes, visual/runtime implementations of their frozen benchmark episode/reward/reset/observation/action/terminal/truncation contracts, the AMD parity gate, BDQ training, replay, model export, or trained policies. The implemented abstract smoke scene proves communication and establishes CPU transport throughput only.
+- Basic or strategic research scenes, visual/runtime implementations of their frozen benchmark episode/reward/reset/observation/action/terminal/truncation contracts, full AMD trace/checkpoint/export/throughput parity, BDQ training, replay, model export, or trained policies. R1E establishes compatibility only and does not accept ROCm as the backend.
 - Combat, cover, the scripted opponent, or `EvadeTelegraphedShot` research reflex.
 - Qwen3/`llama.cpp`, the local HTTP client, strategic directives, failure injection, or LLM evaluation.
 - The seeded factorial runner, confidence-interval analysis, or curated research report.
@@ -174,7 +174,7 @@ Raw JSONL, CSV, checkpoints, and model outputs live under an ignored project-loc
 
 ### Ordered next work and non-goals
 
-Research Tasks R0, R1A, R1B, and R1C are complete. R1B installed and locked Unity ML-Agents `4.0.0`, added the separate abstract communicator fixture and strict side channel, and proved the default terminal/truncation smoke trace repeatable. R1C added a separate registered 10,000-decision CPU mode without changing that default. Two base-seed-`21001` R1C runs each contained exactly 10,000 transitions, ended with `decision_limit` and `interrupted=true`, and produced the same canonical trace SHA-256 `d5080b62ea3cc6c33a18567461f690a568339d2168f9d253ea3134b7c85572c5`; their separately recorded LLAPI transport rates were 108.636 and 107.434 decisions/s. Six focused Edit Mode tests, all 41 existing Play Mode tests, the isolated smoke build, and the normal Windows build passed. No research benchmark, combat, trainer, learned model, AMD backend, or LLM implementation was added. The remaining R1 work requires separate approval; the next candidate is the AMD/backend parity gate, not `Research_Basic` or trainer work.
+Research Tasks R0, R1A, R1B, R1C, and revised R1E are complete; the exploratory R1D lane is superseded and retired. R1C established the exact 10,000-decision CPU transport reference. AMD's current ROCm 7.14 matrix explicitly lists the RX 7900 XT / `gfx1100` on Windows 11 25H2. R1E uses an ignored Python 3.11.13 environment with ROCm 7.14.0 and PyTorch `2.12.0+rocm7.14.0`; its earlier independent reproduction evidence remains recorded even though the disposable reproduction environment was removed during cleanup. A deterministic metadata-only overlay retains every ML-Agents 1.1.0 runtime file while widening its Python upper bound and `grpcio` maximum to 1.53.2; the old PettingZoo metadata exception is also disclosed and source-hashed. Both original environment constructions passed dependency, import, CLI, exact-device, and tensor checks. Four Unity communicator runs produced the same canonical trace SHA-256 `5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`; the CPU-versus-ROCm forward maximum absolute difference was `4.76837158203125e-07` and both gradient differences were zero. Six focused environment-contract tests pass. The refreshed result is `conditional_go`, `backend_acceptance=not_accepted`, `cpu_reference_retained=true`, and `full_parity_executed=false`. The CPU lock and all Unity runtime/gameplay files remain unchanged. The remaining R1 work requires separate approval; the next candidate is R1F, limited to executing the frozen fixed-weight policy/checkpoint/export/10,000-decision CPU-versus-ROCm correctness and throughput procedure.
 
 Current non-goals are survival/extraction systems, crafting or loot economies, multiplayer/networking, production art, procedural worlds, group AI, speech/TTS, unrestricted conversation, LLM training/fine-tuning, LLM frame-level control, hybrid-only privileged mechanics, tactical masks for legal actions, unobserved visible-latency claims, and post-hoc changes to registered thresholds without an exploratory label.
 
@@ -1741,7 +1741,6 @@ TASKS.md
 CITATION.cff
 ASSETS_LICENSE.md
 LICENSE
-.env.example
 ```
 
 #### 19.3 Track
