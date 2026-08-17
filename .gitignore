@@ -35,6 +35,8 @@ sysinfo.txt
 
 # Generated research artifacts and disposable environments
 /Artifacts/Experiments/
+__pycache__/
+*.py[cod]
 
 # Local AI/session memory
 CONTEXT.md

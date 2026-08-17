@@ -37,7 +37,7 @@ Timing stages are recorded separately in structured telemetry so model latency, 
 
 ## Status
 
-The deterministic Unity fixture currently implements player control, NPC patrol and perception, one-shot interruption, a measurable reflex, visible-motion observation, and buffered JSONL telemetry. Research infrastructure pins the Python 3.10.12 CPU dependency set, installs Unity ML-Agents 4.0.0, passes a repeatable standalone Unity/Python communicator smoke gate, and records an exactly repeatable 10,000-decision CPU LLAPI transport reference. R1E established the disclosed Python 3.11.13 / ML-Agents 1.1.0 / ROCm 7.14.0 compatibility lane on the exact RX 7900 XT. R1F then passed every fixed-policy trace, action, return, checkpoint, ONNX, finiteness, and `1e-5` logit gate. Across alternating 10,000-decision runs, CPU measured 81.321 and 105.108 decisions/s while ROCm measured 96.430 and 100.213; the medians were 93.2145 and 98.3215, so ROCm is accepted for this batch-size-one synchronous inference fixture. This does not establish training throughput or model quality. Learned benchmarks, training, strategic combat, and local-model integration remain future phases.
+The deterministic Unity fixture implements player control, NPC patrol and perception, one-shot interruption, a measurable reflex, visible-motion observation, and buffered JSONL telemetry. Research infrastructure pins the CPU dependency set, installs Unity ML-Agents 4.0.0, passes a repeatable communicator smoke gate, and records an exactly repeatable 10,000-decision CPU LLAPI transport reference. R1E established the Python 3.11.13 / ML-Agents 1.1.0 / ROCm 7.14.0 compatibility lane on the exact RX 7900 XT. R1F passed every fixed-policy trace, action, return, checkpoint, ONNX, finiteness, and `1e-5` logit gate; ROCm's 98.3215 decisions/s median exceeded CPU's 93.2145 for that registered batch-size-one fixture. R2A now implements the deterministic `Research_Basic` environment: an actual `[84,84,4]` HWC grayscale observation, shared typed actions and center-camera hitscan, seeded resets, terminal/truncation semantics, and schema-validated random/scripted LLAPI baselines whose fresh-process traces repeat exactly. No BDQ training, learned policy, strategic combat environment, or local-model runtime has begun.
 
 ## Technology
 
@@ -45,7 +45,7 @@ The deterministic Unity fixture currently implements player control, NPC patrol 
 - Universal Render Pipeline
 - Unity Input System
 - Unity ML-Agents 4.0.0 (installed; communicator and CPU reference trace verified)
-- Python 3.10.12 CPU reference plus the accepted Python 3.11.13 / PyTorch 2.12.0 ROCm inference lane (BDQ trainer planned)
+- Python 3.10.12 CPU reference plus the accepted Python 3.11.13 / PyTorch 2.12.0 ROCm inference lane (BDQ trainer not yet implemented)
 - Qwen3-8B through a local `llama.cpp` server (planned strategic layer)
 - ProBuilder
 - Structured JSONL telemetry

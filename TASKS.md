@@ -463,11 +463,23 @@ Scope completed without training or research-gameplay expansion:
 - [x] Applied the frozen no-partial-acceptance rule: every correctness gate passed and ROCm median throughput was strictly higher, so ROCm is accepted for this batch-size-one synchronous inference fixture.
 - [x] Added the fixed-policy implementation, parity runner mode, evaluator, strict Draft 2020-12 result schema, curated result, reproducibility documentation, and four focused R1F tests. Generated checkpoint, ONNX, traces, manifests, environments, and diagnostic evidence remain ignored.
 
-R1F does not prove training throughput, larger-model performance, learned-policy quality, `Research_Basic`, combat, or LLM behavior. The next bounded candidate is an R2A environment-only slice: implement and test the deterministic `Research_Basic` scene/observation/action/reset contract without starting BDQ training.
+R1F does not prove training throughput, larger-model performance, learned-policy quality, `Research_Basic`, combat, or LLM behavior. R2A separately validates the environment contract below without using R1F as learned-policy evidence.
 
 ## R2. Implement the Unity Basic visual-control benchmark
 
 Goal: create a small Unity hitscan analogue of the ViZDoom Basic Scenario that can validate visual Q-learning before strategic or LLM complexity.
+
+### R2A. Deterministic environment-only slice — completed
+
+- [x] Added an isolated long narrow primitive room with the capsule agent at the south end, a target in one of nine seeded north-end lateral slots, and a visible open-center reticle aligned to the only hitscan ray.
+- [x] Implemented an actual uncompressed float32 HWC `[84,84,4]` sensor using Rec. 601 grayscale, oldest-to-newest stacking, and explicit post-reset four-channel fill with stale-stack failure containment.
+- [x] Added stable semantic action enums, the shared typed action tuple, movement-before-shoot actuation, mechanically impossible boundary masks, 10 Hz decision gating, additive rewards, terminal hit, and 300-decision truncation.
+- [x] Reset transforms, seeded target sampling, ammunition, cooldown, counters, cumulative reward, and visual state deterministically; fixed target sequences are locked in both C# and Python tests.
+- [x] Added one common LLAPI runner for seeded random and visual-only scripted policies. Both export the same strict `quickdraw.basic-episode.v1` schema intended for later learned policies.
+- [x] Passed 29 Edit Mode tests, all 41 existing Play Mode tests, six Python tests, the isolated Basic Windows build, and the normal `Test_Arena` Windows build.
+- [x] Ran two fresh 12-episode standalone processes per policy. Random traces matched exactly, scripted traces matched exactly, and the scripted policy completed all 12 episodes with one aligned hit and no misses per episode.
+
+R2A contains no replay buffer, BDQ trainer, training run, learned weights, strategic combat expansion, or LLM runtime.
 
 Scene and mechanics:
 

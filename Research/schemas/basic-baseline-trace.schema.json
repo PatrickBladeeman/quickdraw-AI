@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PatrickBladeeman/quickdraw-AI/Research/schemas/basic-baseline-trace.schema.json",
+  "title": "quickdraw-AI Research_Basic baseline trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "behavior",
+    "policy",
+    "scenario",
+    "episodes"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.basic-baseline-trace.v1"},
+    "contract_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "observation_shape", "wire_layout", "discrete_branches"],
+      "properties": {
+        "name": {"const": "QuickDrawResearchBasic"},
+        "observation_shape": {
+          "type": "array",
+          "prefixItems": [{"const": 84}, {"const": 84}, {"const": 4}],
+          "items": false
+        },
+        "wire_layout": {"const": "HWC"},
+        "discrete_branches": {
+          "type": "array",
+          "prefixItems": [{"const": 3}, {"const": 2}],
+          "items": false
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "kind", "seed", "visual_input_only"],
+      "properties": {
+        "policy_id": {"enum": ["random-visual-v1", "scripted-visual-v1"]},
+        "kind": {"enum": ["random", "scripted"]},
+        "seed": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "visual_input_only": {"const": true}
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seed", "target_sampler", "episode_count"],
+      "properties": {
+        "seed": {"const": 31001},
+        "target_sampler": {"const": "quickdraw.basic-target-slot.v1"},
+        "episode_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/episode"}
+    }
+  },
+  "$defs": {
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "episode_index",
+        "scenario_seed",
+        "target_slot",
+        "policy_id",
+        "initial_frame_sha256",
+        "reset_stack_filled",
+        "decision_count",
+        "shots_fired",
+        "misses",
+        "return",
+        "success",
+        "end_kind",
+        "reason",
+        "interrupted",
+        "transitions"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.basic-episode.v1"},
+        "episode_index": {"type": "integer", "minimum": 0},
+        "scenario_seed": {"const": 31001},
+        "target_slot": {"type": "integer", "minimum": -4, "maximum": 4},
+        "policy_id": {"type": "string", "minLength": 1},
+        "initial_frame_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "reset_stack_filled": {"const": true},
+        "decision_count": {"type": "integer", "minimum": 1, "maximum": 300},
+        "shots_fired": {"type": "integer", "minimum": 0, "maximum": 300},
+        "misses": {"type": "integer", "minimum": 0, "maximum": 300},
+        "return": {"type": "number"},
+        "success": {"type": "boolean"},
+        "end_kind": {"enum": ["terminal", "truncated"]},
+        "reason": {"enum": ["target_hit", "decision_limit"]},
+        "interrupted": {"type": "boolean"},
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 300,
+          "items": {"$ref": "#/$defs/transition"}
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_index",
+        "observation_sha256",
+        "latest_frame_sha256",
+        "latest_frame_range",
+        "action_mask",
+        "action",
+        "semantic_action",
+        "reward",
+        "cumulative_reward",
+        "terminal",
+        "interrupted"
+      ],
+      "properties": {
+        "decision_index": {"type": "integer", "minimum": 0, "maximum": 299},
+        "observation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "latest_frame_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "latest_frame_range": {
+          "type": "array",
+          "prefixItems": [
+            {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            {"type": "number", "minimum": 0.0, "maximum": 1.0}
+          ],
+          "items": false
+        },
+        "action_mask": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "array",
+              "prefixItems": [
+                {"type": "boolean"},
+                {"type": "boolean"},
+                {"type": "boolean"}
+              ],
+              "items": false
+            },
+            {
+              "type": "array",
+              "prefixItems": [{"type": "boolean"}, {"type": "boolean"}],
+              "items": false
+            }
+          ],
+          "items": false
+        },
+        "action": {
+          "type": "array",
+          "prefixItems": [
+            {"type": "integer", "minimum": 0, "maximum": 2},
+            {"type": "integer", "minimum": 0, "maximum": 1}
+          ],
+          "items": false
+        },
+        "semantic_action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["movement", "combat", "utility"],
+          "properties": {
+            "movement": {"enum": ["Stay", "Left", "Right"]},
+            "combat": {"enum": ["Idle", "Shoot"]},
+            "utility": {"const": "Idle"}
+          }
+        },
+        "reward": {"type": "number"},
+        "cumulative_reward": {"type": "number"},
+        "terminal": {"type": "boolean"},
+        "interrupted": {"type": "boolean"}
+      }
+    }
+  }
+}

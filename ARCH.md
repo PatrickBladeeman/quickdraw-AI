@@ -2,7 +2,7 @@
 
 ## Authority and status
 
-`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena` fixture and R1B communicator smoke from the approved but unimplemented learned-agent benchmark architecture; planned contracts must not be described as existing runtime behavior.
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, and R2A Basic environment from the still-unimplemented trainer, learned-policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
 
 ## System overview
 
@@ -16,9 +16,9 @@ Test_Arena (implemented deterministic regression fixture)
     → observed visible-motion onset
     → buffered typed telemetry
 
-Research_Basic (planned visual-control benchmark)
+Research_Basic (implemented R2A environment benchmark)
   84×84 grayscale frame stack
-    → BDQ or baseline policy
+    → random/scripted baseline policy (BDQ planned)
     → [lateral movement, shoot] action tuple
     → shared fixed-forward hitscan actuator
     → seeded reward/episode result
@@ -43,12 +43,13 @@ The default `Test_Arena` flow never maps a camera hit directly to a reflex. An e
 - `QuickDraw.AI.Reflex` — reaction selection and immediate motion command.
 - `QuickDraw.AI.Behavior` — explicit high-level state and recovery coordination.
 - `QuickDraw.Logging` — structured event buffering, serialization, and summaries.
-- `QuickDraw.Research.Environment` — seeded episodes, observations, rewards, resets, and scenario parameters.
-- `QuickDraw.Research.Actuation` — the shared deterministic multi-branch action executor.
-- `QuickDraw.Research.Policy` — BDQ inference boundary and policy metadata; training remains in the pinned Python plugin.
-- `QuickDraw.Research.Reflex` — the optional imminent-shot evade preemption.
-- `QuickDraw.Research.Strategy` — strategic snapshots, directive validation, rule director, mock director, and local-LLM client.
-- `QuickDraw.Research.Telemetry` — research episode records and run manifests, building on the buffered logging pattern.
+- `QuickDraw.Research.Environment` — the isolated R1B/R1C communicator-smoke protocol and state machine.
+- `QuickDraw.Research.Actuation` — stable semantic action enums and the typed multi-branch action tuple.
+- `QuickDraw.Research.Basic` — R2A visual sensor, deterministic episode state, Basic actuator, target, and ML-Agents lifecycle.
+- `QuickDraw.Research.Policy` (planned) — BDQ inference boundary and policy metadata; training remains in the pinned Python plugin.
+- `QuickDraw.Research.Reflex` (planned) — the optional imminent-shot evade preemption.
+- `QuickDraw.Research.Strategy` (planned) — strategic snapshots, directive validation, rule director, mock director, and local-LLM client.
+- `QuickDraw.Research.Telemetry` (planned) — research episode records and run manifests, building on the buffered logging pattern.
 
 Dependency rules:
 
@@ -66,7 +67,7 @@ Dependency rules:
 - The local-LLM transport never touches Unity objects off the main thread.
 - Telemetry observes gameplay/model events without becoming a dependency of urgent control code.
 
-Use assembly boundaries when the research work begins so environment, actuator, policy, reflex, strategy, telemetry, editor, and tests can enforce these dependency directions. Do not retrofit the completed `Test_Arena` components merely to satisfy a speculative abstraction.
+R1B and R2A assembly boundaries now isolate the communicator environment, stable action tuple, Basic runtime, and research Edit Mode tests. Add policy, reflex, strategy, and research-telemetry assemblies only with their approved tasks. Do not retrofit the completed `Test_Arena` components merely to satisfy a speculative abstraction.
 
 ## Implemented `Test_Arena` component contracts
 
@@ -235,7 +236,7 @@ Task 8 records the perception `Recovering` edge as `threat_released` and records
 
 ## Research contracts
 
-R1A freezes the machine-readable pre-runtime contract in `Research/configs/research-contracts-v1.json`. The Unity and trainer implementations remain planned until their corresponding `TASKS.md` research tasks are separately accepted. A breaking contract change requires a new major contract version; implementations must not silently diverge from the tracked contract.
+R1A freezes the machine-readable contract in `Research/configs/research-contracts-v1.json`. R2A now implements the Basic environment portion; the BDQ trainer and strategic environment remain planned until their corresponding `TASKS.md` work is separately accepted. A breaking contract change requires a new major contract version; implementations must not silently diverge from the tracked contract.
 
 ### Implemented R1B/R1C communicator boundary
 
@@ -251,7 +252,17 @@ The current AMD ROCm `7.14.0` matrix explicitly lists the exact RX 7900 XT / `gf
 
 R1E adds a separate ignored Python 3.11.13 environment for ROCm 7.14.0 and PyTorch `2.12.0+rocm7.14.0`. ML-Agents 1.1.0's official runtime files are retained byte-for-byte; a deterministic wheel overlay changes only the published Python upper bound and the `grpcio` maximum to the Release 23-compatible 1.53.2. The overlay, the transitive PettingZoo metadata exception, all source hashes, and the fact that no runtime code changed are explicit contract data.
 
-Two independently constructed environments passed dependency, import, CLI, exact-device, and CPU-versus-ROCm forward/backward gates. Two Unity communicator runs in each environment produced the same canonical trace SHA-256 `5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`. The tensor forward maximum absolute difference was `4.76837158203125e-07`, with zero input- and weight-gradient differences. R1E therefore records `conditional_go` but `backend_acceptance=not_accepted`; CPU remains the sole reference until the separately frozen checkpoint, export, trace, return, tolerance, and 10,000-decision throughput gates all pass.
+Two independently constructed environments passed dependency, import, CLI, exact-device, and CPU-versus-ROCm forward/backward gates. Two Unity communicator runs in each environment produced the same canonical trace SHA-256 `5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`. The tensor forward maximum absolute difference was `4.76837158203125e-07`, with zero input- and weight-gradient differences. R1E recorded `conditional_go` and retained CPU pending the separately frozen checkpoint, export, trace, return, tolerance, and throughput gates. R1F later passed all of those registered fixed-policy gates and accepted ROCm only for that batch-size-one inference fixture.
+
+### Implemented R2A Basic environment boundary
+
+`Research_Basic` is isolated from `Test_Arena` and `Research_Smoke`. `ResearchBasicAgent` owns ML-Agents lifecycle and maps the two discrete branches into the stable `ResearchActionTuple`. `ResearchBasicActuator` is the only mechanical path: it applies one lateral slot movement per 10 Hz decision and then, for `Shoot`, casts the same fixed camera-center ray indicated by the visible open-center reticle. Held actions on the intervening 50 Hz physics steps do not repeat movement, shooting, rewards, or the decision counter.
+
+`ResearchBasicEpisode` is a Unity-independent deterministic state machine. It owns the explicit scenario seed and zero-based episode index, nine-slot target sampler, position, ammunition, cooldown, counters, additive reward, `target_hit` terminal, and `decision_limit` truncation. It fails closed if decision ordering, semantic actions, physical hitscan results, or post-end continuation disagree with the contract.
+
+`ResearchBasicVisualSensor` sends one uncompressed float32 HWC `[84,84,4]` observation. Each frame is converted with Rec. 601 luma and channels are ordered oldest to newest. Sensor reset invalidates the stack; `OnEpisodeBegin` resets physical state, synchronizes transforms, captures one post-reset frame, and copies it into all four channels before the first decision. The standalone runner verifies this fill on every episode.
+
+`Research/basic/run_basic_baseline.py` drives seeded random and visual-only scripted policies through the same LLAPI `ActionTuple` path. It hashes every observation, records action masks/actions/rewards/ends, validates the common `quickdraw.basic-episode.v1` schema, and compares complete traces across fresh processes. These baselines test the environment and export boundary; they are not training or learned-policy evidence.
 
 ### Shared clocks and decision cadence
 
@@ -638,8 +649,9 @@ Assets/_Project/
       LogEvents.cs
       TelemetryRecorder.cs
     Research/
-      Environment/                       (R1B communicator smoke only)
-      Actuation/                         (planned)
+      Environment/                       (R1B/R1C communicator smoke)
+      Actuation/                         (R2A stable semantic action tuple)
+      Basic/                             (R2A scene runtime, sensor, episode, actuator)
       Policy/                            (planned)
       Reflex/                            (planned)
       Strategy/                          (planned)
@@ -647,10 +659,10 @@ Assets/_Project/
   Scenes/
     Test_Arena.unity
     Research_Smoke.unity                  (R1B communicator fixture)
-    Research_Basic.unity                 (planned)
+    Research_Basic.unity                 (R2A deterministic visual benchmark)
     Research_Strategic.unity             (planned)
   Tests/
-    EditMode/                             (R1B smoke contract tests)
+    EditMode/                             (R1B/R1C smoke and R2A Basic tests)
     PlayMode/
 
 Research/                                (non-Unity research source and contracts)
@@ -658,6 +670,7 @@ Research/                                (non-Unity research source and contract
   configs/                               (R1A versioned contracts)
   schemas/                               (R1A run-manifest schema/example)
   smoke/                                 (R1B config, driver, and instructions)
+  basic/                                 (R2A contract, LLAPI baselines, tests, instructions)
   trainer/                               (planned)
   analysis/                              (planned)
 

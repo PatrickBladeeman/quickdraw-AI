@@ -2,6 +2,8 @@
     "name": "QuickDraw.Research.EditModeTests",
     "rootNamespace": "QuickDraw.Tests.EditMode",
     "references": [
+        "QuickDraw.Research.Actuation",
+        "QuickDraw.Research.Basic",
         "QuickDraw.Research.Environment",
         "Unity.ML-Agents",
         "UnityEngine.TestRunner",

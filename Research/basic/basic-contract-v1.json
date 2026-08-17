@@ -1,0 +1,98 @@
+{
+  "schema_version": "quickdraw.research-basic.v1",
+  "purpose": "Deterministic environment-only validation of the Research_Basic visual observation, action, reward, end, and reset contract. This is not training.",
+  "behavior_name": "QuickDrawResearchBasic",
+  "scene": "Assets/_Project/Scenes/Research_Basic.unity",
+  "scenario_seed": 31001,
+  "episode_count": 12,
+  "timing": {
+    "physics_fixed_delta_seconds": 0.02,
+    "policy_decision_interval_fixed_steps": 5,
+    "policy_hz": 10,
+    "between_decisions": "hold_last_tuple"
+  },
+  "observation": {
+    "shape": [84, 84, 4],
+    "wire_layout": "HWC",
+    "trainer_layout": "CHW",
+    "dtype": "float32",
+    "value_range": [0.0, 1.0],
+    "grayscale": "rec601_luma",
+    "stack_order": "oldest_to_newest",
+    "compression": "none",
+    "reset": "Capture one post-reset frame and copy it into all four stack channels before the first decision.",
+    "policy_inputs": ["visual_stack"],
+    "prohibited_policy_inputs": [
+      "object_ids",
+      "target_coordinates",
+      "debug_labels",
+      "raw_scene_matrices",
+      "llm_snapshot"
+    ]
+  },
+  "actions": {
+    "discrete_branches": [3, 2],
+    "movement": {
+      "0": "Stay",
+      "1": "Left",
+      "2": "Right"
+    },
+    "combat": {
+      "0": "Idle",
+      "1": "Shoot"
+    },
+    "utility_fixed": "Idle",
+    "order": "Apply the lateral movement once at the policy decision, then fire the fixed center-camera hitscan if Shoot is selected.",
+    "mask_rule": "Only outward movement at the two lateral boundaries is masked."
+  },
+  "geometry": {
+    "minimum_slot": -4,
+    "maximum_slot": 4,
+    "slot_spacing_world_units": 0.75,
+    "agent_start_slot": 0,
+    "target_sampling": "Unsigned 32-bit quickdraw.basic-target-slot.v1 hash of scenario_seed and zero-based episode_index, modulo nine slots."
+  },
+  "weapon": {
+    "ammunition_capacity": 300,
+    "shot_cooldown_decisions": 0,
+    "hitscan_distance_world_units": 40.0,
+    "aim": "visible fixed crosshair centered on the same camera viewport ray used by hitscan"
+  },
+  "reward": {
+    "per_decision": -0.01,
+    "hit": 1.0,
+    "missed_shot": -0.02,
+    "composition": "additive"
+  },
+  "episode_end": {
+    "terminal_reason": "target_hit",
+    "truncation_reason": "decision_limit",
+    "decision_limit": 300,
+    "infrastructure_invalid_is_outcome": false
+  },
+  "reset": [
+    "Reset the agent to lateral slot zero.",
+    "Place the target from the explicit scenario seed and episode index.",
+    "Reset ammunition and cooldown state.",
+    "Reset decision, shot, miss, reward, and policy-runner telemetry counters.",
+    "Reset deterministic random state from explicit seeds.",
+    "Capture one post-reset frame and fill all four stack channels."
+  ],
+  "policies": {
+    "random": {
+      "policy_id": "random-visual-v1",
+      "policy_seed": 41001,
+      "rule": "Uniformly sample each branch from its mechanically available actions."
+    },
+    "scripted": {
+      "policy_id": "scripted-visual-v1",
+      "policy_seed": 41002,
+      "rule": "Threshold the newest grayscale frame, move toward the bright target centroid, and shoot only when centered. No privileged target state is read."
+    }
+  },
+  "episode_schema": "Research/schemas/basic-baseline-trace.schema.json#/$defs/episode",
+  "comparison": {
+    "runs_per_policy": 2,
+    "rule": "For the same policy and registered seeds, the canonical traces must be structurally and numerically identical across fresh standalone processes."
+  }
+}
