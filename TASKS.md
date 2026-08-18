@@ -507,7 +507,20 @@ Acceptance:
 
 Goal: train a visual branched Q-policy with reproducible checkpoints and demonstrate that learning succeeds on Unity Basic.
 
-Trainer and network:
+### R3A. Pure-Python trainer foundation — completed
+
+- [x] Added a strict `quickdraw.bdq-foundation.v1` contract and Draft 2020-12 schema bound to the exact R2A Basic contract hash and installed Python 3.11 / ML-Agents 1.1 / PyTorch CPU stack.
+- [x] Added immutable validated replay transitions and a fixed-capacity seeded uniform ring buffer carrying observations, branch actions, rewards, next observations, current/next masks, terminal flags, and truncation flags.
+- [x] Added the registered HWC-to-CHW three-convolution encoder, 512-unit representation, scalar value head, and mean-centered `[3,2]` advantage heads.
+- [x] Added fail-closed branch masking, deterministic greedy/epsilon-greedy selection, and reversible row-major branch-to-six-joint-action mapping.
+- [x] Added per-branch Double-DQN online selection/target evaluation, true-terminal masking, registered truncation bootstrapping, and mean Huber loss over batch and branches.
+- [x] Passed 15 deterministic synthetic CPU tests covering contract/schema/runtime parity, the installed ML-Agents plugin seam, Unity action-name/index parity, replay validation/sampling, masks, exact network layers and shapes, gradients, hand-calculated targets, terminal/truncation behavior, loss reduction, and the full replay-to-backward composition.
+
+R3A does not register a trainer entry point, launch Unity, collect experience,
+run an optimizer or training loop, use ROCm, create checkpoints/exports, or make
+a learned-policy claim.
+
+Remaining trainer and network work:
 
 - Implement BDQ as a pinned custom ML-Agents off-policy trainer plugin; do not describe the built-in PPO/SAC trainers as DQN.
 - Use four stacked `84×84` grayscale frames.

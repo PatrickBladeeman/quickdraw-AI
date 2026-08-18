@@ -1,0 +1,104 @@
+{
+  "schema_version": "quickdraw.bdq-foundation.v1",
+  "task": "R3A",
+  "purpose": "Freeze and test the pure-Python replay, action, network, target, loss, and ML-Agents plugin seams before any Unity rollout or optimizer-driven training.",
+  "base_environment_contract": {
+    "path": "Research/basic/basic-contract-v1.json",
+    "sha256": "41e6ffb0b4cf5f9ae9b1d7246306fee2945c75ba49247a696cafdb2b531d4c8f",
+    "schema_version": "quickdraw.research-basic.v1",
+    "behavior_name": "QuickDrawResearchBasic"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents": "1.1.0",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "r3a_device": "cpu"
+  },
+  "plugin_boundary": {
+    "entry_point_group": "mlagents.trainer_type",
+    "entry_point_name": "quickdraw_bdq",
+    "trainer_type": "quickdraw_bdq",
+    "future_registration_callable": "quickdraw_bdq.plugin:register_trainer_types",
+    "registration_status": "foundation_only_not_registered"
+  },
+  "observation": {
+    "wire_shape": [84, 84, 4],
+    "wire_layout": "HWC",
+    "encoder_layout": "CHW",
+    "dtype": "float32",
+    "value_range": [0.0, 1.0]
+  },
+  "actions": {
+    "branch_sizes": [3, 2],
+    "movement": ["Stay", "Left", "Right"],
+    "combat": ["Idle", "Shoot"],
+    "mask_value_true_means": "unavailable",
+    "joint_index_rule": "movement_index * 2 + combat_index"
+  },
+  "network": {
+    "encoder": [
+      {"channels": 32, "kernel": 8, "stride": 4},
+      {"channels": 64, "kernel": 4, "stride": 2},
+      {"channels": 64, "kernel": 3, "stride": 1}
+    ],
+    "shared_units": 512,
+    "value_outputs": 1,
+    "advantage_outputs": [3, 2],
+    "dueling_rule": "Q_i = V + A_i - mean(A_i)",
+    "output_shapes": [["batch", 3], ["batch", 2]]
+  },
+  "replay": {
+    "capacity": 100000,
+    "warmup_decisions": 10000,
+    "sampling": "uniform_without_replacement",
+    "rng": "numpy.random.Generator.PCG64",
+    "transition_fields": [
+      "observation",
+      "action",
+      "reward",
+      "next_observation",
+      "action_masks",
+      "next_action_masks",
+      "terminated",
+      "truncated"
+    ]
+  },
+  "double_dqn": {
+    "gamma": 0.99,
+    "selection_network": "online",
+    "evaluation_network": "target",
+    "target_scope": "per_branch",
+    "terminal_bootstrap": false,
+    "truncation_bootstrap": true,
+    "next_action_mask_applies_to": "online_argmax"
+  },
+  "loss": {
+    "kind": "huber",
+    "beta": 1.0,
+    "reduction": "mean_over_batch_and_branches"
+  },
+  "registered_defaults": {
+    "batch_size": 64,
+    "optimizer": "Adam",
+    "learning_rate": 0.0001,
+    "optimizer_update_interval_decisions": 4,
+    "hard_target_sync_interval_optimizer_updates": 10000,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.1,
+    "exploratory_evaluation_epsilon": 0.05,
+    "final_evaluation_epsilon": 0.0,
+    "training_seeds": [51001, 51002, 51003, 51004, 51005]
+  },
+  "test_scope": "Synthetic CPU tensors and immutable in-memory transitions only.",
+  "exclusions": [
+    "Unity launch or environment rollout",
+    "optimizer or training loop",
+    "ROCm execution",
+    "checkpoint, resume, or ONNX export",
+    "trained weights or effectiveness claims",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}

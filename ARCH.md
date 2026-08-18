@@ -2,7 +2,7 @@
 
 ## Authority and status
 
-`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, and R2A Basic environment from the still-unimplemented trainer, learned-policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, R2A Basic environment, and R3A pure-Python BDQ foundation from the still-unimplemented trainer rollout/optimization, learned policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
 
 ## System overview
 
@@ -18,7 +18,7 @@ Test_Arena (implemented deterministic regression fixture)
 
 Research_Basic (implemented R2A environment benchmark)
   84×84 grayscale frame stack
-    → random/scripted baseline policy (BDQ planned)
+    → random/scripted baseline policy (R3A BDQ tensor foundation implemented)
     → [lateral movement, shoot] action tuple
     → shared fixed-forward hitscan actuator
     → seeded reward/episode result
@@ -46,6 +46,7 @@ The default `Test_Arena` flow never maps a camera hit directly to a reflex. An e
 - `QuickDraw.Research.Environment` — the isolated R1B/R1C communicator-smoke protocol and state machine.
 - `QuickDraw.Research.Actuation` — stable semantic action enums and the typed multi-branch action tuple.
 - `QuickDraw.Research.Basic` — R2A visual sensor, deterministic episode state, Basic actuator, target, and ML-Agents lifecycle.
+- `Research/trainer/quickdraw_bdq` — R3A pure-Python replay, action masking/mapping, visual BDQ network, Double-DQN target/loss, and pinned plugin-boundary validation. Trainer registration and rollout remain planned.
 - `QuickDraw.Research.Policy` (planned) — BDQ inference boundary and policy metadata; training remains in the pinned Python plugin.
 - `QuickDraw.Research.Reflex` (planned) — the optional imminent-shot evade preemption.
 - `QuickDraw.Research.Strategy` (planned) — strategic snapshots, directive validation, rule director, mock director, and local-LLM client.
@@ -407,9 +408,9 @@ Direction selection uses the same physics/clearance information available to the
 
 Required events include telegraph observed, reflex accepted/suppressed, command issued, requested/applied displacement, collision flags, visible motion, damage outcome, preemption ended, and BDQ movement restored. Duplicate telegraphs and cooldown-suppressed events cannot move the agent twice.
 
-### Branching Double DQN (BDQ) inference and training boundary
+### Branching Double DQN (BDQ) foundation and planned training boundary
 
-Unity uses ML-Agents `4.0.0` for sensors, branched action transport, episode boundaries, and exported-model inference. Training uses matching Python packages in Python 3.10.12 plus a version-pinned custom off-policy trainer plugin. Built-in PPO/SAC configuration is not a substitute for BDQ.
+Unity uses ML-Agents `4.0.0` for sensors, branched action transport, episode boundaries, and later exported-model inference. R3A pins its pure-Python foundation to Python `3.11.13`, ML-Agents/ML-Agents Envs `1.1.0`, NumPy `1.23.5`, and PyTorch `2.12.0+cpu`, using the already validated metadata-overlay compatibility lane. The installed custom-trainer entry-point group is frozen as `mlagents.trainer_type`. A later slice must supply and register the real off-policy trainer/settings pair; built-in PPO/SAC configuration is not a substitute for BDQ.
 
 Primary network:
 
@@ -425,6 +426,8 @@ Primary network:
 ```
 
 Use Double-DQN online action selection and target-network evaluation, replay capacity 100,000, replay warmup 10,000 decisions, batch 64, `gamma=0.99`, Adam `1e-4`, Huber loss averaged over selected branch values, update every four decisions, hard target synchronization every 10,000 optimizer updates, and epsilon decay `1.0 → 0.1`, followed by a `0.05` evaluation floor only during exploratory validation. Final evaluation is greedy.
+
+R3A implements and tests only the immutable replay record/buffer, exact visual network and dueling recombination, legal branch selection, reversible six-action mapping, per-branch Double-DQN target construction, and mean branch Huber loss on synthetic CPU tensors. True `target_hit` terminals do not bootstrap; registered decision-limit truncations do. It deliberately does not register an ML-Agents trainer, collect Unity experience, optimize weights, run ROCm, checkpoint, resume, or export a model.
 
 Train five independent policy seeds. Each seed has its own configuration, learning curves, checkpoint lineage, export-parity test, and SHA-256. The same final strategic checkpoint for a seed is loaded into all factorial conditions for that seed.
 
@@ -673,7 +676,7 @@ Research/                                (non-Unity research source and contract
   schemas/                               (R1A run-manifest schema/example)
   smoke/                                 (R1B config, driver, and instructions)
   basic/                                 (R2A contract, LLAPI baselines, tests, instructions)
-  trainer/                               (planned)
+  trainer/                               (R3A tensor/replay foundation; trainer rollout planned)
   analysis/                              (planned)
 
 Artifacts/Experiments/                   (generated/ignored root established by R1A)

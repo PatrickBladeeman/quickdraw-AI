@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-foundation-contract.schema.json",
+  "title": "QuickDraw R3A BDQ foundation contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_environment_contract",
+    "runtime",
+    "plugin_boundary",
+    "observation",
+    "actions",
+    "network",
+    "replay",
+    "double_dqn",
+    "loss",
+    "registered_defaults",
+    "test_scope",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-foundation.v1"},
+    "task": {"const": "R3A"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_environment_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version", "behavior_name"],
+      "properties": {
+        "path": {"const": "Research/basic/basic-contract-v1.json"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "schema_version": {"const": "quickdraw.research-basic.v1"},
+        "behavior_name": {"const": "QuickDrawResearchBasic"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python",
+        "mlagents",
+        "mlagents_envs",
+        "numpy",
+        "torch",
+        "r3a_device"
+      ],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents": {"const": "1.1.0"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "r3a_device": {"const": "cpu"}
+      }
+    },
+    "plugin_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_point_group",
+        "entry_point_name",
+        "trainer_type",
+        "future_registration_callable",
+        "registration_status"
+      ],
+      "properties": {
+        "entry_point_group": {"const": "mlagents.trainer_type"},
+        "entry_point_name": {"const": "quickdraw_bdq"},
+        "trainer_type": {"const": "quickdraw_bdq"},
+        "future_registration_callable": {
+          "const": "quickdraw_bdq.plugin:register_trainer_types"
+        },
+        "registration_status": {"const": "foundation_only_not_registered"}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wire_shape",
+        "wire_layout",
+        "encoder_layout",
+        "dtype",
+        "value_range"
+      ],
+      "properties": {
+        "wire_shape": {"const": [84, 84, 4]},
+        "wire_layout": {"const": "HWC"},
+        "encoder_layout": {"const": "CHW"},
+        "dtype": {"const": "float32"},
+        "value_range": {"const": [0.0, 1.0]}
+      }
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch_sizes",
+        "movement",
+        "combat",
+        "mask_value_true_means",
+        "joint_index_rule"
+      ],
+      "properties": {
+        "branch_sizes": {"const": [3, 2]},
+        "movement": {"const": ["Stay", "Left", "Right"]},
+        "combat": {"const": ["Idle", "Shoot"]},
+        "mask_value_true_means": {"const": "unavailable"},
+        "joint_index_rule": {"const": "movement_index * 2 + combat_index"}
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "encoder",
+        "shared_units",
+        "value_outputs",
+        "advantage_outputs",
+        "dueling_rule",
+        "output_shapes"
+      ],
+      "properties": {
+        "encoder": {
+          "const": [
+            {"channels": 32, "kernel": 8, "stride": 4},
+            {"channels": 64, "kernel": 4, "stride": 2},
+            {"channels": 64, "kernel": 3, "stride": 1}
+          ]
+        },
+        "shared_units": {"const": 512},
+        "value_outputs": {"const": 1},
+        "advantage_outputs": {"const": [3, 2]},
+        "dueling_rule": {"const": "Q_i = V + A_i - mean(A_i)"},
+        "output_shapes": {"const": [["batch", 3], ["batch", 2]]}
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "warmup_decisions",
+        "sampling",
+        "rng",
+        "transition_fields"
+      ],
+      "properties": {
+        "capacity": {"const": 100000},
+        "warmup_decisions": {"const": 10000},
+        "sampling": {"const": "uniform_without_replacement"},
+        "rng": {"const": "numpy.random.Generator.PCG64"},
+        "transition_fields": {
+          "const": [
+            "observation",
+            "action",
+            "reward",
+            "next_observation",
+            "action_masks",
+            "next_action_masks",
+            "terminated",
+            "truncated"
+          ]
+        }
+      }
+    },
+    "double_dqn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gamma",
+        "selection_network",
+        "evaluation_network",
+        "target_scope",
+        "terminal_bootstrap",
+        "truncation_bootstrap",
+        "next_action_mask_applies_to"
+      ],
+      "properties": {
+        "gamma": {"const": 0.99},
+        "selection_network": {"const": "online"},
+        "evaluation_network": {"const": "target"},
+        "target_scope": {"const": "per_branch"},
+        "terminal_bootstrap": {"const": false},
+        "truncation_bootstrap": {"const": true},
+        "next_action_mask_applies_to": {"const": "online_argmax"}
+      }
+    },
+    "loss": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "beta", "reduction"],
+      "properties": {
+        "kind": {"const": "huber"},
+        "beta": {"const": 1.0},
+        "reduction": {"const": "mean_over_batch_and_branches"}
+      }
+    },
+    "registered_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batch_size",
+        "optimizer",
+        "learning_rate",
+        "optimizer_update_interval_decisions",
+        "hard_target_sync_interval_optimizer_updates",
+        "epsilon_start",
+        "epsilon_end",
+        "exploratory_evaluation_epsilon",
+        "final_evaluation_epsilon",
+        "training_seeds"
+      ],
+      "properties": {
+        "batch_size": {"const": 64},
+        "optimizer": {"const": "Adam"},
+        "learning_rate": {"const": 0.0001},
+        "optimizer_update_interval_decisions": {"const": 4},
+        "hard_target_sync_interval_optimizer_updates": {"const": 10000},
+        "epsilon_start": {"const": 1.0},
+        "epsilon_end": {"const": 0.1},
+        "exploratory_evaluation_epsilon": {"const": 0.05},
+        "final_evaluation_epsilon": {"const": 0.0},
+        "training_seeds": {"const": [51001, 51002, 51003, 51004, 51005]}
+      }
+    },
+    "test_scope": {"type": "string", "minLength": 1},
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}
