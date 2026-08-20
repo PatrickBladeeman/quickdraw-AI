@@ -3,7 +3,7 @@
 [Tt]emp/
 [Bb]uild/
 [Bb]uilds/
-Oo[Bb]j/
+[Oo]bj/
 [Ll]ogs/
 [Mm]emoryCaptures/
 UserSettings/
@@ -37,6 +37,7 @@ sysinfo.txt
 /Artifacts/Experiments/
 __pycache__/
 *.py[cod]
+*.egg-info/
 
 # Local AI/session memory
 CONTEXT.md
@@ -45,3 +46,8 @@ SESSION HANDOFF.md
 
 # Asset store cache
 /Assets/AssetStoreTools*
+
+# ML-Agents editor timing output
+/Assets/ML-Agents.meta
+/Assets/ML-Agents/Timers.meta
+/Assets/ML-Agents/Timers/

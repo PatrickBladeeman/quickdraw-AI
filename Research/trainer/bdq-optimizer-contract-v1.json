@@ -1,0 +1,93 @@
+{
+  "schema_version": "quickdraw.bdq-optimizer.v1",
+  "task": "R3B",
+  "purpose": "Register the ML-Agents trainer boundary and prove deterministic Adam updates, decision scheduling, and hard target synchronization with synthetic CPU transitions only.",
+  "base_foundation_contract": {
+    "path": "Research/trainer/bdq-foundation-contract-v1.json",
+    "sha256": "9a97d8b58ed08e816f032784069e7b1c38b7185df73b4b8edd504dc58112cfb9",
+    "schema_version": "quickdraw.bdq-foundation.v1"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents": "1.1.0",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "r3b_device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.2.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "editable_install_command": "python -m pip install --no-deps -e Research/trainer"
+  },
+  "plugin": {
+    "entry_point_group": "mlagents.trainer_type",
+    "entry_point_name": "quickdraw_bdq",
+    "entry_point_value": "quickdraw_bdq.plugin:register_trainer_types",
+    "trainer_type": "quickdraw_bdq",
+    "trainer_class": "quickdraw_bdq.trainer:QuickDrawBDQTrainer",
+    "settings_class": "quickdraw_bdq.settings:QuickDrawBDQSettings",
+    "registration_status": "registered_optimizer_smoke_rollout_unimplemented"
+  },
+  "registered_defaults": {
+    "replay_capacity": 100000,
+    "replay_warmup_decisions": 10000,
+    "batch_size": 64,
+    "gamma": 0.99,
+    "optimizer": "Adam",
+    "learning_rate": 0.0001,
+    "optimizer_update_interval_decisions": 4,
+    "optimizer_updates_per_boundary": 1,
+    "hard_target_sync_interval_optimizer_updates": 10000,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.1,
+    "exploratory_evaluation_epsilon": 0.05,
+    "final_evaluation_epsilon": 0.0
+  },
+  "scheduling": {
+    "decision_counter_increment": "after_validated_replay_insert",
+    "update_requires": [
+      "decision_count >= replay_warmup_decisions",
+      "replay_size >= replay_warmup_decisions",
+      "decision_count % optimizer_update_interval_decisions == 0"
+    ],
+    "target_sync_timing": "after_optimizer_step_when_optimizer_update_count_is_divisible_by_sync_interval",
+    "online_network_receives_gradients": true,
+    "target_network_receives_gradients": false,
+    "target_initialization": "exact_deep_copy_of_online"
+  },
+  "reported_update_metrics": [
+    "decision_count",
+    "replay_size",
+    "optimizer_update_count",
+    "target_sync_count",
+    "updated",
+    "target_synced",
+    "loss",
+    "mean_absolute_td_error"
+  ],
+  "synthetic_test_overrides": {
+    "allowed": true,
+    "production_defaults_remain_immutable": true,
+    "fields": [
+      "replay_capacity",
+      "replay_warmup_decisions",
+      "batch_size",
+      "optimizer_update_interval_decisions",
+      "hard_target_sync_interval_optimizer_updates"
+    ]
+  },
+  "test_scope": "Installed plugin discovery, official TrainerFactory construction, and deterministic in-memory CPU optimizer updates with synthetic replay transitions.",
+  "exclusions": [
+    "Unity launch, policy creation, trajectory collection, or environment rollout",
+    "full training or learned-policy effectiveness claims",
+    "ROCm execution",
+    "epsilon-decay rollout",
+    "checkpoint, resume, or ONNX export",
+    "five-seed training or held-out evaluation",
+    "joint-action comparison trainer",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}

@@ -145,8 +145,18 @@ namespace QuickDraw.Research.Basic
                     "ResearchBasicVisualSensorComponent requires a camera.");
             }
 
+            ResearchBasicAgent agent = GetComponent<ResearchBasicAgent>();
+            if (agent == null)
+            {
+                throw new InvalidOperationException(
+                    "ResearchBasicVisualSensorComponent requires a ResearchBasicAgent.");
+            }
+
             DisposeSensor();
-            _sensor = new ResearchBasicVisualSensor(observationCamera, sensorName);
+            _sensor = new ResearchBasicVisualSensor(
+                observationCamera,
+                sensorName,
+                agent.RecoverFromMissingVisualSensorReset);
             return new ISensor[] { _sensor };
         }
 
@@ -180,8 +190,12 @@ namespace QuickDraw.Research.Basic
         private readonly Texture2D _texture;
         private readonly float[] _capture;
         private readonly ResearchBasicFrameStack _stack;
+        private readonly Action _recoverFromMissingReset;
 
-        public ResearchBasicVisualSensor(Camera camera, string name)
+        public ResearchBasicVisualSensor(
+            Camera camera,
+            string name,
+            Action recoverFromMissingReset)
         {
             _camera = camera != null
                 ? camera
@@ -189,6 +203,8 @@ namespace QuickDraw.Research.Basic
             _name = string.IsNullOrWhiteSpace(name)
                 ? throw new ArgumentException("Sensor name is required.", nameof(name))
                 : name;
+            _recoverFromMissingReset = recoverFromMissingReset ??
+                throw new ArgumentNullException(nameof(recoverFromMissingReset));
             _texture = new Texture2D(
                 ResearchBasicContract.ObservationWidth,
                 ResearchBasicContract.ObservationHeight,
@@ -258,7 +274,15 @@ namespace QuickDraw.Research.Basic
         public void Update()
         {
             CaptureCurrentFrame();
-            _stack.PushFrame(_capture);
+            if (_stack.IsReady)
+            {
+                _stack.PushFrame(_capture);
+                return;
+            }
+
+            _recoverFromMissingReset();
+            CaptureCurrentFrame();
+            _stack.ResetWithFrame(_capture);
         }
 
         public void Reset()

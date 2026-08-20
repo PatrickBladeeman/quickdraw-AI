@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-optimizer-contract.schema.json",
+  "title": "QuickDraw R3B BDQ optimizer contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_foundation_contract",
+    "runtime",
+    "package",
+    "plugin",
+    "registered_defaults",
+    "scheduling",
+    "reported_update_metrics",
+    "synthetic_test_overrides",
+    "test_scope",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-optimizer.v1"},
+    "task": {"const": "R3B"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_foundation_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-foundation-contract-v1.json"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "schema_version": {"const": "quickdraw.bdq-foundation.v1"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python",
+        "mlagents",
+        "mlagents_envs",
+        "numpy",
+        "torch",
+        "r3b_device"
+      ],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents": {"const": "1.1.0"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "r3b_device": {"const": "cpu"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "metadata_path",
+        "editable_install_command"
+      ],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.2.0"},
+        "metadata_path": {"const": "Research/trainer/pyproject.toml"},
+        "editable_install_command": {
+          "const": "python -m pip install --no-deps -e Research/trainer"
+        }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_point_group",
+        "entry_point_name",
+        "entry_point_value",
+        "trainer_type",
+        "trainer_class",
+        "settings_class",
+        "registration_status"
+      ],
+      "properties": {
+        "entry_point_group": {"const": "mlagents.trainer_type"},
+        "entry_point_name": {"const": "quickdraw_bdq"},
+        "entry_point_value": {
+          "const": "quickdraw_bdq.plugin:register_trainer_types"
+        },
+        "trainer_type": {"const": "quickdraw_bdq"},
+        "trainer_class": {
+          "const": "quickdraw_bdq.trainer:QuickDrawBDQTrainer"
+        },
+        "settings_class": {
+          "const": "quickdraw_bdq.settings:QuickDrawBDQSettings"
+        },
+        "registration_status": {
+          "const": "registered_optimizer_smoke_rollout_unimplemented"
+        }
+      }
+    },
+    "registered_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay_capacity",
+        "replay_warmup_decisions",
+        "batch_size",
+        "gamma",
+        "optimizer",
+        "learning_rate",
+        "optimizer_update_interval_decisions",
+        "optimizer_updates_per_boundary",
+        "hard_target_sync_interval_optimizer_updates",
+        "epsilon_start",
+        "epsilon_end",
+        "exploratory_evaluation_epsilon",
+        "final_evaluation_epsilon"
+      ],
+      "properties": {
+        "replay_capacity": {"const": 100000},
+        "replay_warmup_decisions": {"const": 10000},
+        "batch_size": {"const": 64},
+        "gamma": {"const": 0.99},
+        "optimizer": {"const": "Adam"},
+        "learning_rate": {"const": 0.0001},
+        "optimizer_update_interval_decisions": {"const": 4},
+        "optimizer_updates_per_boundary": {"const": 1},
+        "hard_target_sync_interval_optimizer_updates": {"const": 10000},
+        "epsilon_start": {"const": 1.0},
+        "epsilon_end": {"const": 0.1},
+        "exploratory_evaluation_epsilon": {"const": 0.05},
+        "final_evaluation_epsilon": {"const": 0.0}
+      }
+    },
+    "scheduling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_counter_increment",
+        "update_requires",
+        "target_sync_timing",
+        "online_network_receives_gradients",
+        "target_network_receives_gradients",
+        "target_initialization"
+      ],
+      "properties": {
+        "decision_counter_increment": {
+          "const": "after_validated_replay_insert"
+        },
+        "update_requires": {
+          "const": [
+            "decision_count >= replay_warmup_decisions",
+            "replay_size >= replay_warmup_decisions",
+            "decision_count % optimizer_update_interval_decisions == 0"
+          ]
+        },
+        "target_sync_timing": {
+          "const": "after_optimizer_step_when_optimizer_update_count_is_divisible_by_sync_interval"
+        },
+        "online_network_receives_gradients": {"const": true},
+        "target_network_receives_gradients": {"const": false},
+        "target_initialization": {"const": "exact_deep_copy_of_online"}
+      }
+    },
+    "reported_update_metrics": {
+      "const": [
+        "decision_count",
+        "replay_size",
+        "optimizer_update_count",
+        "target_sync_count",
+        "updated",
+        "target_synced",
+        "loss",
+        "mean_absolute_td_error"
+      ]
+    },
+    "synthetic_test_overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed", "production_defaults_remain_immutable", "fields"],
+      "properties": {
+        "allowed": {"const": true},
+        "production_defaults_remain_immutable": {"const": true},
+        "fields": {
+          "const": [
+            "replay_capacity",
+            "replay_warmup_decisions",
+            "batch_size",
+            "optimizer_update_interval_decisions",
+            "hard_target_sync_interval_optimizer_updates"
+          ]
+        }
+      }
+    },
+    "test_scope": {"type": "string", "minLength": 1},
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

@@ -45,6 +45,16 @@ namespace QuickDraw.Research.Basic
 
         public override void OnEpisodeBegin()
         {
+            BeginEpisode();
+        }
+
+        internal void RecoverFromMissingVisualSensorReset()
+        {
+            BeginEpisode();
+        }
+
+        private void BeginEpisode()
+        {
             _episode.Reset(scenarioSeed, _nextEpisodeIndex);
             _nextEpisodeIndex++;
             target.SetSlot(_episode.TargetSlot);

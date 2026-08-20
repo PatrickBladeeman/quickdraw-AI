@@ -27,25 +27,41 @@ namespace QuickDraw.Editor
         {
             Material floorMaterial = CreateOrReplaceMaterial(
                 $"{MaterialRoot}Floor.mat",
-                new Color(0.035f, 0.035f, 0.04f, 1f));
+                new Color(0.045f, 0.06f, 0.08f, 1f),
+                true);
             Material wallMaterial = CreateOrReplaceMaterial(
                 $"{MaterialRoot}Wall.mat",
-                new Color(0.08f, 0.08f, 0.095f, 1f));
+                new Color(0.28f, 0.38f, 0.5f, 1f),
+                true);
             Material targetMaterial = CreateOrReplaceMaterial(
                 $"{MaterialRoot}Target.mat",
-                Color.white);
+                Color.white,
+                true);
             Material agentMaterial = CreateOrReplaceMaterial(
                 $"{MaterialRoot}Agent.mat",
-                new Color(0.16f, 0.2f, 0.24f, 1f));
+                new Color(0.16f, 0.2f, 0.24f, 1f),
+                true);
             Material crosshairMaterial = CreateOrReplaceMaterial(
                 $"{MaterialRoot}Crosshair.mat",
-                new Color(0.5f, 0.5f, 0.5f, 1f));
+                new Color(0.1f, 0.85f, 0.95f, 1f),
+                false);
 
             Scene scene = EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
                 NewSceneMode.Single);
 
             GameObject environment = new GameObject("ResearchBasicEnvironment");
+            GameObject lightObject = new GameObject("ResearchBasicKeyLight");
+            lightObject.transform.SetParent(environment.transform, false);
+            lightObject.transform.localPosition = new Vector3(0f, 4f, 0f);
+            lightObject.transform.localRotation = Quaternion.Euler(50f, -30f, 0f);
+            Light keyLight = lightObject.AddComponent<Light>();
+            keyLight.type = LightType.Directional;
+            keyLight.color = new Color(1f, 0.95686275f, 0.8392157f, 1f);
+            keyLight.intensity = 1.25f;
+            keyLight.shadows = LightShadows.None;
+            RenderSettings.sun = keyLight;
+
             CreatePrimitive(
                 "Floor",
                 PrimitiveType.Cube,
@@ -116,26 +132,26 @@ namespace QuickDraw.Editor
             CreateCrosshairPart(
                 "CrosshairLeft",
                 cameraObject.transform,
-                new Vector3(-0.012f, 0f, 0.11f),
-                new Vector3(0.012f, 0.002f, 1f),
+                new Vector3(-0.006f, 0f, 0.11f),
+                new Vector3(0.006f, 0.001f, 1f),
                 crosshairMaterial);
             CreateCrosshairPart(
                 "CrosshairRight",
                 cameraObject.transform,
-                new Vector3(0.012f, 0f, 0.11f),
-                new Vector3(0.012f, 0.002f, 1f),
+                new Vector3(0.006f, 0f, 0.11f),
+                new Vector3(0.006f, 0.001f, 1f),
                 crosshairMaterial);
             CreateCrosshairPart(
                 "CrosshairUp",
                 cameraObject.transform,
-                new Vector3(0f, 0.012f, 0.11f),
-                new Vector3(0.002f, 0.012f, 1f),
+                new Vector3(0f, 0.006f, 0.11f),
+                new Vector3(0.001f, 0.006f, 1f),
                 crosshairMaterial);
             CreateCrosshairPart(
                 "CrosshairDown",
                 cameraObject.transform,
-                new Vector3(0f, -0.012f, 0.11f),
-                new Vector3(0.002f, 0.012f, 1f),
+                new Vector3(0f, -0.006f, 0.11f),
+                new Vector3(0.001f, 0.006f, 1f),
                 crosshairMaterial);
 
             BehaviorParameters behavior =
@@ -189,6 +205,7 @@ namespace QuickDraw.Editor
             }
 
             AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             Debug.Log($"Rebuilt deterministic research Basic scene at {ScenePath}.");
         }
 
@@ -244,12 +261,17 @@ namespace QuickDraw.Editor
 
         private static Material CreateOrReplaceMaterial(
             string path,
-            Color color)
+            Color color,
+            bool receivesLighting)
         {
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            string shaderName = receivesLighting
+                ? "Universal Render Pipeline/Lit"
+                : "Universal Render Pipeline/Unlit";
+            Shader shader = Shader.Find(shaderName);
             if (shader == null)
             {
-                throw new InvalidOperationException("URP Unlit shader is unavailable.");
+                throw new InvalidOperationException(
+                    $"Required shader is unavailable: {shaderName}.");
             }
 
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);

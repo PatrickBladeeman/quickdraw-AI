@@ -97,6 +97,27 @@ namespace QuickDraw.Tests.EditMode
             Assert.That(GameObject.Find("EastWall"), Is.Not.Null);
             Assert.That(GameObject.Find("NorthWall"), Is.Not.Null);
             Assert.That(GameObject.Find("SouthWall"), Is.Not.Null);
+            Light keyLight = GameObject.Find("ResearchBasicKeyLight")?.GetComponent<Light>();
+            Assert.That(keyLight, Is.Not.Null);
+            Assert.That(keyLight.type, Is.EqualTo(LightType.Directional));
+            Assert.That(keyLight.intensity, Is.EqualTo(1.25f).Within(1e-6f));
+
+            Color floorColor = GameObject.Find("Floor")
+                .GetComponent<Renderer>().sharedMaterial.color;
+            Color wallColor = GameObject.Find("NorthWall")
+                .GetComponent<Renderer>().sharedMaterial.color;
+            Color targetColor = target.GetComponent<Renderer>().sharedMaterial.color;
+            Assert.That(
+                GameObject.Find("NorthWall").GetComponent<Renderer>()
+                    .sharedMaterial.shader.name,
+                Is.EqualTo("Universal Render Pipeline/Lit"));
+            Assert.That(
+                Rec601Luminance(wallColor),
+                Is.GreaterThan(Rec601Luminance(floorColor) + 0.25f));
+            Assert.That(
+                Rec601Luminance(targetColor),
+                Is.GreaterThan(Rec601Luminance(wallColor) + 0.5f));
+
             foreach (string crosshairName in new[]
                      {
                          "CrosshairLeft",
@@ -110,6 +131,23 @@ namespace QuickDraw.Tests.EditMode
                 Assert.That(crosshairPart.transform.parent, Is.SameAs(
                     sensor.ObservationCamera.transform));
                 Assert.That(crosshairPart.GetComponent<Collider>(), Is.Null);
+                Assert.That(
+                    crosshairPart.GetComponent<Renderer>().sharedMaterial.shader.name,
+                    Is.EqualTo("Universal Render Pipeline/Unlit"));
+
+                bool horizontal = crosshairName == "CrosshairLeft" ||
+                                  crosshairName == "CrosshairRight";
+                Vector3 scale = crosshairPart.transform.localScale;
+                Vector3 position = crosshairPart.transform.localPosition;
+                Assert.That(
+                    horizontal ? scale.x : scale.y,
+                    Is.EqualTo(0.006f).Within(1e-6f));
+                Assert.That(
+                    horizontal ? scale.y : scale.x,
+                    Is.EqualTo(0.001f).Within(1e-6f));
+                Assert.That(
+                    Mathf.Abs(horizontal ? position.x : position.y),
+                    Is.EqualTo(0.006f).Within(1e-6f));
             }
 
             MonoBehaviour[] components = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(
@@ -124,6 +162,30 @@ namespace QuickDraw.Tests.EditMode
                     typeName => typeName != null &&
                                 typeName.StartsWith("QuickDraw.AI.", StringComparison.Ordinal)),
                 Is.False);
+        }
+
+        [Test]
+        public void VisualSensorRecoversAPlayModeEntryThatMissedItsFirstReset()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            ResearchBasicAgent agent =
+                UnityEngine.Object.FindFirstObjectByType<ResearchBasicAgent>();
+            ResearchBasicVisualSensorComponent sensorComponent =
+                agent?.GetComponent<ResearchBasicVisualSensorComponent>();
+            Assert.That(agent, Is.Not.Null);
+            Assert.That(sensorComponent, Is.Not.Null);
+
+            agent.Initialize();
+            ISensor sensor = sensorComponent.CreateSensors()[0];
+            Assert.That(sensorComponent.IsStackReady, Is.False);
+            Assert.That(agent.Episode.IsActive, Is.False);
+
+            Assert.DoesNotThrow(sensor.Update);
+
+            Assert.That(sensorComponent.IsStackReady, Is.True);
+            Assert.That(agent.Episode.IsActive, Is.True);
+            Assert.That(agent.NextEpisodeIndex, Is.EqualTo(1));
+            (sensor as IDisposable)?.Dispose();
         }
 
         [Test]
@@ -159,6 +221,11 @@ namespace QuickDraw.Tests.EditMode
             Assert.That(aligned.Hit, Is.True);
             Assert.That(adjacent.ShotFired, Is.True);
             Assert.That(adjacent.Hit, Is.False);
+        }
+
+        private static float Rec601Luminance(Color color)
+        {
+            return 0.299f * color.r + 0.587f * color.g + 0.114f * color.b;
         }
     }
 }

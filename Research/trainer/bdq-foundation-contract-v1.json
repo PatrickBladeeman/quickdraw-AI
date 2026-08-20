@@ -4,7 +4,7 @@
   "purpose": "Freeze and test the pure-Python replay, action, network, target, loss, and ML-Agents plugin seams before any Unity rollout or optimizer-driven training.",
   "base_environment_contract": {
     "path": "Research/basic/basic-contract-v1.json",
-    "sha256": "41e6ffb0b4cf5f9ae9b1d7246306fee2945c75ba49247a696cafdb2b531d4c8f",
+    "sha256": "d0803181993a9b31d089a483fc0e4499980ec5893625be5a9188e0db68c7153d",
     "schema_version": "quickdraw.research-basic.v1",
     "behavior_name": "QuickDrawResearchBasic"
   },

@@ -476,8 +476,10 @@ Goal: create a small Unity hitscan analogue of the ViZDoom Basic Scenario that c
 - [x] Added stable semantic action enums, the shared typed action tuple, movement-before-shoot actuation, mechanically impossible boundary masks, 10 Hz decision gating, additive rewards, terminal hit, and 300-decision truncation.
 - [x] Reset transforms, seeded target sampling, ammunition, cooldown, counters, cumulative reward, and visual state deterministically; fixed target sequences are locked in both C# and Python tests.
 - [x] Added one common LLAPI runner for seeded random and visual-only scripted policies. Both export the same strict `quickdraw.basic-episode.v1` schema intended for later learned policies.
-- [x] Passed 29 Edit Mode tests, all 41 existing Play Mode tests, six Python tests, the isolated Basic Windows build, and the normal `Test_Arena` Windows build.
+- [x] Passed the current 30 Edit Mode tests, all 41 existing Play Mode tests, seven Basic Python tests, the isolated Basic Windows build, and the normal `Test_Arena` Windows build.
 - [x] Ran two fresh 12-episode standalone processes per policy. Random traces matched exactly, scripted traces matched exactly, and the scripted policy completed all 12 episodes with one aligned hit and no misses per episode.
+- [x] Added a directional key light, lit high-contrast room materials, and a half-size unlit cyan reticle; froze those pixel-affecting values in the Basic contract and propagated its hash through R3A and R3B.
+- [x] Recovered a deterministic episode and post-reset stack when the supported Domain-Reload-off workflow lets ML-Agents request an observation before its normal first reset; the focused regression reproduces the unprimed update path.
 
 R2A contains no replay buffer, BDQ trainer, training run, learned weights, strategic combat expansion, or LLM runtime.
 
@@ -520,9 +522,35 @@ R3A does not register a trainer entry point, launch Unity, collect experience,
 run an optimizer or training loop, use ROCm, create checkpoints/exports, or make
 a learned-policy claim.
 
+### R3B. Registered trainer and deterministic optimizer smoke — completed
+
+- [x] Added an installable `quickdraw-bdq-trainer` package with a real
+  `mlagents.trainer_type` entry point, `QuickDrawBDQSettings`, and a
+  factory-compatible `QuickDrawBDQTrainer`.
+- [x] Kept policy creation, trajectory advancement, episode handling, model
+  saving, and checkpoint loading fail-closed because Unity rollout is outside
+  R3B.
+- [x] Added seeded online/target initialization, Adam `1e-4`, replay warmup,
+  one optimizer update every four decisions, and hard synchronization every
+  10,000 optimizer updates with explicit decision/update/sync counters.
+- [x] Preserved the exact production defaults while allowing smaller injectable
+  scheduling values only for deterministic synthetic tests.
+- [x] Passed 22 focused R3B CPU tests, all 37 trainer tests, and all 54 Python
+  research tests. The proof covers
+  official plugin discovery, settings structuring, `TrainerFactory`
+  construction, exact initialization, no premature update, online-only weight
+  change after optimization, a frozen target before its boundary, exact hard
+  synchronization, a real batch-64 update, and tensor-for-tensor seeded replay.
+
+R3B does not create an ML-Agents policy, consume Unity trajectories, run an
+environment training session, execute ROCm, implement epsilon decay, save or
+restore checkpoints, export ONNX, or claim learned-policy effectiveness.
+
 Remaining trainer and network work:
 
-- Implement BDQ as a pinned custom ML-Agents off-policy trainer plugin; do not describe the built-in PPO/SAC trainers as DQN.
+- Connect the registered BDQ shell to ML-Agents policy creation and Basic
+  trajectory collection without changing the R2A/R3A/R3B contracts; do not
+  describe the built-in PPO/SAC trainers as DQN.
 - Use four stacked `84×84` grayscale frames.
 - Shared encoder:
   - 32 filters, `8×8`, stride 4;
@@ -530,7 +558,10 @@ Remaining trainer and network work:
   - 64 filters, `3×3`, stride 1;
   - 512-unit shared representation.
 - Use a scalar dueling value head and one mean-centered advantage head per action branch.
-- Use Double-DQN online selection and target-network evaluation, replay memory, epsilon-greedy collection, averaged branch Huber loss, gradient clipping if needed and documented, checkpointing, resume, and inference export.
+- Add epsilon-greedy Unity collection, checkpointing, resume, and inference
+  export around the implemented replay, Double-DQN target, averaged branch
+  Huber loss, and optimizer schedule. Add gradient clipping only if needed and
+  documented.
 
 Registered defaults:
 

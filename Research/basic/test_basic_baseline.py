@@ -45,6 +45,33 @@ def test_scripted_policy_uses_latest_frame_direction_and_center() -> None:
     assert policy.act(centered, masks) == (0, 1)
 
 
+def test_render_contract_freezes_lighting_contrast_and_reticle() -> None:
+    contract = json.loads((HERE / "basic-contract-v1.json").read_text("utf-8"))
+    rendering = contract["rendering"]
+    assert rendering["world_shader"] == "Universal Render Pipeline/Lit"
+    assert rendering["key_light"] == {
+        "type": "directional",
+        "euler_degrees": [50.0, -30.0, 0.0],
+        "color": [1.0, 0.95686275, 0.8392157, 1.0],
+        "intensity": 1.25,
+        "shadows": "none",
+    }
+    assert rendering["materials"]["wall_base_color"] == [
+        0.28,
+        0.38,
+        0.5,
+        1.0,
+    ]
+    assert rendering["crosshair"] == {
+        "shader": "Universal Render Pipeline/Unlit",
+        "base_color": [0.1, 0.85, 0.95, 1.0],
+        "segment_length_world_units": 0.006,
+        "segment_thickness_world_units": 0.001,
+        "segment_center_offset_world_units": 0.006,
+        "camera_depth_world_units": 0.11,
+    }
+
+
 def test_scripted_policy_fails_closed_without_visual_target() -> None:
     policy = ScriptedVisualPolicy(41002)
     observation = np.zeros((84, 84, 4), dtype=np.float32)
