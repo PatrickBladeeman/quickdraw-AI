@@ -1,41 +1,46 @@
-# R3A/R3B BDQ trainer foundation and optimizer smoke
+# R3A-R3D BDQ foundation and direct LLAPI collection
 
-This directory contains the bounded pure-Python work for the custom Branching
-Double DQN trainer. R3A freezes the replay, visual tensor, branched action,
-masking, dueling-network, Double-DQN target, and Huber-loss meanings. R3B adds
-the real ML-Agents entry point and settings boundary plus a deterministic CPU
-optimizer/scheduler smoke. Neither slice launches Unity or claims that a policy
-has learned the Basic task.
+This directory contains QuickDraw's bounded Branching Double DQN implementation.
+R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
+Huber loss. R3B freezes the optimizer and update schedule. R3C records the
+superseded high-level ML-Agents trajectory experiment. R3D replaces that
+experiment with synchronous `DecisionSteps`/`TerminalSteps` collection.
 
-`bdq-foundation-contract-v1.json` binds R3A to the exact `Research_Basic`
-contract hash, the `[84,84,4]` HWC float32 observation, branches `[3,2]`, and
-the row-major six-action mapping. `bdq-optimizer-contract-v1.json` binds R3B to
-that exact R3A file and freezes plugin registration, production optimizer
-defaults, decision/update counters, and hard target synchronization timing.
+The tracked contract chain is:
 
-`quickdraw_bdq` contains:
+- `bdq-foundation-contract-v1.json`: historical R3A foundation;
+- `bdq-optimizer-contract-v1.json`: historical R3B optimizer contract;
+- `bdq-llapi-contract-v1.json`: current R3D direct-collection and
+  truncation-mask contract.
 
-- `replay.py`: immutable validated transitions and seeded uniform ring-buffer
-  sampling;
-- `network.py`: the registered three-convolution encoder, 512-unit shared
-  representation, scalar value head, and mean-centered `[3,2]` advantage heads;
-- `action_space.py`: branch/joint mapping and fail-closed legal-action masking
-  for greedy and epsilon-greedy selection;
-- `targets.py`: per-branch Double-DQN targets and mean branch Huber loss;
-- `optimizer.py`: online and target networks, seeded replay, Adam updates, and
-  explicit decision/update/synchronization counters;
-- `settings.py`: the registered production defaults for ML-Agents 1.1;
-- `trainer.py`: the factory-compatible trainer shell, whose Unity rollout
-  methods fail closed because rollout belongs to a later slice;
-- `plugin.py`: both the historical R3A seam check and the installed R3B
-  registration callable.
+`quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
+boundary:
 
-True `target_hit` terminals do not bootstrap. The registered 300-decision time
-limit is a truncation, so it bootstraps from its final observation and legal
-next-action mask. A transition cannot be both terminal and truncated.
+- `replay.py`: immutable validated transitions and seeded uniform replay;
+- `network.py`: the three-convolution visual encoder and dueling `[3,2]`
+  branch heads;
+- `action_space.py`: branch/joint mapping and strict mask-aware selection;
+- `targets.py`: per-branch Double-DQN targets and averaged Huber loss;
+- `optimizer.py`: online/target networks, Adam, replay, and exact counters;
+- `llapi.py`: behavior validation, online-network action selection, one pending
+  decision per agent, direct replay completion, and strict truncation-mask
+  side-channel ingestion.
 
-Install the editable plugin into the isolated Python 3.11 environment from the
-repository root:
+The former `Trainer`, `Policy`, `Trajectory`, settings, plugin-registration,
+YAML, and next-mask-registry scaffolding has been removed. `pyproject.toml`
+therefore registers no `mlagents.trainer_type` entry point and depends only on
+`mlagents-envs`, NumPy, and PyTorch.
+
+For each agent, the runner stores `(observation, action, current masks)` when a
+decision is sent. When that agent next appears, it completes exactly one replay
+transition with the delivered reward and next observation. A `DecisionStep`
+supplies the next masks for ordinary continuation. A true terminal uses an
+irrelevant all-available sentinel because it does not bootstrap. A decision-limit
+truncation receives the authoritative final-state mask from Unity over the
+dedicated `quickdraw.basic-truncation-mask.v1` side channel; Python never infers
+that mask from privileged scene state.
+
+Install the editable package in the isolated Python 3.11 environment:
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = '1'
@@ -43,19 +48,37 @@ $python = 'Artifacts\Experiments\.venvs\r1f-cpu-py311\Scripts\python.exe'
 & $python -B -m pip install --no-deps -e Research\trainer
 ```
 
-Then run both focused suites:
+Run the focused trainer suite:
 
 ```powershell
 & $python -B -m pytest -p no:cacheprovider Research\trainer
 ```
 
-The registered production defaults are replay capacity 100,000, warmup 10,000
-decisions, batch size 64, `gamma=0.99`, Adam `1e-4`, one update every four
-decisions, and a hard target copy every 10,000 optimizer updates. Tests may
-inject smaller capacities and intervals without changing those defaults.
+Build the already-saved `Research_Basic` scene, then run the real two-process
+gate:
 
-R3B excludes Unity policy creation, trajectory collection, environment rollout,
-epsilon-decay rollout, ROCm execution, checkpoint/resume, ONNX export, trained
-weights, gradual motion, strategic combat, reflexes, and LLM work. The next
-trainer slice must build on these tested seams rather than replacing their
-meanings silently.
+```powershell
+& 'C:\Program Files\Unity\Hub\Editor\6000.0.57f1\Editor\Unity.exe' `
+  -batchmode -nographics -quit `
+  -projectPath 'C:\projects\quickdraw-AI' `
+  -executeMethod QuickDraw.Editor.ResearchBasicBuild.BuildWindows `
+  -quickdrawBasicOutput 'Artifacts\Experiments\r3d-llapi\build\QuickDrawResearchBasic.exe' `
+  -logFile 'Artifacts\Experiments\r3d-llapi\build.log'
+
+& $python Research\trainer\run_bdq_llapi_smoke.py `
+  --env Artifacts\Experiments\r3d-llapi\build\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3d-llapi\live-smoke
+```
+
+Each fresh process collects two episodes. The unchanged online network greedily
+finishes the first. The second moves left four times, idles through decision
+300, and ends as an interrupted truncation at slot `-4`, whose Unity-authored
+movement mask is `[false,true,false]`. Every one of the 302 decisions becomes
+one replay transition. The gate requires exact trace equality, zero optimizer
+updates, zero target synchronizations, and unchanged online/target weight
+hashes.
+
+This is collection evidence, not training evidence. Epsilon decay, replay
+warmup completion, gradient updates on Unity experience, checkpoint/resume,
+ONNX export, ROCm training, learned-policy evaluation, gradual motion,
+strategic combat, reflexes, and LLM work remain outside this slice.

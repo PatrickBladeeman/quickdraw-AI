@@ -211,7 +211,7 @@ namespace QuickDraw.Editor
 
         public static void BuildWindows()
         {
-            RebuildScene();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             string outputPath = GetCommandLineValue(OutputArgument) ?? DefaultOutput;
             string absoluteOutput = Path.GetFullPath(outputPath);
             string outputDirectory = Path.GetDirectoryName(absoluteOutput);

@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +28,6 @@ from quickdraw_bdq import (  # noqa: E402
     greedy_actions,
     joint_indices_from_branches,
     mean_branch_huber_loss,
-    validate_installed_plugin_api,
 )
 
 
@@ -75,7 +73,7 @@ def transition(index: int, **overrides: object) -> ReplayTransition:
     return ReplayTransition(**values)  # type: ignore[arg-type]
 
 
-def test_contract_schema_runtime_and_basic_hash_are_exact() -> None:
+def test_historical_contract_schema_and_basic_hash_are_exact() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     basic = json.loads(BASIC_CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -99,22 +97,6 @@ def test_contract_schema_runtime_and_basic_hash_are_exact() -> None:
         basic["actions"]["combat"][str(index)]
         for index in range(BRANCH_SIZES[1])
     ) == COMBAT_NAMES
-    assert contract["runtime"] == {
-        "python": "3.11.13",
-        "mlagents": version("mlagents"),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "r3a_device": "cpu",
-    }
-
-
-def test_installed_plugin_boundary_matches_mlagents_1_1() -> None:
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    boundary = validate_installed_plugin_api()
-    assert boundary.__dict__ == contract["plugin_boundary"]
-
-
 def test_action_names_and_joint_indices_match_basic_branch_order() -> None:
     actions = torch.tensor(
         [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1]],

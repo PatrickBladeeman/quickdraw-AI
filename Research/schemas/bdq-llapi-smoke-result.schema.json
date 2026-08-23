@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-llapi-smoke-result.schema.json",
+  "title": "QuickDraw direct BDQ LLAPI smoke result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "fresh_process_count",
+    "exact_trace_equality",
+    "canonical_trace_sha256",
+    "canonical_trace"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-llapi-smoke-result.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "fresh_process_count": {"const": 2},
+    "exact_trace_equality": {"const": true},
+    "canonical_trace_sha256": {"$ref": "#/$defs/sha256"},
+    "canonical_trace": {"$ref": "#/$defs/trace"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mask3": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "mask2": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "masks": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/mask3"},
+        {"$ref": "#/$defs/mask2"}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "episode_index",
+        "episode_decision_index",
+        "observation_sha256",
+        "next_observation_sha256",
+        "observation_shape",
+        "action",
+        "reward",
+        "action_masks",
+        "next_action_masks",
+        "terminated",
+        "truncated"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "episode_index": {"type": "integer", "minimum": 0},
+        "episode_decision_index": {"type": "integer", "minimum": 0},
+        "observation_sha256": {"$ref": "#/$defs/sha256"},
+        "next_observation_sha256": {"$ref": "#/$defs/sha256"},
+        "observation_shape": {"const": [84, 84, 4]},
+        "action": {
+          "type": "array",
+          "prefixItems": [
+            {"type": "integer", "minimum": 0, "maximum": 2},
+            {"type": "integer", "minimum": 0, "maximum": 1}
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "reward": {"type": "number"},
+        "action_masks": {"$ref": "#/$defs/masks"},
+        "next_action_masks": {"$ref": "#/$defs/masks"},
+        "terminated": {"type": "boolean"},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "selector",
+        "transition_start_index",
+        "transition_count",
+        "return",
+        "end_kind",
+        "reason",
+        "interrupted"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "selector": {
+          "enum": ["online_network_masked_greedy", "fixed_left_then_stay_idle"]
+        },
+        "transition_start_index": {"type": "integer", "minimum": 0},
+        "transition_count": {"type": "integer", "minimum": 1},
+        "return": {"type": "number"},
+        "end_kind": {"enum": ["terminal", "truncated"]},
+        "reason": {"enum": ["target_hit", "decision_limit"]},
+        "interrupted": {"type": "boolean"}
+      }
+    },
+    "truncation_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "decision_count",
+        "reason",
+        "position_slot",
+        "next_action_masks"
+      ],
+      "properties": {
+        "episode_index": {"const": 1},
+        "decision_count": {"const": 300},
+        "reason": {"const": "decision_limit"},
+        "position_slot": {"type": "integer", "minimum": -4, "maximum": 4},
+        "next_action_masks": {"$ref": "#/$defs/masks"}
+      }
+    },
+    "learning_guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_before_sha256",
+        "online_after_sha256",
+        "target_before_sha256",
+        "target_after_sha256",
+        "online_weights_unchanged",
+        "target_weights_unchanged"
+      ],
+      "properties": {
+        "optimizer_update_count": {"const": 0},
+        "target_sync_count": {"const": 0},
+        "online_before_sha256": {"$ref": "#/$defs/sha256"},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"},
+        "target_before_sha256": {"$ref": "#/$defs/sha256"},
+        "target_after_sha256": {"$ref": "#/$defs/sha256"},
+        "online_weights_unchanged": {"const": true},
+        "target_weights_unchanged": {"const": true}
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_sha256",
+        "behavior",
+        "policy_seed",
+        "episodes",
+        "truncation_events",
+        "transitions",
+        "replay",
+        "learning_guard"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-llapi-trace.v1"},
+        "contract_sha256": {"$ref": "#/$defs/sha256"},
+        "behavior": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "observation_shape",
+            "wire_layout",
+            "dtype",
+            "discrete_branches",
+            "privileged_observation_count"
+          ],
+          "properties": {
+            "name": {"const": "QuickDrawResearchBasic"},
+            "observation_shape": {"const": [84, 84, 4]},
+            "wire_layout": {"const": "HWC"},
+            "dtype": {"const": "float32"},
+            "discrete_branches": {"const": [3, 2]},
+            "privileged_observation_count": {"const": 0}
+          }
+        },
+        "policy_seed": {"const": 51001},
+        "episodes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/episode"},
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "truncation_events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/truncation_event"},
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "transitions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transition"},
+          "minItems": 301,
+          "maxItems": 305
+        },
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision_count", "size"],
+          "properties": {
+            "decision_count": {"type": "integer", "minimum": 301, "maximum": 305},
+            "size": {"type": "integer", "minimum": 301, "maximum": 305}
+          }
+        },
+        "learning_guard": {"$ref": "#/$defs/learning_guard"}
+      }
+    }
+  }
+}

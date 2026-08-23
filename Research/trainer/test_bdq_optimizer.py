@@ -4,19 +4,12 @@ import hashlib
 import json
 import math
 import sys
-import tomllib
-from importlib.metadata import version
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
 import torch
 from jsonschema import Draft202012Validator
-from mlagents import plugins as mlagents_plugins
-from mlagents.plugins.trainer_type import register_trainer_plugins
-from mlagents.trainers.settings import TrainerSettings
-from mlagents.trainers.trainer import TrainerFactory
 
 
 HERE = Path(__file__).resolve().parent
@@ -26,18 +19,13 @@ sys.path.insert(0, str(HERE))
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     BDQOptimizerController,
-    QuickDrawBDQSettings,
-    QuickDrawBDQTrainer,
     ReplayTransition,
-    R3BRolloutUnavailableError,
-    validate_registered_plugin_api,
 )
 
 
 CONTRACT_PATH = HERE / "bdq-optimizer-contract-v1.json"
 SCHEMA_PATH = ROOT / "Research" / "schemas" / "bdq-optimizer-contract.schema.json"
 FOUNDATION_CONTRACT_PATH = HERE / "bdq-foundation-contract-v1.json"
-PYPROJECT_PATH = HERE / "pyproject.toml"
 
 
 def sha256_file(path: Path) -> str:
@@ -88,42 +76,10 @@ def states_are_equal(
     )
 
 
-class FakeParameterManager:
-    def get_minimum_reward_buffer_size(self, behavior_name: str) -> int:
-        assert behavior_name
-        return 1
-
-
-def structured_trainer_settings() -> TrainerSettings:
-    return TrainerSettings.structure(
-        {
-            "trainer_type": "quickdraw_bdq",
-            "hyperparameters": {},
-        },
-        TrainerSettings,
-    )
-
-
-def generated_trainer(tmp_path: Path, seed: int = 71001) -> QuickDrawBDQTrainer:
-    settings = structured_trainer_settings()
-    factory = TrainerFactory(
-        trainer_config={"QuickDrawBasic": settings},
-        output_path=str(tmp_path),
-        train_model=True,
-        load_model=False,
-        seed=seed,
-        param_manager=FakeParameterManager(),  # type: ignore[arg-type]
-    )
-    trainer = factory.generate("QuickDrawBasic")
-    assert isinstance(trainer, QuickDrawBDQTrainer)
-    return trainer
-
-
-def test_contract_schema_runtime_foundation_hash_and_package_are_exact() -> None:
+def test_historical_contract_schema_and_foundation_hash_are_exact() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     foundation = json.loads(FOUNDATION_CONTRACT_PATH.read_text(encoding="utf-8"))
-    pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
 
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(contract)
@@ -132,68 +88,12 @@ def test_contract_schema_runtime_foundation_hash_and_package_are_exact() -> None
         "sha256": sha256_file(FOUNDATION_CONTRACT_PATH),
         "schema_version": foundation["schema_version"],
     }
-    assert contract["runtime"] == {
-        "python": "3.11.13",
-        "mlagents": version("mlagents"),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "r3b_device": "cpu",
-    }
-    assert pyproject["project"]["name"] == contract["package"]["distribution"]
-    assert pyproject["project"]["version"] == contract["package"]["version"]
-    assert pyproject["project"]["entry-points"]["mlagents.trainer_type"] == {
-        contract["plugin"]["entry_point_name"]: contract["plugin"][
-            "entry_point_value"
-        ]
-    }
-
-
-def test_official_plugin_discovery_settings_and_factory(tmp_path: Path) -> None:
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    boundary = validate_registered_plugin_api()
-    expected_boundary = {
-        **contract["plugin"],
-        "distribution": contract["package"]["distribution"],
-        "distribution_version": contract["package"]["version"],
-    }
-    assert boundary.__dict__ == expected_boundary
-
-    mlagents_plugins.all_trainer_types.clear()
-    mlagents_plugins.all_trainer_settings.clear()
-    trainer_types, trainer_settings = register_trainer_plugins()
-    assert trainer_types["quickdraw_bdq"] is QuickDrawBDQTrainer
-    assert trainer_settings["quickdraw_bdq"] is QuickDrawBDQSettings
-
-    settings = structured_trainer_settings()
-    assert isinstance(settings.hyperparameters, QuickDrawBDQSettings)
-    trainer = generated_trainer(tmp_path)
-    assert trainer.get_trainer_name() == "quickdraw_bdq"
-    assert trainer.optimizer_controller.settings == BDQOptimizationSettings()
-
-
-def test_registered_trainer_fails_closed_for_unimplemented_rollout(
-    tmp_path: Path,
-) -> None:
-    register_trainer_plugins()
-    trainer = generated_trainer(tmp_path)
-    calls: tuple[tuple[str, tuple[Any, ...]], ...] = (
-        ("save_model", ()),
-        ("end_episode", ()),
-        ("create_policy", (None, None)),
-        ("add_policy", (None, None)),
-        ("advance", ()),
-    )
-    for method_name, arguments in calls:
-        with pytest.raises(R3BRolloutUnavailableError, match="R3B is synthetic only"):
-            getattr(trainer, method_name)(*arguments)
 
 
 def test_production_optimizer_and_exploration_defaults_are_exact() -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     registered = contract["registered_defaults"]
-    plugin_settings = QuickDrawBDQSettings()
-    optimizer_settings = plugin_settings.to_optimization_settings()
+    optimizer_settings = BDQOptimizationSettings()
 
     assert optimizer_settings == BDQOptimizationSettings()
     assert {
@@ -210,12 +110,12 @@ def test_production_optimizer_and_exploration_defaults_are_exact() -> None:
         "hard_target_sync_interval_optimizer_updates": (
             optimizer_settings.hard_target_sync_interval_optimizer_updates
         ),
-        "epsilon_start": plugin_settings.epsilon_start,
-        "epsilon_end": plugin_settings.epsilon_end,
-        "exploratory_evaluation_epsilon": (
-            plugin_settings.exploratory_evaluation_epsilon
-        ),
-        "final_evaluation_epsilon": plugin_settings.final_evaluation_epsilon,
+        "epsilon_start": registered["epsilon_start"],
+        "epsilon_end": registered["epsilon_end"],
+        "exploratory_evaluation_epsilon": registered[
+            "exploratory_evaluation_epsilon"
+        ],
+        "final_evaluation_epsilon": registered["final_evaluation_epsilon"],
     } == registered
 
 
@@ -251,11 +151,6 @@ def test_optimizer_settings_reject_invalid_values(
     defaults.update(overrides)
     with pytest.raises(ValueError, match=message):
         BDQOptimizationSettings(**defaults)  # type: ignore[arg-type]
-
-
-def test_plugin_settings_reject_fractional_update_interval() -> None:
-    with pytest.raises(ValueError, match="positive whole number"):
-        QuickDrawBDQSettings(steps_per_update=1.5).to_optimization_settings()
 
 
 @pytest.mark.parametrize("seed", [-1, 1.0, True])

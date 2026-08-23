@@ -11,6 +11,11 @@ namespace QuickDraw.Research.Basic
         public const string TargetHitReason = "target_hit";
         public const string DecisionLimitReason = "decision_limit";
         public const string InfrastructureInvalidReason = "infrastructure_invalid";
+        public const string TruncationMaskSchemaVersion =
+            "quickdraw.basic-truncation-mask.v1";
+        public const string TruncationMaskMessageType = "truncation_mask";
+        public const string TruncationMaskChannelUuid =
+            "0541088f-93b9-4299-8c9e-af7431da553a";
 
         public const int ObservationWidth = 84;
         public const int ObservationHeight = 84;

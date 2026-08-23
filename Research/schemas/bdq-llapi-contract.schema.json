@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-llapi-contract.schema.json",
+  "title": "QuickDraw direct BDQ LLAPI contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_environment_contract",
+    "base_foundation_contract",
+    "base_optimizer_contract",
+    "runtime",
+    "package",
+    "transport",
+    "truncation_mask_channel",
+    "collection",
+    "retired_trajectory_scaffolding",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-llapi.v1"},
+    "task": {"const": "R3D"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_environment_contract": {"$ref": "#/$defs/contract_binding"},
+    "base_foundation_contract": {"$ref": "#/$defs/contract_binding"},
+    "base_optimizer_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version", "reused_scope"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "schema_version": {"type": "string", "minLength": 1},
+        "reused_scope": {"type": "string", "minLength": 1}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "device": {"const": "cpu"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "version", "metadata_path", "trainer_entry_points"],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.3.0"},
+        "metadata_path": {"const": "Research/trainer/pyproject.toml"},
+        "trainer_entry_points": {"const": []}
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api",
+        "behavior_name",
+        "agent_count",
+        "observation_shape",
+        "observation_layout",
+        "observation_dtype",
+        "discrete_branches",
+        "transition_completion",
+        "trajectory_objects_permitted",
+        "privileged_scene_inference_permitted"
+      ],
+      "properties": {
+        "api": {"const": "mlagents_envs.environment.UnityEnvironment"},
+        "behavior_name": {"const": "QuickDrawResearchBasic"},
+        "agent_count": {"const": 1},
+        "observation_shape": {"const": [84, 84, 4]},
+        "observation_layout": {"const": "HWC"},
+        "observation_dtype": {"const": "float32"},
+        "discrete_branches": {"const": [3, 2]},
+        "transition_completion": {"type": "string", "minLength": 1},
+        "trajectory_objects_permitted": {"const": false},
+        "privileged_scene_inference_permitted": {"const": false}
+      }
+    },
+    "truncation_mask_channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_uuid",
+        "schema_version",
+        "message_type",
+        "direction",
+        "reason",
+        "decision_count",
+        "mask_value_true_means",
+        "fields"
+      ],
+      "properties": {
+        "channel_uuid": {"const": "0541088f-93b9-4299-8c9e-af7431da553a"},
+        "schema_version": {"const": "quickdraw.basic-truncation-mask.v1"},
+        "message_type": {"const": "truncation_mask"},
+        "direction": {"const": "Unity_to_Python"},
+        "reason": {"const": "decision_limit"},
+        "decision_count": {"const": 300},
+        "mask_value_true_means": {"const": "unavailable"},
+        "fields": {
+          "const": [
+            "schema_version",
+            "message_type",
+            "scenario_seed",
+            "episode_index",
+            "decision_count",
+            "reason",
+            "position_slot",
+            "movement_unavailable",
+            "combat_unavailable"
+          ]
+        }
+      }
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_seed",
+        "policy_seed",
+        "episodes",
+        "learning_enabled",
+        "optimizer_updates",
+        "target_synchronizations",
+        "fresh_processes",
+        "exact_trace_equality"
+      ],
+      "properties": {
+        "scenario_seed": {"const": 31001},
+        "policy_seed": {"const": 51001},
+        "episodes": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["episode_index", "selector", "expected_end", "expected_max_decision_count"],
+              "properties": {
+                "episode_index": {"const": 0},
+                "selector": {"const": "online_network_masked_greedy"},
+                "expected_end": {"const": "terminal"},
+                "expected_max_decision_count": {"const": 5}
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["episode_index", "selector", "expected_end", "expected_decision_count"],
+              "properties": {
+                "episode_index": {"const": 1},
+                "selector": {"const": "fixed_left_then_stay_idle"},
+                "expected_end": {"const": "truncated"},
+                "expected_decision_count": {"const": 300}
+              }
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "learning_enabled": {"const": false},
+        "optimizer_updates": {"const": 0},
+        "target_synchronizations": {"const": 0},
+        "fresh_processes": {"const": 2},
+        "exact_trace_equality": {"const": true}
+      }
+    },
+    "retired_trajectory_scaffolding": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "contract_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "schema_version": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

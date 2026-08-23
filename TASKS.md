@@ -542,15 +542,82 @@ a learned-policy claim.
   change after optimization, a frozen target before its boundary, exact hard
   synchronization, a real batch-64 update, and tensor-for-tensor seeded replay.
 
+Post-R3B repository and tooling checkpoint — completed:
+
+- [x] Committed and pushed R3B plus the bounded R2A lighting/contrast,
+  compact-reticle, missing-reset recovery, contract-hash, test, cleanup, and
+  documentation maintenance as `500bc24` (`add optimizer implementation and
+  unity cli`).
+- [x] Installed Unity CLI `1.0.0-beta.5` as local tooling, registered and
+  structurally verified Unity `6000.0.57f1`, and matched the legacy batch-mode
+  result for one exact focused Edit Mode test: one selected, one passed, zero
+  failed or skipped.
+- [x] Kept the CLI outside the project dependency contract and left the
+  experimental `com.unity.pipeline` package uninstalled. Treat raw Editor
+  stderr as sensitive because it can include authentication command-line
+  arguments.
+
 R3B does not create an ML-Agents policy, consume Unity trajectories, run an
 environment training session, execute ROCm, implement epsilon decay, save or
 restore checkpoints, export ONNX, or claim learned-policy effectiveness.
 
+### R3C. High-level trajectory experiment — superseded and removed
+
+The local R3C experiment proved that ML-Agents' trainer controller could deliver
+one terminal trajectory, but its `Trainer`/`Policy`/`Trajectory` lifecycle and
+next-mask registry obscured the direct environment-step boundary. None of that
+experimental scaffolding was committed. R3D removes
+the trainer class, settings class, plugin entry point, trajectory adapter,
+configuration YAML, runner, contracts, schemas, and focused trajectory tests.
+
+### R3D. Direct LLAPI collection and truncation-mask transport — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-llapi.v1` and result schemas bound to the exact
+  R2A, R3A, and R3B contracts plus the pinned Python 3.11 CPU runtime.
+- [x] Replaced the registered ML-Agents trainer path with direct synchronous
+  `UnityEnvironment` collection. One pending decision per agent is completed
+  exactly once when that agent next appears in `DecisionSteps` or
+  `TerminalSteps`.
+- [x] Added exact behavior/observation/branch validation, mask-aware greedy
+  online-network action selection, immutable replay completion, weight hashing,
+  and strict failure on missing, duplicate, malformed, or unused masks.
+- [x] Added a Unity-to-Python `quickdraw.basic-truncation-mask.v1` side channel.
+  Immediately before decision-limit interruption, Unity supplies the final slot
+  and authoritative current-state unavailable-action masks; Python never infers
+  them from privileged scene state.
+- [x] Preserved true-terminal non-bootstrapping and proved that the transported
+  truncation mask controls Double-DQN online selection/target evaluation.
+- [x] Removed the now-unneeded trainer, policy, trajectory, settings, plugin,
+  YAML, next-mask registry, one-time runner, contracts, schemas, and tests.
+  The package now has no `mlagents.trainer_type` entry point.
+- [x] Passed all 39 focused trainer tests, all 56 Python research tests, 13
+  focused Unity Basic episode tests, and the complete 31-test Edit Mode suite.
+- [x] Built the saved Windows `Research_Basic` scene and ran two fresh direct
+  Python/Unity processes. Each inserted exactly 302 transitions: a deterministic
+  two-step greedy terminal episode and a 300-step truncation episode that moved
+  to slot `-4` and delivered `[false,true,false]` as its final movement mask.
+  Both traces were byte-identical; optimizer updates and target synchronizations
+  remained zero, and online/target weight hashes did not change.
+
+This direct-collection slice is verified in the working tree but is not yet
+committed or pushed. It is not a training session and makes no learned-policy
+claim.
+
+### R3E. Seeded epsilon-greedy LLAPI collection below warmup — next SSNT
+
+- [ ] Extend only the R3D direct collector with fixed, seeded epsilon-greedy
+  action selection and collect exactly 1,000 replay transitions across episode
+  resets.
+- [ ] Remain below the 10,000-transition replay warmup so optimizer updates and
+  target synchronizations both stay at zero and online/target hashes remain
+  unchanged.
+- [ ] Require no unresolved pending decision at the cutoff and run two fresh
+  Python/player processes whose canonical traces are byte-identical.
+- [ ] Exclude epsilon decay, gradients, checkpointing, ROCm execution, ONNX,
+  learned weights, effectiveness claims, and changes to the R2A environment.
+
 Remaining trainer and network work:
 
-- Connect the registered BDQ shell to ML-Agents policy creation and Basic
-  trajectory collection without changing the R2A/R3A/R3B contracts; do not
-  describe the built-in PPO/SAC trainers as DQN.
 - Use four stacked `84×84` grayscale frames.
 - Shared encoder:
   - 32 filters, `8×8`, stride 4;

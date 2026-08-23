@@ -1,4 +1,4 @@
-"""Deterministic optimizer scheduling for the R3B synthetic CPU smoke."""
+"""Deterministic BDQ optimizer scheduling shared by synthetic and LLAPI tests."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class BDQOptimizationSettings:
         if not math.isfinite(self.learning_rate) or self.learning_rate <= 0.0:
             raise ValueError("Learning rate must be finite and positive.")
         if self.device != "cpu":
-            raise ValueError("R3B permits the CPU device only.")
+            raise ValueError("The current optimizer contract permits the CPU device only.")
 
 
 @dataclass(frozen=True)

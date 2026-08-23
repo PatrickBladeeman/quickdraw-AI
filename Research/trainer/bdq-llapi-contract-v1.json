@@ -1,0 +1,111 @@
+{
+  "schema_version": "quickdraw.bdq-llapi.v1",
+  "task": "R3D",
+  "purpose": "Replace the ML-Agents trajectory/plugin collection path with direct synchronous LLAPI replay construction and explicit decision-limit truncation-mask transport.",
+  "base_environment_contract": {
+    "path": "Research/basic/basic-contract-v1.json",
+    "sha256": "d0803181993a9b31d089a483fc0e4499980ec5893625be5a9188e0db68c7153d",
+    "schema_version": "quickdraw.research-basic.v1"
+  },
+  "base_foundation_contract": {
+    "path": "Research/trainer/bdq-foundation-contract-v1.json",
+    "sha256": "9a97d8b58ed08e816f032784069e7b1c38b7185df73b4b8edd504dc58112cfb9",
+    "schema_version": "quickdraw.bdq-foundation.v1"
+  },
+  "base_optimizer_contract": {
+    "path": "Research/trainer/bdq-optimizer-contract-v1.json",
+    "sha256": "1095419f9ebc11050e188ce042b55ca578cf8bf320a6321a5b98470bc98e3849",
+    "schema_version": "quickdraw.bdq-optimizer.v1",
+    "reused_scope": "network, replay, Adam, decision/update counters, and target synchronization only; the registered trainer plugin is historical and retired"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "trainer_entry_points": []
+  },
+  "transport": {
+    "api": "mlagents_envs.environment.UnityEnvironment",
+    "behavior_name": "QuickDrawResearchBasic",
+    "agent_count": 1,
+    "observation_shape": [84, 84, 4],
+    "observation_layout": "HWC",
+    "observation_dtype": "float32",
+    "discrete_branches": [3, 2],
+    "transition_completion": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps",
+    "trajectory_objects_permitted": false,
+    "privileged_scene_inference_permitted": false
+  },
+  "truncation_mask_channel": {
+    "channel_uuid": "0541088f-93b9-4299-8c9e-af7431da553a",
+    "schema_version": "quickdraw.basic-truncation-mask.v1",
+    "message_type": "truncation_mask",
+    "direction": "Unity_to_Python",
+    "reason": "decision_limit",
+    "decision_count": 300,
+    "mask_value_true_means": "unavailable",
+    "fields": [
+      "schema_version",
+      "message_type",
+      "scenario_seed",
+      "episode_index",
+      "decision_count",
+      "reason",
+      "position_slot",
+      "movement_unavailable",
+      "combat_unavailable"
+    ]
+  },
+  "collection": {
+    "scenario_seed": 31001,
+    "policy_seed": 51001,
+    "episodes": [
+      {
+        "episode_index": 0,
+        "selector": "online_network_masked_greedy",
+        "expected_end": "terminal",
+        "expected_max_decision_count": 5
+      },
+      {
+        "episode_index": 1,
+        "selector": "fixed_left_then_stay_idle",
+        "expected_end": "truncated",
+        "expected_decision_count": 300
+      }
+    ],
+    "learning_enabled": false,
+    "optimizer_updates": 0,
+    "target_synchronizations": 0,
+    "fresh_processes": 2,
+    "exact_trace_equality": true
+  },
+  "retired_trajectory_scaffolding": [
+    "Research/trainer/quickdraw_bdq/trajectory.py",
+    "Research/trainer/quickdraw_bdq/trainer.py",
+    "Research/trainer/quickdraw_bdq/settings.py",
+    "Research/trainer/quickdraw_bdq/plugin.py",
+    "Research/trainer/run_bdq_trajectory_smoke.py",
+    "Research/trainer/test_bdq_trajectory.py",
+    "Research/configs/quickdraw-bdq-r3c-smoke.yaml",
+    "Research/trainer/bdq-trajectory-contract-v1.json",
+    "Research/schemas/bdq-trajectory-contract.schema.json",
+    "Research/schemas/bdq-trajectory-smoke-result.schema.json"
+  ],
+  "exclusions": [
+    "optimizer updates or learned-policy claims",
+    "epsilon decay or replay warmup completion",
+    "checkpoint, resume, or ONNX export",
+    "ROCm training",
+    "multi-environment collection",
+    "five-seed training or held-out evaluation",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}

@@ -6,9 +6,18 @@ The actual observation is uncompressed float32 HWC `[84, 84, 4]`: four Rec. 601 
 
 Every action is a concurrent two-branch tuple: movement `[Stay, Left, Right]` and combat `[Idle, Shoot]`; utility is fixed to `Idle`. Movement is applied once on each 10 Hz policy decision, then `Shoot` uses the same center-camera ray used by the fixed crosshair. ML-Agents holds the accepted tuple during the four intervening physics steps without repeating one-shot mechanics.
 
+Immediately before a decision-limit `EpisodeInterrupted()`, Unity sends one
+strict `quickdraw.basic-truncation-mask.v1` side-channel message containing the
+environment-authored action-unavailability masks for the final state. This is
+used by the direct BDQ collector because truncated transitions bootstrap while
+true terminals do not. The message contains only contract state needed to
+validate the mask; Python does not inspect scene objects or infer legality.
+
 The tracked `basic-contract-v1.json` fixes geometry, timing, reward, reset, target sampling, and baseline-policy behavior. Both baselines emit `quickdraw.basic-episode.v1` episode records validated by `Research/schemas/basic-baseline-trace.schema.json`; later learned policies must emit that same episode shape.
 
-Build the dedicated standalone scene:
+Build the dedicated standalone from the tracked saved scene. Scene regeneration
+is a separate explicit editor action; `BuildWindows` does not rewrite the scene
+before serialization:
 
 ```powershell
 & 'C:\Program Files\Unity\Hub\Editor\6000.0.57f1\Editor\Unity.exe' `

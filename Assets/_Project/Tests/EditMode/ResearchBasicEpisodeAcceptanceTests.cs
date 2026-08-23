@@ -134,6 +134,41 @@ namespace QuickDraw.Tests.EditMode
         }
 
         [Test]
+        public void ContinuationMaskRemainsDefinedAfterDecisionLimitTruncation()
+        {
+            var episode = new ResearchBasicEpisode();
+            episode.Reset(ResearchBasicContract.ScenarioSeed, 0);
+
+            for (int decision = 0;
+                 decision < -ResearchBasicContract.MinimumSlot;
+                 decision++)
+            {
+                episode.Step(
+                    ResearchBasicContract.MapAction(1, 0, decision),
+                    false);
+            }
+
+            for (int decision = -ResearchBasicContract.MinimumSlot;
+                 decision < ResearchBasicContract.DecisionLimit;
+                 decision++)
+            {
+                episode.Step(
+                    ResearchBasicContract.MapAction(0, 0, decision),
+                    false);
+            }
+
+            Assert.That(episode.IsActive, Is.False);
+            Assert.That(
+                episode.PositionSlot,
+                Is.EqualTo(ResearchBasicContract.MinimumSlot));
+            Assert.That(episode.IsActionEnabledForContinuation(0, 0), Is.True);
+            Assert.That(episode.IsActionEnabledForContinuation(0, 1), Is.False);
+            Assert.That(episode.IsActionEnabledForContinuation(0, 2), Is.True);
+            Assert.That(episode.IsActionEnabledForContinuation(1, 0), Is.True);
+            Assert.That(episode.IsActionEnabledForContinuation(1, 1), Is.True);
+        }
+
+        [Test]
         public void ResetRestoresEveryBasicEpisodeStateField()
         {
             var episode = new ResearchBasicEpisode();

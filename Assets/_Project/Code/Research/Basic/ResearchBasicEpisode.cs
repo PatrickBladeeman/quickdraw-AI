@@ -89,6 +89,11 @@ namespace QuickDraw.Research.Basic
                 return action == 0;
             }
 
+            return IsActionEnabledForContinuation(branch, action);
+        }
+
+        public bool IsActionEnabledForContinuation(int branch, int action)
+        {
             if (branch == 0)
             {
                 return action switch
