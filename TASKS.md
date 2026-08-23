@@ -603,7 +603,7 @@ This direct-collection slice is committed and pushed as `a4b449d` (`R3D: llapi
 implementation + truncation maski + pending decision`). It is not a training
 session and makes no learned-policy claim.
 
-### R3E. Seeded epsilon-greedy LLAPI collection below warmup — implemented and verified locally
+### R3E. Seeded epsilon-greedy LLAPI collection below warmup — completed and pushed
 
 - [x] Extended only the R3D direct collector with the registered starting
   epsilon `1.0`, fixed exploration seed `61001`, branch-wise uniform legal
@@ -620,7 +620,46 @@ The live gate completed 18 Unity episodes and crossed 18 reset boundaries per
 process, exercised all six action tuples, handled one authoritative truncation
 mask, and stopped after transition 1,000 with a completed nonterminal replay
 transition and no pending action. All 47 trainer tests and all 64 Python
-research tests pass. R3E is verified locally but is not committed or pushed.
+research tests pass. R3E is committed and pushed as `6aef062` (`R3E: fixed
+episilon greedy test runs`).
+
+### R3F. Production warmup and first Unity-derived optimizer update — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-warmup-update.v1` and result schemas bound to
+  the exact pushed R3E contract and pinned Python 3.11 CPU runtime.
+- [x] Reused the R3E seeds, legal branch-wise epsilon `1.0` selection, direct
+  pending-decision collector, and authoritative truncation-mask transport.
+- [x] Collected exactly 10,000 complete transitions with no optimizer update
+  through transition 9,999, then performed exactly one batch-64 Adam update at
+  transition 10,000 under the registered production schedule.
+- [x] Recorded finite Huber loss and mean absolute TD error, changed only the
+  online-network hash, left the target hash unchanged, performed zero target
+  synchronizations, and stopped without a pending decision.
+- [x] Ran two fresh CPU Python/player processes whose complete transition,
+  episode, action, metric, and weight-hash traces are byte-identical.
+- [x] Added an explicitly diagnostic single-run watch mode for either the Unity
+  Editor on port 5004 or a visible standalone player. It uses time scale 1,
+  terminal progress, and one trace only; it cannot satisfy the two-process
+  acceptance result contract.
+- [x] Completed one standalone watch validation through transition 10,000 and
+  the first update. It exited cleanly, created no `result.json`, and its trace
+  was byte-identical to both accepted worker traces.
+- [x] Excluded epsilon decay, a second optimizer update, target synchronization,
+  checkpoint/resume, ONNX, ROCm, extended training, effectiveness claims, and
+  changes to the R2A environment.
+
+Each live process completed 10,000 transitions across 215 episode resets,
+handled three truncations, and exercised all six action tuples with counts
+`[1853,1741,1592,1603,1592,1619]`. The one update occurred at decision 10,000
+with loss `0.01628389209508896` and mean absolute TD error
+`0.06243317946791649`. The online hash changed from
+`b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb` to
+`7dd2365b5e219af10aeb4fabb5191df873762fcea6765cb50f83d41525279c8e`;
+the target remained
+`b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`.
+All 62 trainer tests and all 79 Python research tests pass. R3F is the first
+minimal learning operation on real Unity experience, not an extended training
+session or effectiveness claim.
 
 Remaining trainer and network work:
 
@@ -631,10 +670,10 @@ Remaining trainer and network work:
   - 64 filters, `3×3`, stride 1;
   - 512-unit shared representation.
 - Use a scalar dueling value head and one mean-centered advantage head per action branch.
-- Add epsilon-greedy Unity collection, checkpointing, resume, and inference
-  export around the implemented replay, Double-DQN target, averaged branch
-  Huber loss, and optimizer schedule. Add gradient clipping only if needed and
-  documented.
+- Add epsilon decay, extended Unity optimization, checkpointing, resume, and
+  inference export around the implemented replay, Double-DQN target, averaged
+  branch Huber loss, and optimizer schedule. Add gradient clipping only if
+  needed and documented.
 
 Registered defaults:
 

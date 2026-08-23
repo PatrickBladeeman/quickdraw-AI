@@ -1,4 +1,4 @@
-# R3A-R3E BDQ foundation and direct LLAPI collection
+# R3A-R3F BDQ foundation, direct LLAPI collection, and first update
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -6,6 +6,8 @@ Huber loss. R3B freezes the optimizer and update schedule. R3C records the
 superseded high-level ML-Agents trajectory experiment. R3D replaces that
 experiment with synchronous `DecisionSteps`/`TerminalSteps` collection. R3E
 adds deterministic mask-safe epsilon-greedy collection below replay warmup.
+R3F reaches the exact production warmup and performs one CPU update from real
+Unity transitions.
 
 The tracked contract chain is:
 
@@ -15,6 +17,8 @@ The tracked contract chain is:
   truncation-mask contract.
 - `bdq-epsilon-collection-contract-v1.json`: R3E's hash-bound, fixed-epsilon,
   exactly-1,000-transition collection contract.
+- `bdq-warmup-update-contract-v1.json`: R3F's hash-bound, exactly-10,000-
+  transition production-warmup and first-update contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -28,7 +32,8 @@ boundary:
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
   side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E.
+  selector used by R3E and R3F. At epsilon `1.0`, the selector preserves the
+  exact exploration RNG sequence without evaluating unused network Q-values.
 
 The former `Trainer`, `Policy`, `Trajectory`, settings, plugin-registration,
 YAML, and next-mask-registry scaffolding has been removed. `pyproject.toml`
@@ -98,7 +103,59 @@ completed 18 episodes, exercised all six action tuples, handled one truncation,
 performed zero optimizer updates or target synchronizations, preserved both
 networks, and produced byte-identical traces.
 
-These are collection results, not training evidence. Epsilon decay, replay
-warmup completion, gradient updates on Unity experience, checkpoint/resume,
-ONNX export, ROCm training, learned-policy evaluation, gradual motion,
-strategic combat, reflexes, and LLM work remain outside this slice.
+Run the R3F production-warmup and first-update gate:
+
+```powershell
+& $python Research\trainer\run_bdq_warmup_update_smoke.py `
+  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3f-warmup-update\acceptance
+```
+
+Each accepted fresh process collected exactly 10,000 complete transitions,
+crossed 215 episode resets, handled three truncations, and exercised all six
+action tuples. No update occurred through transition 9,999. Transition 10,000
+opened exactly one registered batch-64 Adam update with loss
+`0.01628389209508896` and mean absolute TD error `0.06243317946791649`. The
+online weights changed, the target weights remained frozen, target-sync and
+pending-decision counts stayed zero, and the two complete traces matched byte
+for byte.
+
+To watch one diagnostic run in the Unity Editor, open `Research_Basic` but
+leave the Editor out of Play Mode, then start Python:
+
+```powershell
+& $python Research\trainer\run_bdq_warmup_update_smoke.py `
+  --watch `
+  --output Artifacts\Experiments\r3f-warmup-update\editor-watch
+```
+
+When Python reports that it is listening on port `5004`, press Play in Unity.
+The runner forces `Time.timeScale` to `1`, targets 60 frames per second, and
+prints the completed transition count, current episode and episode decision,
+selected action, reward, replay size, optimizer-update count, and target-sync
+count every 100 transitions. `--progress-interval N` changes that terminal
+reporting interval. The run stops after transition 10,000 and its first update;
+stop Play Mode manually afterward.
+
+The same one-run diagnostic can launch a visible standalone player:
+
+```powershell
+& $python Research\trainer\run_bdq_warmup_update_smoke.py `
+  --watch `
+  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3f-warmup-update\standalone-watch
+```
+
+Both watch forms write one validated trace only. They are explicitly
+observational and never produce the two-fresh-process `result.json` required by
+the unchanged R3F acceptance gate. A local standalone watch validation completed
+all 10,000 transitions at time scale 1, performed the same single update, and
+produced trace SHA-256
+`aee36f7bc5c2e2202e2738709c021826878de717d22b91345001dafd8599f0b2`,
+byte-identical to each accepted worker trace, without creating `result.json`.
+
+R3D and R3E are collection evidence. R3F is one minimal learning operation on
+real Unity experience, not an extended training run or effectiveness result.
+Epsilon decay, a second update, target synchronization, checkpoint/resume, ONNX
+export, ROCm training, learned-policy evaluation, gradual motion, strategic
+combat, reflexes, and LLM work remain outside this slice.

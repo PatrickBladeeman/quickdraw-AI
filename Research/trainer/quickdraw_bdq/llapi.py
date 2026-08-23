@@ -194,9 +194,20 @@ class SeededEpsilonGreedyBDQActionSelector:
         validated_masks = validate_action_masks(action_masks, "policy action_masks")
         self._online_network.eval()
         with torch.no_grad():
-            q_values = self._online_network(
-                torch.as_tensor(validated_observation[None, ...], dtype=torch.float32)
-            )
+            if self._epsilon == 1.0:
+                # Full exploration overwrites every greedy branch choice. Shape-only
+                # zeros preserve the registered RNG sequence without unused inference.
+                q_values = tuple(
+                    torch.zeros((1, branch_size), dtype=torch.float32)
+                    for branch_size in BRANCH_SIZES
+                )
+            else:
+                q_values = self._online_network(
+                    torch.as_tensor(
+                        validated_observation[None, ...],
+                        dtype=torch.float32,
+                    )
+                )
             selected = epsilon_greedy_actions(
                 q_values,
                 tuple(

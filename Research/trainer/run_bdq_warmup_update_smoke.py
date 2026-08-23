@@ -1,0 +1,1033 @@
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+import subprocess
+import sys
+import tomllib
+from importlib.metadata import version
+from pathlib import Path
+from typing import Any, Dict, Sequence
+
+import numpy as np
+import torch
+from jsonschema import Draft202012Validator
+from mlagents_envs.base_env import ActionTuple
+from mlagents_envs.environment import UnityEnvironment
+from mlagents_envs.side_channel.engine_configuration_channel import (
+    EngineConfigurationChannel,
+)
+
+
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parents[1]
+sys.path.insert(0, str(HERE))
+
+from quickdraw_bdq import (  # noqa: E402
+    BASIC_BEHAVIOR_NAME,
+    BDQOptimizationSettings,
+    BDQOptimizerController,
+    BasicTruncationMaskSideChannel,
+    DirectReplayCollector,
+    LLAPIContractError,
+    OptimizationStepResult,
+    SeededEpsilonGreedyBDQActionSelector,
+    network_sha256,
+    read_action_masks,
+    validate_basic_behavior_spec,
+    validate_observation,
+)
+from run_bdq_epsilon_collection_smoke import (  # noqa: E402
+    _action_tuple_counts,
+    _episode_record,
+    _masks_to_json,
+    _transition_to_json,
+    sha256_file,
+)
+
+
+ARTIFACT_ROOT = (REPO_ROOT / "Artifacts" / "Experiments").resolve()
+CONTRACT_PATH = HERE / "bdq-warmup-update-contract-v1.json"
+CONTRACT_SCHEMA_PATH = (
+    REPO_ROOT / "Research" / "schemas" / "bdq-warmup-update-contract.schema.json"
+)
+RESULT_SCHEMA_PATH = (
+    REPO_ROOT
+    / "Research"
+    / "schemas"
+    / "bdq-warmup-update-smoke-result.schema.json"
+)
+PYPROJECT_PATH = HERE / "pyproject.toml"
+TRACE_FILE_NAME = "r3f-warmup-update-trace.json"
+TRACE_SCHEMA_VERSION = "quickdraw.bdq-warmup-update-trace.v1"
+RESULT_SCHEMA_VERSION = "quickdraw.bdq-warmup-update-smoke-result.v1"
+WATCH_BASE_PORT = 5004
+WATCH_PROGRESS_INTERVAL = 100
+WATCH_TARGET_FRAME_RATE = 60
+WATCH_TIME_SCALE = 1.0
+
+
+def _registered_settings(settings: BDQOptimizationSettings) -> Dict[str, Any]:
+    return {
+        "replay_capacity": settings.replay_capacity,
+        "replay_warmup_decisions": settings.replay_warmup_decisions,
+        "batch_size": settings.batch_size,
+        "gamma": settings.gamma,
+        "optimizer": "Adam",
+        "learning_rate": settings.learning_rate,
+        "optimizer_update_interval_decisions": (
+            settings.optimizer_update_interval_decisions
+        ),
+        "hard_target_sync_interval_optimizer_updates": (
+            settings.hard_target_sync_interval_optimizer_updates
+        ),
+    }
+
+
+def configure_torch(determinism: Dict[str, Any]) -> None:
+    torch.set_num_threads(int(determinism["torch_num_threads"]))
+    torch.set_num_interop_threads(int(determinism["torch_num_interop_threads"]))
+    torch.use_deterministic_algorithms(bool(determinism["deterministic_algorithms"]))
+    if torch.get_num_threads() != int(determinism["torch_num_threads"]):
+        raise LLAPIContractError("PyTorch intra-op thread count differs from R3F.")
+    if torch.get_num_interop_threads() != int(
+        determinism["torch_num_interop_threads"]
+    ):
+        raise LLAPIContractError("PyTorch inter-op thread count differs from R3F.")
+    if torch.are_deterministic_algorithms_enabled() is not bool(
+        determinism["deterministic_algorithms"]
+    ):
+        raise LLAPIContractError("PyTorch deterministic mode differs from R3F.")
+
+
+def _optimization_event(result: OptimizationStepResult) -> Dict[str, Any]:
+    if result.loss is None or result.mean_absolute_td_error is None:
+        raise LLAPIContractError("R3F optimizer update omitted required metrics.")
+    if not math.isfinite(result.loss):
+        raise LLAPIContractError("R3F optimizer loss is not finite.")
+    if not math.isfinite(result.mean_absolute_td_error):
+        raise LLAPIContractError("R3F mean absolute TD error is not finite.")
+    return {
+        "decision_count": result.decision_count,
+        "replay_size": result.replay_size,
+        "optimizer_update_count": result.optimizer_update_count,
+        "target_sync_count": result.target_sync_count,
+        "updated": result.updated,
+        "target_synced": result.target_synced,
+        "loss": result.loss,
+        "mean_absolute_td_error": result.mean_absolute_td_error,
+    }
+
+
+def _complete_transition(
+    collector: DirectReplayCollector,
+    agent_id: int,
+    reward: float,
+    next_observation: np.ndarray,
+    next_action_masks: Sequence[np.ndarray],
+    *,
+    terminated: bool,
+    truncated: bool,
+    transitions: list[Dict[str, Any]],
+    optimization_events: list[Dict[str, Any]],
+    episode_index: int,
+    episode_decision_index: int,
+    expected_first_update_decision: int,
+) -> OptimizationStepResult:
+    transition, result = collector.complete(
+        agent_id,
+        reward,
+        next_observation,
+        next_action_masks,
+        terminated=terminated,
+        truncated=truncated,
+    )
+    transitions.append(
+        _transition_to_json(
+            transition,
+            len(transitions),
+            episode_index,
+            episode_decision_index,
+        )
+    )
+    if result.target_synced:
+        raise LLAPIContractError("R3F synchronized the target network.")
+    if result.updated:
+        if result.decision_count != expected_first_update_decision:
+            raise LLAPIContractError(
+                "R3F optimizer update opened at the wrong decision."
+            )
+        optimization_events.append(_optimization_event(result))
+    elif result.decision_count == expected_first_update_decision:
+        raise LLAPIContractError("R3F missed the registered first optimizer update.")
+    return result
+
+
+def _emit_watch_progress(
+    result: OptimizationStepResult,
+    transition: Dict[str, Any],
+    *,
+    transition_limit: int,
+    episode_index: int,
+    episode_decision_index: int,
+    progress_interval: int,
+) -> None:
+    if (
+        progress_interval <= 0
+        or (
+            result.decision_count % progress_interval != 0
+            and not result.updated
+        )
+    ):
+        return
+    action = json.dumps(transition["action"], separators=(",", ":"))
+    print(
+        "watch_progress "
+        f"transition={result.decision_count}/{transition_limit} "
+        f"episode={episode_index + 1} "
+        f"episode_decision={episode_decision_index + 1} "
+        f"action={action} "
+        f"reward={float(transition['reward']):.6g} "
+        f"replay_size={result.replay_size} "
+        f"optimizer_updates={result.optimizer_update_count} "
+        f"target_syncs={result.target_sync_count}",
+        flush=True,
+    )
+
+
+def _environment_side_channels(
+    truncation_side_channel: BasicTruncationMaskSideChannel,
+    *,
+    watch: bool,
+) -> list[Any]:
+    channels: list[Any] = [truncation_side_channel]
+    if watch:
+        engine_configuration = EngineConfigurationChannel()
+        engine_configuration.set_configuration_parameters(
+            time_scale=WATCH_TIME_SCALE,
+            target_frame_rate=WATCH_TARGET_FRAME_RATE,
+        )
+        channels.append(engine_configuration)
+    return channels
+
+
+def execute_worker(
+    executable: Path | None,
+    worker_output: Path,
+    worker_index: int,
+    contract: Dict[str, Any],
+    *,
+    base_port: int = 5045,
+    timeout_wait: int = 120,
+    watch: bool = False,
+    progress_interval: int = 0,
+) -> Dict[str, Any]:
+    worker_output.mkdir(parents=True, exist_ok=False)
+    collection = contract["collection"]
+    optimization = contract["optimization"]
+    determinism = contract["determinism"]
+    settings = BDQOptimizationSettings()
+    if _registered_settings(settings) != {
+        key: optimization[key] for key in _registered_settings(settings)
+    }:
+        raise LLAPIContractError("Production optimizer settings differ from R3F.")
+    transition_limit = int(collection["transition_limit"])
+    expected_first_update = int(optimization["expected_first_update_decision"])
+    if transition_limit != settings.replay_warmup_decisions:
+        raise LLAPIContractError("R3F must stop exactly at production replay warmup.")
+    if expected_first_update != transition_limit:
+        raise LLAPIContractError("R3F first-update decision differs from its cutoff.")
+    configure_torch(determinism)
+
+    side_channel = BasicTruncationMaskSideChannel()
+    side_channels = _environment_side_channels(side_channel, watch=watch)
+    policy_seed = int(collection["policy_seed"])
+    controller = BDQOptimizerController(policy_seed, settings)
+    collector = DirectReplayCollector(controller)
+    selector = SeededEpsilonGreedyBDQActionSelector(
+        controller.online_network,
+        epsilon=float(collection["epsilon"]),
+        seed=int(collection["exploration_seed"]),
+    )
+    online_before = network_sha256(controller.online_network)
+    target_before = network_sha256(controller.target_network)
+    if online_before != target_before:
+        raise LLAPIContractError("R3F target did not begin as an online-network copy.")
+
+    transitions: list[Dict[str, Any]] = []
+    episodes: list[Dict[str, Any]] = []
+    truncation_events: list[Dict[str, Any]] = []
+    optimization_events: list[Dict[str, Any]] = []
+    active_episode_index = 0
+    episode_decision_index = 0
+    episode_start_index = 0
+    episode_return = 0.0
+    ended_on_unity_boundary = False
+    maximum_iterations = transition_limit + transition_limit // 300 + 20
+    environment: UnityEnvironment | None = None
+
+    try:
+        environment_options: Dict[str, Any] = {
+            "file_name": str(executable) if executable is not None else None,
+            "worker_id": worker_index,
+            "base_port": base_port,
+            "seed": int(collection["scenario_seed"]),
+            "side_channels": side_channels,
+            "no_graphics": False,
+            "timeout_wait": timeout_wait,
+        }
+        if executable is not None:
+            environment_options["log_folder"] = str(worker_output / "player-log")
+        environment = UnityEnvironment(**environment_options)
+        environment.reset()
+        behavior_names = list(environment.behavior_specs)
+        expected_behavior_id = f"{BASIC_BEHAVIOR_NAME}?team=0"
+        if behavior_names != [expected_behavior_id]:
+            raise LLAPIContractError(
+                f"Expected behavior {BASIC_BEHAVIOR_NAME}, got {behavior_names}."
+            )
+        behavior_id = behavior_names[0]
+        behavior_spec = environment.behavior_specs[behavior_id]
+        validate_basic_behavior_spec(behavior_spec)
+
+        for _ in range(maximum_iterations):
+            decision_steps, terminal_steps = environment.get_steps(behavior_id)
+            if len(decision_steps) > 1 or len(terminal_steps) > 1:
+                raise LLAPIContractError("R3F permits one Basic agent only.")
+            if len(decision_steps) == 1 and len(terminal_steps) == 1:
+                if int(decision_steps.agent_id[0]) != int(terminal_steps.agent_id[0]):
+                    raise LLAPIContractError(
+                        "A terminal/new-decision handoff must belong to one agent."
+                    )
+
+            for terminal_row, raw_agent_id in enumerate(terminal_steps.agent_id):
+                agent_id = int(raw_agent_id)
+                next_observation = validate_observation(
+                    terminal_steps.obs[0][terminal_row],
+                    "terminal next_observation",
+                )
+                reward = float(terminal_steps.reward[terminal_row])
+                interrupted = bool(terminal_steps.interrupted[terminal_row])
+                completed_decision_count = episode_decision_index + 1
+                if interrupted:
+                    event = side_channel.take(
+                        active_episode_index,
+                        completed_decision_count,
+                    )
+                    next_action_masks = event.action_masks
+                    truncation_events.append(
+                        {
+                            "episode_index": event.episode_index,
+                            "decision_count": event.decision_count,
+                            "reason": event.reason,
+                            "position_slot": event.position_slot,
+                            "next_action_masks": _masks_to_json(event.action_masks),
+                        }
+                    )
+                else:
+                    next_action_masks = tuple(
+                        np.zeros(branch_size, dtype=np.bool_)
+                        for branch_size in (3, 2)
+                    )
+                optimization_result = _complete_transition(
+                    collector,
+                    agent_id,
+                    reward,
+                    next_observation,
+                    next_action_masks,
+                    terminated=not interrupted,
+                    truncated=interrupted,
+                    transitions=transitions,
+                    optimization_events=optimization_events,
+                    episode_index=active_episode_index,
+                    episode_decision_index=episode_decision_index,
+                    expected_first_update_decision=expected_first_update,
+                )
+                if watch:
+                    _emit_watch_progress(
+                        optimization_result,
+                        transitions[-1],
+                        transition_limit=transition_limit,
+                        episode_index=active_episode_index,
+                        episode_decision_index=episode_decision_index,
+                        progress_interval=progress_interval,
+                    )
+                episode_return += reward
+                episode_decision_index += 1
+                episodes.append(
+                    _episode_record(
+                        episode_index=active_episode_index,
+                        transition_start_index=episode_start_index,
+                        transition_count=episode_decision_index,
+                        episode_return=episode_return,
+                        end_kind="truncated" if interrupted else "terminal",
+                    )
+                )
+                active_episode_index += 1
+                episode_decision_index = 0
+                episode_start_index = len(transitions)
+                episode_return = 0.0
+                if len(transitions) == transition_limit:
+                    ended_on_unity_boundary = True
+
+            if len(transitions) > transition_limit:
+                raise LLAPIContractError("R3F exceeded its exact transition limit.")
+            if len(transitions) == transition_limit:
+                break
+
+            actions = np.zeros((len(decision_steps), 2), dtype=np.int32)
+            reached_limit = False
+            for decision_row, raw_agent_id in enumerate(decision_steps.agent_id):
+                agent_id = int(raw_agent_id)
+                observation = validate_observation(
+                    decision_steps.obs[0][decision_row],
+                    "decision observation",
+                )
+                action_masks = read_action_masks(decision_steps, decision_row)
+                if agent_id in collector.pending_agent_ids:
+                    optimization_result = _complete_transition(
+                        collector,
+                        agent_id,
+                        float(decision_steps.reward[decision_row]),
+                        observation,
+                        action_masks,
+                        terminated=False,
+                        truncated=False,
+                        transitions=transitions,
+                        optimization_events=optimization_events,
+                        episode_index=active_episode_index,
+                        episode_decision_index=episode_decision_index,
+                        expected_first_update_decision=expected_first_update,
+                    )
+                    if watch:
+                        _emit_watch_progress(
+                            optimization_result,
+                            transitions[-1],
+                            transition_limit=transition_limit,
+                            episode_index=active_episode_index,
+                            episode_decision_index=episode_decision_index,
+                            progress_interval=progress_interval,
+                        )
+                    episode_return += float(decision_steps.reward[decision_row])
+                    episode_decision_index += 1
+                    if len(transitions) == transition_limit:
+                        reached_limit = True
+                        break
+                action = selector.select(observation, action_masks)
+                collector.begin(agent_id, observation, action, action_masks)
+                actions[decision_row] = action
+
+            if len(transitions) > transition_limit:
+                raise LLAPIContractError("R3F exceeded its exact transition limit.")
+            if reached_limit:
+                episodes.append(
+                    _episode_record(
+                        episode_index=active_episode_index,
+                        transition_start_index=episode_start_index,
+                        transition_count=episode_decision_index,
+                        episode_return=episode_return,
+                        end_kind="collection_cutoff",
+                    )
+                )
+                break
+
+            if len(decision_steps) > 0:
+                environment.set_actions(
+                    behavior_id,
+                    ActionTuple(discrete=actions),
+                )
+            environment.step()
+        else:
+            raise LLAPIContractError("R3F collection exceeded its iteration bound.")
+
+        if len(transitions) != transition_limit:
+            raise LLAPIContractError(
+                f"R3F collected {len(transitions)} transitions, "
+                f"expected {transition_limit}."
+            )
+        if collector.pending_agent_ids:
+            raise LLAPIContractError(
+                f"Pending decisions remain at cutoff: {collector.pending_agent_ids}."
+            )
+        side_channel.assert_empty()
+        completed_episode_count = sum(
+            1 for episode in episodes if episode["unity_episode_ended"]
+        )
+        if completed_episode_count < int(collection["minimum_completed_episodes"]):
+            raise LLAPIContractError("R3F did not collect across an episode reset.")
+
+        online_after = network_sha256(controller.online_network)
+        target_after = network_sha256(controller.target_network)
+        if controller.optimizer_update_count != int(
+            optimization["expected_optimizer_updates"]
+        ):
+            raise LLAPIContractError(
+                "R3F optimizer update count differs from contract."
+            )
+        if controller.target_sync_count != int(
+            optimization["expected_target_synchronizations"]
+        ):
+            raise LLAPIContractError("R3F target-sync count differs from contract.")
+        if len(optimization_events) != controller.optimizer_update_count:
+            raise LLAPIContractError("R3F optimizer events do not match its updates.")
+        if online_before == online_after:
+            raise LLAPIContractError("R3F online weights did not change.")
+        if target_before != target_after:
+            raise LLAPIContractError(
+                "R3F target weights changed before synchronization."
+            )
+        if online_after == target_after:
+            raise LLAPIContractError(
+                "R3F online network still equals its frozen target."
+            )
+
+        action_tuple_counts = _action_tuple_counts(transitions)
+        unique_action_tuple_count = sum(count > 0 for count in action_tuple_counts)
+        if unique_action_tuple_count < int(collection["minimum_unique_action_tuples"]):
+            raise LLAPIContractError("R3F did not collect every Basic action tuple.")
+
+        trace = {
+            "schema_version": TRACE_SCHEMA_VERSION,
+            "contract_sha256": sha256_file(CONTRACT_PATH),
+            "behavior": {
+                "name": BASIC_BEHAVIOR_NAME,
+                "observation_shape": [84, 84, 4],
+                "wire_layout": "HWC",
+                "dtype": "float32",
+                "discrete_branches": [3, 2],
+                "privileged_observation_count": 0,
+            },
+            "scenario_seed": int(collection["scenario_seed"]),
+            "policy_seed": policy_seed,
+            "selector": {
+                "name": collection["selector"],
+                "epsilon": selector.epsilon,
+                "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
+                "exploration_seed": selector.seed,
+                "selection_count": sum(action_tuple_counts),
+                "action_tuple_counts": action_tuple_counts,
+                "unique_action_tuple_count": unique_action_tuple_count,
+            },
+            "execution_determinism": {
+                "torch_num_threads": torch.get_num_threads(),
+                "torch_num_interop_threads": torch.get_num_interop_threads(),
+                "deterministic_algorithms": (
+                    torch.are_deterministic_algorithms_enabled()
+                ),
+            },
+            "episodes": episodes,
+            "completed_episode_count": completed_episode_count,
+            "episode_reset_count": completed_episode_count,
+            "truncation_events": truncation_events,
+            "transitions": transitions,
+            "replay": {
+                "decision_count": controller.decision_count,
+                "size": len(controller.replay),
+                "capacity": settings.replay_capacity,
+                "warmup_decisions": settings.replay_warmup_decisions,
+                "below_warmup": (
+                    controller.decision_count < settings.replay_warmup_decisions
+                ),
+                "at_warmup": (
+                    controller.decision_count == settings.replay_warmup_decisions
+                ),
+            },
+            "cutoff": {
+                "transition_limit": transition_limit,
+                "pending_agent_ids": list(collector.pending_agent_ids),
+                "pending_decision_count": len(collector.pending_agent_ids),
+                "active_episode_index": active_episode_index,
+                "ended_on_unity_boundary": ended_on_unity_boundary,
+            },
+            "optimization": {
+                "optimizer_update_count": controller.optimizer_update_count,
+                "target_sync_count": controller.target_sync_count,
+                "update_events": optimization_events,
+                "online_before_sha256": online_before,
+                "online_after_sha256": online_after,
+                "target_before_sha256": target_before,
+                "target_after_sha256": target_after,
+                "online_weights_changed": online_before != online_after,
+                "target_weights_unchanged": target_before == target_after,
+            },
+        }
+        trace_path = worker_output / TRACE_FILE_NAME
+        trace_path.write_text(
+            json.dumps(trace, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return trace
+    finally:
+        if environment is not None:
+            environment.close()
+
+
+def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None:
+    trace_schema = {
+        **result_schema["$defs"]["trace"],
+        "$defs": result_schema["$defs"],
+    }
+    Draft202012Validator(trace_schema).validate(trace)
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    collection = contract["collection"]
+    optimization_contract = contract["optimization"]
+    transition_limit = int(collection["transition_limit"])
+    if trace["contract_sha256"] != sha256_file(CONTRACT_PATH):
+        raise LLAPIContractError("Trace contract hash differs from R3F.")
+
+    transitions = trace["transitions"]
+    episodes = trace["episodes"]
+    if len(transitions) != transition_limit:
+        raise LLAPIContractError(
+            "R3F trace does not contain exactly 10,000 transitions."
+        )
+    if [item["index"] for item in transitions] != list(range(transition_limit)):
+        raise LLAPIContractError("R3F transition indices are not contiguous.")
+    if [item["episode_index"] for item in episodes] != list(range(len(episodes))):
+        raise LLAPIContractError("R3F episode indices are not contiguous.")
+    if trace["replay"] != {
+        "decision_count": transition_limit,
+        "size": transition_limit,
+        "capacity": int(optimization_contract["replay_capacity"]),
+        "warmup_decisions": int(optimization_contract["replay_warmup_decisions"]),
+        "below_warmup": False,
+        "at_warmup": True,
+    }:
+        raise LLAPIContractError("R3F replay counters differ from its contract.")
+    if trace["cutoff"]["pending_agent_ids"] or trace["cutoff"][
+        "pending_decision_count"
+    ] != 0:
+        raise LLAPIContractError("R3F cutoff retained a pending decision.")
+
+    next_start = 0
+    for episode in episodes:
+        if episode["transition_start_index"] != next_start:
+            raise LLAPIContractError("R3F episode spans are not contiguous.")
+        stop = next_start + episode["transition_count"]
+        episode_transitions = transitions[next_start:stop]
+        if len(episode_transitions) != episode["transition_count"]:
+            raise LLAPIContractError("R3F episode transition span is incomplete.")
+        if any(
+            item["episode_index"] != episode["episode_index"]
+            for item in episode_transitions
+        ):
+            raise LLAPIContractError("R3F assigned a transition to the wrong episode.")
+        if [item["episode_decision_index"] for item in episode_transitions] != list(
+            range(len(episode_transitions))
+        ):
+            raise LLAPIContractError("R3F episode decisions are not contiguous.")
+        if not math.isclose(
+            sum(item["reward"] for item in episode_transitions),
+            episode["return"],
+            rel_tol=0.0,
+            abs_tol=1e-7,
+        ):
+            raise LLAPIContractError("R3F episode return differs from its rewards.")
+        for current, following in zip(episode_transitions, episode_transitions[1:]):
+            if current["next_observation_sha256"] != following[
+                "observation_sha256"
+            ]:
+                raise LLAPIContractError("R3F consecutive observations do not join.")
+            if current["next_action_masks"] != following["action_masks"]:
+                raise LLAPIContractError("R3F consecutive action masks do not join.")
+            if current["terminated"] or current["truncated"]:
+                raise LLAPIContractError("R3F has a nonfinal episode end flag.")
+        final = episode_transitions[-1]
+        if episode["end_kind"] == "terminal":
+            if not final["terminated"] or final["truncated"]:
+                raise LLAPIContractError("R3F terminal episode flags are incorrect.")
+            if final["next_action_masks"] != [
+                [False, False, False],
+                [False, False],
+            ]:
+                raise LLAPIContractError("R3F terminal sentinel mask is incorrect.")
+        elif episode["end_kind"] == "truncated":
+            if final["terminated"] or not final["truncated"]:
+                raise LLAPIContractError("R3F truncation flags are incorrect.")
+        elif final["terminated"] or final["truncated"]:
+            raise LLAPIContractError("R3F cutoff was marked as an episode end.")
+        next_start = stop
+    if next_start != transition_limit:
+        raise LLAPIContractError("R3F episode spans do not cover every transition.")
+
+    for item in transitions:
+        if item["terminated"] and item["truncated"]:
+            raise LLAPIContractError("R3F transition has conflicting end flags.")
+        for branch, action in enumerate(item["action"]):
+            if item["action_masks"][branch][action]:
+                raise LLAPIContractError("R3F selected an unavailable action.")
+
+    completed_episode_count = sum(
+        1 for episode in episodes if episode["unity_episode_ended"]
+    )
+    if completed_episode_count != trace["completed_episode_count"]:
+        raise LLAPIContractError("R3F completed-episode count is inconsistent.")
+    if trace["episode_reset_count"] != completed_episode_count:
+        raise LLAPIContractError("R3F reset count is inconsistent.")
+    if completed_episode_count < int(collection["minimum_completed_episodes"]):
+        raise LLAPIContractError("R3F did not cross an episode reset.")
+    if episodes[-1]["end_kind"] == "collection_cutoff":
+        if trace["cutoff"]["ended_on_unity_boundary"]:
+            raise LLAPIContractError("R3F cutoff boundary record is inconsistent.")
+    elif not trace["cutoff"]["ended_on_unity_boundary"]:
+        raise LLAPIContractError("R3F cutoff omitted its Unity episode boundary.")
+
+    truncations = {
+        episode["episode_index"]: episode
+        for episode in episodes
+        if episode["end_kind"] == "truncated"
+    }
+    if len(trace["truncation_events"]) != len(truncations):
+        raise LLAPIContractError("R3F truncation events do not match episode ends.")
+    for event in trace["truncation_events"]:
+        episode = truncations.get(event["episode_index"])
+        if episode is None or episode["transition_count"] != event["decision_count"]:
+            raise LLAPIContractError("R3F truncation event is not correlated.")
+        final_index = episode["transition_start_index"] + episode[
+            "transition_count"
+        ] - 1
+        if transitions[final_index]["next_action_masks"] != event[
+            "next_action_masks"
+        ]:
+            raise LLAPIContractError("R3F truncation replay mask differs from Unity.")
+
+    counts = _action_tuple_counts(transitions)
+    selector = trace["selector"]
+    if selector["selection_count"] != transition_limit:
+        raise LLAPIContractError("R3F action count differs from transition count.")
+    if selector["action_tuple_counts"] != counts:
+        raise LLAPIContractError("R3F action histogram is inconsistent.")
+    unique_count = sum(count > 0 for count in counts)
+    if selector["unique_action_tuple_count"] != unique_count:
+        raise LLAPIContractError("R3F unique-action count is inconsistent.")
+    if unique_count != int(collection["minimum_unique_action_tuples"]):
+        raise LLAPIContractError("R3F did not exercise all six action tuples.")
+
+    optimization = trace["optimization"]
+    if optimization["optimizer_update_count"] != int(
+        optimization_contract["expected_optimizer_updates"]
+    ):
+        raise LLAPIContractError("R3F update count differs from its contract.")
+    if optimization["target_sync_count"] != int(
+        optimization_contract["expected_target_synchronizations"]
+    ):
+        raise LLAPIContractError("R3F target-sync count differs from its contract.")
+    events = optimization["update_events"]
+    if len(events) != 1:
+        raise LLAPIContractError("R3F must contain exactly one optimizer event.")
+    event = events[0]
+    if event["decision_count"] != int(
+        optimization_contract["expected_first_update_decision"]
+    ):
+        raise LLAPIContractError("R3F optimizer event is at the wrong decision.")
+    if not math.isfinite(event["loss"]):
+        raise LLAPIContractError("R3F loss is not finite.")
+    if not math.isfinite(event["mean_absolute_td_error"]):
+        raise LLAPIContractError("R3F mean absolute TD error is not finite.")
+    if optimization["online_before_sha256"] != optimization[
+        "target_before_sha256"
+    ]:
+        raise LLAPIContractError("R3F networks did not begin equal.")
+    if optimization["online_before_sha256"] == optimization["online_after_sha256"]:
+        raise LLAPIContractError("R3F online weights did not change.")
+    if optimization["target_before_sha256"] != optimization["target_after_sha256"]:
+        raise LLAPIContractError("R3F target weights changed.")
+    if optimization["online_after_sha256"] == optimization["target_after_sha256"]:
+        raise LLAPIContractError("R3F online and target networks did not diverge.")
+
+
+def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
+    contract_schema = json.loads(CONTRACT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    result_schema = json.loads(RESULT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(contract_schema)
+    Draft202012Validator.check_schema(result_schema)
+    Draft202012Validator(contract_schema).validate(contract)
+    binding = contract["base_epsilon_collection_contract"]
+    if sha256_file(REPO_ROOT / binding["path"]) != binding["sha256"]:
+        raise LLAPIContractError(f"Contract binding drifted: {binding['path']}.")
+    runtime = contract["runtime"]
+    if runtime != {
+        "python": ".".join(str(value) for value in sys.version_info[:3]),
+        "mlagents_envs": version("mlagents-envs"),
+        "numpy": version("numpy"),
+        "torch": version("torch"),
+        "device": "cpu",
+    }:
+        raise LLAPIContractError("The active runtime differs from R3F.")
+    pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+    if pyproject["project"]["name"] != contract["package"]["distribution"]:
+        raise LLAPIContractError("The R3F package name has drifted.")
+    if pyproject["project"]["version"] != contract["package"]["version"]:
+        raise LLAPIContractError("The R3F package version has drifted.")
+    if "entry-points" in pyproject["project"]:
+        raise LLAPIContractError("The retired trainer entry point returned.")
+    settings = BDQOptimizationSettings()
+    optimization = contract["optimization"]
+    if _registered_settings(settings) != {
+        key: optimization[key] for key in _registered_settings(settings)
+    }:
+        raise LLAPIContractError("R3F differs from production optimizer defaults.")
+    collection = contract["collection"]
+    if collection["transition_limit"] != settings.replay_warmup_decisions:
+        raise LLAPIContractError("R3F cutoff differs from production warmup.")
+    if optimization["expected_first_update_decision"] != collection[
+        "transition_limit"
+    ]:
+        raise LLAPIContractError("R3F update decision differs from its cutoff.")
+    if (
+        optimization["expected_first_update_decision"]
+        % settings.optimizer_update_interval_decisions
+        != 0
+    ):
+        raise LLAPIContractError("R3F warmup is not an optimizer-update boundary.")
+    return result_schema
+
+
+def run_fresh_worker(
+    executable: Path,
+    output_directory: Path,
+    worker_index: int,
+    contract: Dict[str, Any],
+) -> tuple[Dict[str, Any], Path]:
+    worker_output = output_directory / f"run-{worker_index + 1}"
+    command = [
+        sys.executable,
+        "-B",
+        str(Path(__file__).resolve()),
+        f"--env={executable}",
+        f"--worker-output={worker_output}",
+        f"--worker-index={worker_index}",
+    ]
+    process_environment = dict(os.environ)
+    process_environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    thread_count = str(contract["determinism"]["torch_num_threads"])
+    process_environment["OMP_NUM_THREADS"] = thread_count
+    process_environment["MKL_NUM_THREADS"] = thread_count
+    completed = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        env=process_environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=1800,
+        check=False,
+    )
+    log_path = output_directory / f"worker-{worker_index + 1}.log"
+    log_path.write_text(completed.stdout, encoding="utf-8")
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Fresh R3F worker {worker_index + 1} failed with exit code "
+            f"{completed.returncode}; see {log_path}."
+        )
+    trace_path = worker_output / TRACE_FILE_NAME
+    if not trace_path.is_file():
+        raise RuntimeError(f"Fresh R3F worker omitted {trace_path}.")
+    return json.loads(trace_path.read_text(encoding="utf-8")), trace_path
+
+
+def parse_arguments(
+    arguments: Sequence[str] | None = None,
+) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run the production BDQ warmup and first update twice, or run one "
+            "diagnostic watch session."
+        )
+    )
+    parser.add_argument(
+        "--env",
+        type=Path,
+        help=(
+            "Unity player executable. Required for acceptance; optional with "
+            "--watch to connect to the Unity Editor on port 5004."
+        ),
+    )
+    parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help=(
+            "Run one visible, real-time diagnostic session. This does not "
+            "produce two-process R3F acceptance evidence."
+        ),
+    )
+    parser.add_argument(
+        "--progress-interval",
+        type=int,
+        help="Watch-mode terminal progress interval (default: 100 transitions).",
+    )
+    parser.add_argument("--worker-output", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-index", type=int, help=argparse.SUPPRESS)
+    return parser.parse_args(arguments)
+
+
+def _execution_mode(arguments: argparse.Namespace) -> str:
+    if arguments.worker_output is not None:
+        if (
+            arguments.env is None
+            or arguments.worker_index is None
+            or arguments.output is not None
+            or arguments.watch
+            or arguments.progress_interval is not None
+        ):
+            raise ValueError(
+                "Worker mode requires only --env, --worker-output, and "
+                "--worker-index."
+            )
+        return "worker"
+    if arguments.worker_index is not None:
+        raise ValueError("--worker-index requires --worker-output.")
+    if arguments.output is None:
+        raise ValueError("Parent and watch modes require --output.")
+    if arguments.watch:
+        if (
+            arguments.progress_interval is not None
+            and arguments.progress_interval <= 0
+        ):
+            raise ValueError("--progress-interval must be positive.")
+        return "watch"
+    if arguments.env is None:
+        raise ValueError("R3F acceptance mode requires --env.")
+    if arguments.progress_interval is not None:
+        raise ValueError("--progress-interval requires --watch.")
+    return "acceptance"
+
+
+def main() -> int:
+    arguments = parse_arguments()
+    mode = _execution_mode(arguments)
+    executable = arguments.env.resolve() if arguments.env is not None else None
+    if executable is not None and not executable.is_file():
+        raise FileNotFoundError(executable)
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    result_schema = validate_contract(contract)
+
+    if mode == "worker":
+        assert executable is not None
+        assert arguments.worker_output is not None
+        assert arguments.worker_index is not None
+        trace = execute_worker(
+            executable,
+            arguments.worker_output.resolve(),
+            arguments.worker_index,
+            contract,
+        )
+        validate_trace(trace, result_schema)
+        print(f"trace={arguments.worker_output.resolve() / TRACE_FILE_NAME}")
+        return 0
+
+    assert arguments.output is not None
+    output_directory = arguments.output.resolve()
+    if ARTIFACT_ROOT not in output_directory.parents:
+        raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
+    if output_directory.exists():
+        raise FileExistsError(f"R3F output must be fresh: {output_directory}.")
+
+    if mode == "watch":
+        progress_interval = (
+            arguments.progress_interval
+            if arguments.progress_interval is not None
+            else WATCH_PROGRESS_INTERVAL
+        )
+        print("watch_mode=diagnostic_only", flush=True)
+        print("acceptance_evidence=false", flush=True)
+        print(f"time_scale={WATCH_TIME_SCALE:g}", flush=True)
+        print(f"target_frame_rate={WATCH_TARGET_FRAME_RATE}", flush=True)
+        if executable is None:
+            print("watch_source=unity_editor", flush=True)
+            print(f"listening_port={WATCH_BASE_PORT}", flush=True)
+            print(
+                "Open the Research_Basic scene in Unity, then press Play now.",
+                flush=True,
+            )
+        else:
+            print("watch_source=standalone_player", flush=True)
+        trace = execute_worker(
+            executable,
+            output_directory,
+            0,
+            contract,
+            base_port=WATCH_BASE_PORT,
+            timeout_wait=300 if executable is None else 120,
+            watch=True,
+            progress_interval=progress_interval,
+        )
+        validate_trace(trace, result_schema)
+        update = trace["optimization"]["update_events"][0]
+        print(f"trace={output_directory / TRACE_FILE_NAME}")
+        print("watch_complete=true")
+        print("acceptance_evidence=false")
+        print(f"transitions={trace['replay']['decision_count']}")
+        print(f"completed_episodes={trace['completed_episode_count']}")
+        print(f"optimizer_updates={trace['optimization']['optimizer_update_count']}")
+        print(f"loss={update['loss']}")
+        if executable is None:
+            print("Stop Play Mode in the Unity Editor when you are finished watching.")
+        return 0
+
+    assert executable is not None
+    output_directory.mkdir(parents=True)
+
+    first, first_path = run_fresh_worker(
+        executable,
+        output_directory,
+        0,
+        contract,
+    )
+    second, second_path = run_fresh_worker(
+        executable,
+        output_directory,
+        1,
+        contract,
+    )
+    validate_trace(first, result_schema)
+    validate_trace(second, result_schema)
+    if first != second or first_path.read_bytes() != second_path.read_bytes():
+        raise LLAPIContractError(
+            f"Fresh R3F traces differ: {first_path} versus {second_path}."
+        )
+
+    canonical_bytes = json.dumps(
+        first,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    result = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "contract_sha256": sha256_file(CONTRACT_PATH),
+        "fresh_process_count": 2,
+        "exact_trace_equality": True,
+        "canonical_trace_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+        "canonical_trace": first,
+    }
+    Draft202012Validator(result_schema).validate(result)
+    result_path = output_directory / "result.json"
+    result_path.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    update = first["optimization"]["update_events"][0]
+    print(f"result={result_path}")
+    print("fresh_processes=2")
+    print("transitions=10000")
+    print(f"completed_episodes={first['completed_episode_count']}")
+    print(f"episode_resets={first['episode_reset_count']}")
+    print(f"unique_action_tuples={first['selector']['unique_action_tuple_count']}")
+    print("pending_decisions=0")
+    print("optimizer_updates=1")
+    print("first_update_decision=10000")
+    print("target_synchronizations=0")
+    print(f"loss={update['loss']}")
+    print(f"mean_absolute_td_error={update['mean_absolute_td_error']}")
+    print("online_weights_changed=pass")
+    print("target_weights_unchanged=pass")
+    print("exact_trace_equality=pass")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

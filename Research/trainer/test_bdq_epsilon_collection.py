@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 from jsonschema import Draft202012Validator
 
 
@@ -21,6 +22,7 @@ from quickdraw_bdq import (  # noqa: E402
     BDQOptimizerController,
     GreedyBDQActionSelector,
     SeededEpsilonGreedyBDQActionSelector,
+    epsilon_greedy_actions,
 )
 from run_bdq_epsilon_collection_smoke import (  # noqa: E402
     _action_tuple_counts,
@@ -135,6 +137,36 @@ def test_zero_epsilon_selector_matches_masked_online_greedy() -> None:
         epsilon_selector.select(observation(), unavailable),
         greedy_selector.select(observation(), unavailable),
     )
+
+
+def test_full_epsilon_selector_does_not_run_an_unused_network_forward() -> None:
+    class ForwardMustNotRun(torch.nn.Module):
+        def forward(self, value: torch.Tensor) -> torch.Tensor:
+            raise AssertionError("epsilon 1.0 must not evaluate unused Q-values")
+
+    selector = SeededEpsilonGreedyBDQActionSelector(
+        ForwardMustNotRun(),  # type: ignore[arg-type]
+        epsilon=1.0,
+        seed=61001,
+    )
+    unavailable = masks(movement=(False, True, False), combat=(False, False))
+    action = selector.select(observation(), unavailable)
+    expected = epsilon_greedy_actions(
+        (
+            torch.tensor([[2.0, 3.0, 1.0]], dtype=torch.float32),
+            torch.tensor([[0.0, 1.0]], dtype=torch.float32),
+        ),
+        tuple(
+            torch.tensor(mask[None, ...], dtype=torch.bool) for mask in unavailable
+        ),
+        1.0,
+        torch.Generator(device="cpu").manual_seed(61001),
+    )[0].numpy()
+
+    assert action.dtype == np.int64
+    assert np.array_equal(action, expected)
+    assert not unavailable[0][action[0]]
+    assert not unavailable[1][action[1]]
 
 
 @pytest.mark.parametrize(
