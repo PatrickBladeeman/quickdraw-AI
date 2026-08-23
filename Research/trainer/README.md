@@ -1,4 +1,4 @@
-# R3A-R3F BDQ foundation, direct LLAPI collection, and first update
+# R3A-R3G BDQ foundation, direct LLAPI collection, and scheduled updates
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -7,7 +7,8 @@ superseded high-level ML-Agents trajectory experiment. R3D replaces that
 experiment with synchronous `DecisionSteps`/`TerminalSteps` collection. R3E
 adds deterministic mask-safe epsilon-greedy collection below replay warmup.
 R3F reaches the exact production warmup and performs one CPU update from real
-Unity transitions.
+Unity transitions. R3G extends the same seeded run by four transitions and
+proves the second scheduled CPU update.
 
 The tracked contract chain is:
 
@@ -19,6 +20,8 @@ The tracked contract chain is:
   exactly-1,000-transition collection contract.
 - `bdq-warmup-update-contract-v1.json`: R3F's hash-bound, exactly-10,000-
   transition production-warmup and first-update contract.
+- `bdq-two-update-contract-v1.json`: R3G's hash-bound, exactly-10,004-
+  transition recurring-update contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -32,7 +35,7 @@ boundary:
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
   side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E and R3F. At epsilon `1.0`, the selector preserves the
+  selector used by R3E through R3G. At epsilon `1.0`, the selector preserves the
   exact exploration RNG sequence without evaluating unused network Q-values.
 
 The former `Trainer`, `Policy`, `Trajectory`, settings, plugin-registration,
@@ -154,8 +157,26 @@ produced trace SHA-256
 `aee36f7bc5c2e2202e2738709c021826878de717d22b91345001dafd8599f0b2`,
 byte-identical to each accepted worker trace, without creating `result.json`.
 
-R3D and R3E are collection evidence. R3F is one minimal learning operation on
-real Unity experience, not an extended training run or effectiveness result.
-Epsilon decay, a second update, target synchronization, checkpoint/resume, ONNX
-export, ROCm training, learned-policy evaluation, gradual motion, strategic
-combat, reflexes, and LLM work remain outside this slice.
+Run the R3G second-update gate against the same saved-scene player:
+
+```powershell
+& $python Research\trainer\run_bdq_two_update_smoke.py `
+  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3g-two-update\acceptance
+```
+
+Each accepted fresh process completed exactly 10,004 transitions. The first
+10,000 transitions and first-update evidence exactly preserve R3F. Update 2
+opened at decision 10,004 with loss `0.014819225296378136`, mean absolute TD
+error `0.06711231172084808`, and online SHA-256
+`6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471`.
+The target remained frozen, pending-decision and target-sync counts stayed zero,
+and the two serialized traces matched SHA-256
+`157cc826d99696fa5c137b596e8eafd04b4abba520c8af5d93b7355b8bdc5576`.
+
+R3D and R3E are collection evidence. R3F and R3G are two minimal scheduled
+learning operations on real Unity experience, not an extended training run or
+effectiveness result. Epsilon decay, a third update, target synchronization,
+checkpoint/resume, ONNX export, ROCm training, learned-policy evaluation,
+gradual motion, strategic combat, reflexes, and LLM work remain outside this
+slice.

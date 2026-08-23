@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-two-update-contract.schema.json",
+  "title": "QuickDraw second Unity-derived optimizer-update contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_warmup_update_contract",
+    "runtime",
+    "package",
+    "transport",
+    "collection",
+    "optimization",
+    "determinism",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-two-update.v1"},
+    "task": {"const": "R3G"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_warmup_update_contract": {
+      "const": {
+        "path": "Research/trainer/bdq-warmup-update-contract-v1.json",
+        "sha256": "edc2af190d778b9d43238a440e30c9ffd36a4b246a07933c03e233b3e2e94875",
+        "schema_version": "quickdraw.bdq-warmup-update.v1"
+      }
+    },
+    "runtime": {
+      "const": {
+        "python": "3.11.13",
+        "mlagents_envs": "1.1.0",
+        "numpy": "1.23.5",
+        "torch": "2.12.0+cpu",
+        "device": "cpu"
+      }
+    },
+    "package": {
+      "const": {
+        "distribution": "quickdraw-bdq-trainer",
+        "version": "0.3.0",
+        "metadata_path": "Research/trainer/pyproject.toml",
+        "trainer_entry_points": []
+      }
+    },
+    "transport": {
+      "const": {
+        "api": "mlagents_envs.environment.UnityEnvironment",
+        "behavior_name": "QuickDrawResearchBasic",
+        "agent_count": 1,
+        "observation_shape": [84, 84, 4],
+        "observation_layout": "HWC",
+        "observation_dtype": "float32",
+        "discrete_branches": [3, 2],
+        "transition_completion": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps",
+        "truncation_mask_transport": "quickdraw.basic-truncation-mask.v1",
+        "privileged_scene_inference_permitted": false
+      }
+    },
+    "collection": {
+      "const": {
+        "scenario_seed": 31001,
+        "policy_seed": 51001,
+        "exploration_seed": 61001,
+        "selector": "seeded_branch_epsilon_greedy",
+        "epsilon": 1.0,
+        "epsilon_decay_enabled": false,
+        "transition_limit": 10004,
+        "minimum_completed_episodes": 1,
+        "minimum_unique_action_tuples": 6,
+        "require_no_pending_decision_at_cutoff": true
+      }
+    },
+    "optimization": {
+      "const": {
+        "replay_capacity": 100000,
+        "replay_warmup_decisions": 10000,
+        "batch_size": 64,
+        "gamma": 0.99,
+        "optimizer": "Adam",
+        "learning_rate": 0.0001,
+        "optimizer_update_interval_decisions": 4,
+        "hard_target_sync_interval_optimizer_updates": 10000,
+        "expected_first_update_decision": 10000,
+        "expected_update_decisions": [10000, 10004],
+        "expected_optimizer_updates": 2,
+        "expected_target_synchronizations": 0,
+        "require_finite_loss": true,
+        "require_finite_mean_absolute_td_error": true,
+        "require_online_weights_changed_after_each_update": true,
+        "require_target_weights_unchanged": true
+      }
+    },
+    "determinism": {
+      "const": {
+        "fresh_processes": 2,
+        "exact_trace_equality": true,
+        "torch_num_threads": 1,
+        "torch_num_interop_threads": 1,
+        "deterministic_algorithms": true
+      }
+    },
+    "exclusions": {
+      "const": [
+        "more than two optimizer updates or any extended training rollout",
+        "epsilon decay",
+        "target-network synchronization",
+        "checkpoint, resume, or ONNX export",
+        "ROCm execution or training",
+        "multi-environment collection",
+        "five-seed training or held-out evaluation",
+        "learned-policy effectiveness claims",
+        "changes to the R2A environment or action contract",
+        "gradual-motion Basic variant",
+        "strategic combat, reflex, or LLM runtime"
+      ]
+    }
+  }
+}

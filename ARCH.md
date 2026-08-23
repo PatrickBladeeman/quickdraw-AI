@@ -2,7 +2,7 @@
 
 ## Authority and status
 
-`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, R2A Basic environment, R3A pure-Python BDQ foundation, R3B synthetic optimizer smoke, R3D direct-LLAPI replay collection, R3E seeded epsilon-greedy collection, and R3F first Unity-derived update from the still-unimplemented extended learning rollout, learned policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, R2A Basic environment, R3A pure-Python BDQ foundation, R3B synthetic optimizer smoke, R3D direct-LLAPI replay collection, R3E seeded epsilon-greedy collection, R3F first Unity-derived update, and R3G second scheduled Unity-derived update from the still-unimplemented extended learning rollout, learned policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
 
 ## System overview
 
@@ -18,8 +18,8 @@ Test_Arena (implemented deterministic regression fixture)
 
 Research_Basic (implemented R2A environment benchmark)
   84×84 grayscale frame stack
-    → random/scripted baseline or R3D-R3F direct LLAPI BDQ action selector
-      (R3A tensors + R3B optimizer + direct replay and one live update implemented;
+    → random/scripted baseline or R3D-R3G direct LLAPI BDQ action selector
+      (R3A tensors + R3B optimizer + direct replay and two live updates implemented;
        extended learning rollout not connected)
     → [lateral movement, shoot] action tuple
     → shared fixed-forward hitscan actuator
@@ -51,8 +51,9 @@ The default `Test_Arena` flow never maps a camera hit directly to a reflex. An e
 - `Research/trainer/quickdraw_bdq` — R3A replay/action/network/target foundation,
   the R3B deterministic CPU optimizer scheduler, and the current strict LLAPI
   behavior/action-mask validator, online-network selector, pending-decision
-  collector, truncation-mask side channel, and R3F production-warmup/first-
-  update gate. The former ML-Agents trainer, policy, trajectory, settings,
+  collector, truncation-mask side channel, R3F production-warmup/first-update
+  gate, and R3G second-update gate. The former ML-Agents trainer, policy,
+  trajectory, settings,
   plugin, and next-mask-registry abstractions are retired. Extended training,
   checkpoint/export, and epsilon decay remain closed.
 - `QuickDraw.Research.Policy` (planned) — BDQ inference boundary and policy metadata; training remains in the pinned Python plugin.
@@ -435,7 +436,7 @@ Primary network:
 
 Use Double-DQN online action selection and target-network evaluation, replay capacity 100,000, replay warmup 10,000 decisions, batch 64, `gamma=0.99`, Adam `1e-4`, Huber loss averaged over selected branch values, update every four decisions, hard target synchronization every 10,000 optimizer updates, and epsilon decay `1.0 → 0.1`, followed by a `0.05` evaluation floor only during exploratory validation. Final evaluation is greedy.
 
-R3A implements and tests the immutable replay record/buffer, exact visual network and dueling recombination, legal branch selection, reversible six-action mapping, per-branch Double-DQN target construction, and mean branch Huber loss. True `target_hit` terminals do not bootstrap; registered decision-limit truncations do. R3B adds exact seeded online/target initialization, Adam updates, replay/update gates, metrics, and post-update hard synchronization. The direct collector validates exact `QuickDrawResearchBasic?team=0` behavior, HWC observation and `[3,2]` branch shapes, preserves ML-Agents' `true = unavailable` mask meaning, and holds only the data needed to complete the pending action. Ordinary continuation gets its next mask from the next `DecisionStep`; a true terminal uses an irrelevant all-available sentinel. Unity sends an authoritative final-state action mask immediately before a decision-limit interruption, so truncated replay can bootstrap without Python inspecting scene state. R3D's verified two-process smoke inserted 302 transitions per process: a two-step online-network terminal episode plus a 300-step truncation at slot `-4` with final movement mask `[false,true,false]`. R3E adds a fixed seeded epsilon-greedy selector and exact clean cutoff: each fresh process collected 1,000 legal transitions across 18 resets, exercised all six action tuples, and ended with no pending action. Both gates performed no update or target sync, preserved all weights, and repeated byte-for-byte. R3F reaches the exact production warmup with 10,000 real Unity transitions and opens one batch-64 Adam update at decision 10,000. Two fresh processes produced byte-identical traces, finite loss and TD-error metrics, the same changed online hash, the same frozen target hash, zero target synchronizations, and no pending decision. Its separate single-run watch path can connect to the Unity Editor on port 5004 or launch a visible standalone player at time scale 1 while reporting terminal progress; it writes one diagnostic trace and cannot produce acceptance evidence. Epsilon decay, a second live update, target synchronization, an extended Unity training rollout, ROCm training, checkpoint/resume, ONNX export, and effectiveness claims remain unimplemented.
+R3A implements and tests the immutable replay record/buffer, exact visual network and dueling recombination, legal branch selection, reversible six-action mapping, per-branch Double-DQN target construction, and mean branch Huber loss. True `target_hit` terminals do not bootstrap; registered decision-limit truncations do. R3B adds exact seeded online/target initialization, Adam updates, replay/update gates, metrics, and post-update hard synchronization. The direct collector validates exact `QuickDrawResearchBasic?team=0` behavior, HWC observation and `[3,2]` branch shapes, preserves ML-Agents' `true = unavailable` mask meaning, and holds only the data needed to complete the pending action. Ordinary continuation gets its next mask from the next `DecisionStep`; a true terminal uses an irrelevant all-available sentinel. Unity sends an authoritative final-state action mask immediately before a decision-limit interruption, so truncated replay can bootstrap without Python inspecting scene state. R3D's verified two-process smoke inserted 302 transitions per process: a two-step online-network terminal episode plus a 300-step truncation at slot `-4` with final movement mask `[false,true,false]`. R3E adds a fixed seeded epsilon-greedy selector and exact clean cutoff: each fresh process collected 1,000 legal transitions across 18 resets, exercised all six action tuples, and ended with no pending action. Both gates performed no update or target sync, preserved all weights, and repeated byte-for-byte. R3F reaches the exact production warmup with 10,000 real Unity transitions and opens one batch-64 Adam update at decision 10,000. Two fresh processes produced byte-identical traces, finite loss and TD-error metrics, the same changed online hash, the same frozen target hash, zero target synchronizations, and no pending decision. Its separate single-run watch path can connect to the Unity Editor on port 5004 or launch a visible standalone player at time scale 1 while reporting terminal progress; it writes one diagnostic trace and cannot produce acceptance evidence. R3G extends the same seeded trace by exactly four completed transitions and proves the recurring update at decision 10,004. Two fresh R3G processes preserve the complete R3F prefix, change the online hash after each of the two scheduled updates, leave the target hash frozen, stop without a pending decision, and repeat byte-for-byte. Epsilon decay, a third live update, target synchronization, an extended Unity training rollout, ROCm training, checkpoint/resume, ONNX export, and effectiveness claims remain unimplemented.
 
 Train five independent policy seeds. Each seed has its own configuration, learning curves, checkpoint lineage, export-parity test, and SHA-256. The same final strategic checkpoint for a seed is loaded into all factorial conditions for that seed.
 
@@ -684,7 +685,7 @@ Research/                                (non-Unity research source and contract
   schemas/                               (R1A run-manifest schema/example)
   smoke/                                 (R1B config, driver, and instructions)
   basic/                                 (R2A contract, LLAPI baselines, tests, instructions)
-  trainer/                               (R3A foundation through R3F first live update)
+  trainer/                               (R3A foundation through R3G second live update)
   analysis/                              (planned)
 
 Artifacts/Experiments/                   (generated/ignored root established by R1A)

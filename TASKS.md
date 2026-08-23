@@ -623,7 +623,7 @@ transition and no pending action. All 47 trainer tests and all 64 Python
 research tests pass. R3E is committed and pushed as `6aef062` (`R3E: fixed
 episilon greedy test runs`).
 
-### R3F. Production warmup and first Unity-derived optimizer update — implemented and verified locally
+### R3F. Production warmup and first Unity-derived optimizer update — completed and pushed
 
 - [x] Added strict `quickdraw.bdq-warmup-update.v1` and result schemas bound to
   the exact pushed R3E contract and pinned Python 3.11 CPU runtime.
@@ -659,7 +659,43 @@ the target remained
 `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`.
 All 62 trainer tests and all 79 Python research tests pass. R3F is the first
 minimal learning operation on real Unity experience, not an extended training
-session or effectiveness claim.
+session or effectiveness claim. R3F is committed and pushed as `7edf7a3`
+(`R3F: Watch mode and 10000 transition update warmup test`).
+
+### R3G. Second Unity-derived optimizer update — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-two-update.v1` and result schemas bound to the
+  exact pushed R3F contract and pinned Python 3.11 CPU runtime.
+- [x] Refactored the live-update collector behind an R3F-preserving wrapper so
+  R3F remains a one-update gate while R3G registers update decisions
+  `[10000,10004]` explicitly.
+- [x] Collected exactly 10,004 complete transitions under the unchanged R3F
+  seeds, fixed epsilon `1.0`, action masks, replay semantics, and production
+  optimizer defaults.
+- [x] Performed exactly two batch-64 Adam updates at decisions 10,000 and
+  10,004, recording a distinct online-network SHA-256 after each update.
+- [x] Kept the target network byte-identical to initialization, performed zero
+  target synchronizations, and stopped without a pending decision.
+- [x] Ran two fresh CPU Python/player processes whose complete transition,
+  episode, action, metric, per-update hash, and final trace bytes are identical.
+- [x] Verified that R3G's first 10,000 transitions, first-update metrics, and
+  first post-update online hash exactly preserve the pushed R3F evidence.
+- [x] Excluded epsilon decay, a third optimizer update, target synchronization,
+  checkpoint/resume, ONNX, ROCm, extended training, effectiveness claims, and
+  changes to the R2A environment.
+
+Each live process completed 10,004 transitions across 215 episode resets,
+handled three truncations, and exercised all six action tuples with counts
+`[1854,1741,1592,1605,1593,1619]`. Update 1 retained R3F's loss
+`0.01628389209508896`, mean absolute TD error `0.06243317946791649`, and online
+hash `7dd2365b5e219af10aeb4fabb5191df873762fcea6765cb50f83d41525279c8e`.
+Update 2 produced loss `0.014819225296378136`, mean absolute TD error
+`0.06711231172084808`, and online hash
+`6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471`.
+The target remained
+`b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`.
+All 69 trainer tests and all 86 Python research tests pass. R3G proves recurring
+live optimization once; it is not an epsilon-decay or extended-training gate.
 
 Remaining trainer and network work:
 
