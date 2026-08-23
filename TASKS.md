@@ -570,7 +570,7 @@ experimental scaffolding was committed. R3D removes
 the trainer class, settings class, plugin entry point, trajectory adapter,
 configuration YAML, runner, contracts, schemas, and focused trajectory tests.
 
-### R3D. Direct LLAPI collection and truncation-mask transport — implemented and verified locally
+### R3D. Direct LLAPI collection and truncation-mask transport — completed and pushed
 
 - [x] Added strict `quickdraw.bdq-llapi.v1` and result schemas bound to the exact
   R2A, R3A, and R3B contracts plus the pinned Python 3.11 CPU runtime.
@@ -599,22 +599,28 @@ configuration YAML, runner, contracts, schemas, and focused trajectory tests.
   Both traces were byte-identical; optimizer updates and target synchronizations
   remained zero, and online/target weight hashes did not change.
 
-This direct-collection slice is verified in the working tree but is not yet
-committed or pushed. It is not a training session and makes no learned-policy
-claim.
+This direct-collection slice is committed and pushed as `a4b449d` (`R3D: llapi
+implementation + truncation maski + pending decision`). It is not a training
+session and makes no learned-policy claim.
 
-### R3E. Seeded epsilon-greedy LLAPI collection below warmup — next SSNT
+### R3E. Seeded epsilon-greedy LLAPI collection below warmup — implemented and verified locally
 
-- [ ] Extend only the R3D direct collector with fixed, seeded epsilon-greedy
-  action selection and collect exactly 1,000 replay transitions across episode
-  resets.
-- [ ] Remain below the 10,000-transition replay warmup so optimizer updates and
+- [x] Extended only the R3D direct collector with the registered starting
+  epsilon `1.0`, fixed exploration seed `61001`, branch-wise uniform legal
+  action sampling, and exactly 1,000 replay transitions across episode resets.
+- [x] Remained below the 10,000-transition replay warmup so optimizer updates and
   target synchronizations both stay at zero and online/target hashes remain
   unchanged.
-- [ ] Require no unresolved pending decision at the cutoff and run two fresh
+- [x] Required no unresolved pending decision at the cutoff and ran two fresh
   Python/player processes whose canonical traces are byte-identical.
-- [ ] Exclude epsilon decay, gradients, checkpointing, ROCm execution, ONNX,
+- [x] Excluded epsilon decay, gradients, checkpointing, ROCm execution, ONNX,
   learned weights, effectiveness claims, and changes to the R2A environment.
+
+The live gate completed 18 Unity episodes and crossed 18 reset boundaries per
+process, exercised all six action tuples, handled one authoritative truncation
+mask, and stopped after transition 1,000 with a completed nonterminal replay
+transition and no pending action. All 47 trainer tests and all 64 Python
+research tests pass. R3E is verified locally but is not committed or pushed.
 
 Remaining trainer and network work:
 

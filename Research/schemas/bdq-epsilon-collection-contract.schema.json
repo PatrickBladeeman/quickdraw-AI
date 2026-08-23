@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-epsilon-collection-contract.schema.json",
+  "title": "QuickDraw seeded epsilon-greedy collection contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_llapi_contract",
+    "runtime",
+    "package",
+    "transport",
+    "collection",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-epsilon-collection.v1"},
+    "task": {"const": "R3E"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_llapi_contract": {"$ref": "#/$defs/contract_binding"},
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "device": {"const": "cpu"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "version", "metadata_path", "trainer_entry_points"],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.3.0"},
+        "metadata_path": {"const": "Research/trainer/pyproject.toml"},
+        "trainer_entry_points": {"const": []}
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api",
+        "behavior_name",
+        "agent_count",
+        "observation_shape",
+        "observation_layout",
+        "observation_dtype",
+        "discrete_branches",
+        "transition_completion",
+        "truncation_mask_transport",
+        "privileged_scene_inference_permitted"
+      ],
+      "properties": {
+        "api": {"const": "mlagents_envs.environment.UnityEnvironment"},
+        "behavior_name": {"const": "QuickDrawResearchBasic"},
+        "agent_count": {"const": 1},
+        "observation_shape": {"const": [84, 84, 4]},
+        "observation_layout": {"const": "HWC"},
+        "observation_dtype": {"const": "float32"},
+        "discrete_branches": {"const": [3, 2]},
+        "transition_completion": {"type": "string", "minLength": 1},
+        "truncation_mask_transport": {"const": "quickdraw.basic-truncation-mask.v1"},
+        "privileged_scene_inference_permitted": {"const": false}
+      }
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_seed",
+        "policy_seed",
+        "exploration_seed",
+        "selector",
+        "epsilon",
+        "epsilon_decay_enabled",
+        "exploration_unit",
+        "random_generator",
+        "random_legal_action_sampling",
+        "transition_limit",
+        "minimum_completed_episodes",
+        "minimum_unique_action_tuples",
+        "require_no_pending_decision_at_cutoff",
+        "replay_warmup_decisions",
+        "learning_enabled",
+        "optimizer_updates",
+        "target_synchronizations",
+        "fresh_processes",
+        "exact_trace_equality"
+      ],
+      "properties": {
+        "scenario_seed": {"const": 31001},
+        "policy_seed": {"const": 51001},
+        "exploration_seed": {"const": 61001},
+        "selector": {"const": "seeded_branch_epsilon_greedy"},
+        "epsilon": {"const": 1.0},
+        "epsilon_decay_enabled": {"const": false},
+        "exploration_unit": {"const": "branch"},
+        "random_generator": {"const": "torch.Generator(cpu)"},
+        "random_legal_action_sampling": {
+          "const": "uniform over ascending unmasked branch indices"
+        },
+        "transition_limit": {"const": 1000},
+        "minimum_completed_episodes": {"const": 1},
+        "minimum_unique_action_tuples": {"const": 2},
+        "require_no_pending_decision_at_cutoff": {"const": true},
+        "replay_warmup_decisions": {"const": 10000},
+        "learning_enabled": {"const": false},
+        "optimizer_updates": {"const": 0},
+        "target_synchronizations": {"const": 0},
+        "fresh_processes": {"const": 2},
+        "exact_trace_equality": {"const": true}
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "contract_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-llapi-contract-v1.json"},
+        "sha256": {"const": "5e321f320d109c8cc60d65b6993e64e77e5926c95cb5308e6db0ca8b3b7b3c94"},
+        "schema_version": {"const": "quickdraw.bdq-llapi.v1"}
+      }
+    }
+  }
+}

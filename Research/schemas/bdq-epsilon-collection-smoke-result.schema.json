@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-epsilon-collection-smoke-result.schema.json",
+  "title": "QuickDraw seeded epsilon-greedy collection smoke result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "fresh_process_count",
+    "exact_trace_equality",
+    "canonical_trace_sha256",
+    "canonical_trace"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-epsilon-collection-smoke-result.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "fresh_process_count": {"const": 2},
+    "exact_trace_equality": {"const": true},
+    "canonical_trace_sha256": {"$ref": "#/$defs/sha256"},
+    "canonical_trace": {"$ref": "#/$defs/trace"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mask3": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "mask2": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "masks": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/mask3"},
+        {"$ref": "#/$defs/mask2"}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "episode_index",
+        "episode_decision_index",
+        "observation_sha256",
+        "next_observation_sha256",
+        "observation_shape",
+        "action",
+        "reward",
+        "action_masks",
+        "next_action_masks",
+        "terminated",
+        "truncated"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0, "maximum": 999},
+        "episode_index": {"type": "integer", "minimum": 0},
+        "episode_decision_index": {"type": "integer", "minimum": 0, "maximum": 299},
+        "observation_sha256": {"$ref": "#/$defs/sha256"},
+        "next_observation_sha256": {"$ref": "#/$defs/sha256"},
+        "observation_shape": {"const": [84, 84, 4]},
+        "action": {
+          "type": "array",
+          "prefixItems": [
+            {"type": "integer", "minimum": 0, "maximum": 2},
+            {"type": "integer", "minimum": 0, "maximum": 1}
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "reward": {"type": "number"},
+        "action_masks": {"$ref": "#/$defs/masks"},
+        "next_action_masks": {"$ref": "#/$defs/masks"},
+        "terminated": {"type": "boolean"},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "transition_start_index",
+        "transition_count",
+        "return",
+        "end_kind",
+        "reason",
+        "interrupted",
+        "unity_episode_ended"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "transition_start_index": {"type": "integer", "minimum": 0, "maximum": 999},
+        "transition_count": {"type": "integer", "minimum": 1, "maximum": 300},
+        "return": {"type": "number"},
+        "end_kind": {"enum": ["terminal", "truncated", "collection_cutoff"]},
+        "reason": {"enum": ["target_hit", "decision_limit", "collection_limit"]},
+        "interrupted": {"type": "boolean"},
+        "unity_episode_ended": {"type": "boolean"}
+      }
+    },
+    "truncation_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "decision_count",
+        "reason",
+        "position_slot",
+        "next_action_masks"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "decision_count": {"const": 300},
+        "reason": {"const": "decision_limit"},
+        "position_slot": {"type": "integer", "minimum": -4, "maximum": 4},
+        "next_action_masks": {"$ref": "#/$defs/masks"}
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "epsilon",
+        "epsilon_decay_enabled",
+        "exploration_seed",
+        "exploration_unit",
+        "random_generator",
+        "selection_count",
+        "action_tuple_counts",
+        "unique_action_tuple_count"
+      ],
+      "properties": {
+        "name": {"const": "seeded_branch_epsilon_greedy"},
+        "epsilon": {"const": 1.0},
+        "epsilon_decay_enabled": {"const": false},
+        "exploration_seed": {"const": 61001},
+        "exploration_unit": {"const": "branch"},
+        "random_generator": {"const": "torch.Generator(cpu)"},
+        "selection_count": {"const": 1000},
+        "action_tuple_counts": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0, "maximum": 1000},
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "unique_action_tuple_count": {"type": "integer", "minimum": 2, "maximum": 6}
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_count", "size", "warmup_decisions", "below_warmup"],
+      "properties": {
+        "decision_count": {"const": 1000},
+        "size": {"const": 1000},
+        "warmup_decisions": {"const": 10000},
+        "below_warmup": {"const": true}
+      }
+    },
+    "cutoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transition_limit",
+        "pending_agent_ids",
+        "pending_decision_count",
+        "active_episode_index",
+        "ended_on_unity_boundary"
+      ],
+      "properties": {
+        "transition_limit": {"const": 1000},
+        "pending_agent_ids": {"const": []},
+        "pending_decision_count": {"const": 0},
+        "active_episode_index": {"type": "integer", "minimum": 0},
+        "ended_on_unity_boundary": {"type": "boolean"}
+      }
+    },
+    "learning_guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_before_sha256",
+        "online_after_sha256",
+        "target_before_sha256",
+        "target_after_sha256",
+        "online_weights_unchanged",
+        "target_weights_unchanged"
+      ],
+      "properties": {
+        "optimizer_update_count": {"const": 0},
+        "target_sync_count": {"const": 0},
+        "online_before_sha256": {"$ref": "#/$defs/sha256"},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"},
+        "target_before_sha256": {"$ref": "#/$defs/sha256"},
+        "target_after_sha256": {"$ref": "#/$defs/sha256"},
+        "online_weights_unchanged": {"const": true},
+        "target_weights_unchanged": {"const": true}
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_sha256",
+        "behavior",
+        "scenario_seed",
+        "policy_seed",
+        "selector",
+        "episodes",
+        "completed_episode_count",
+        "episode_reset_count",
+        "truncation_events",
+        "transitions",
+        "replay",
+        "cutoff",
+        "learning_guard"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-epsilon-collection-trace.v1"},
+        "contract_sha256": {"$ref": "#/$defs/sha256"},
+        "behavior": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "observation_shape",
+            "wire_layout",
+            "dtype",
+            "discrete_branches",
+            "privileged_observation_count"
+          ],
+          "properties": {
+            "name": {"const": "QuickDrawResearchBasic"},
+            "observation_shape": {"const": [84, 84, 4]},
+            "wire_layout": {"const": "HWC"},
+            "dtype": {"const": "float32"},
+            "discrete_branches": {"const": [3, 2]},
+            "privileged_observation_count": {"const": 0}
+          }
+        },
+        "scenario_seed": {"const": 31001},
+        "policy_seed": {"const": 51001},
+        "selector": {"$ref": "#/$defs/selector"},
+        "episodes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/episode"},
+          "minItems": 2,
+          "maxItems": 1000
+        },
+        "completed_episode_count": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "episode_reset_count": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "truncation_events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/truncation_event"},
+          "maxItems": 3
+        },
+        "transitions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transition"},
+          "minItems": 1000,
+          "maxItems": 1000
+        },
+        "replay": {"$ref": "#/$defs/replay"},
+        "cutoff": {"$ref": "#/$defs/cutoff"},
+        "learning_guard": {"$ref": "#/$defs/learning_guard"}
+      }
+    }
+  }
+}

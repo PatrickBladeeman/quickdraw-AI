@@ -1,10 +1,11 @@
-# R3A-R3D BDQ foundation and direct LLAPI collection
+# R3A-R3E BDQ foundation and direct LLAPI collection
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
 Huber loss. R3B freezes the optimizer and update schedule. R3C records the
 superseded high-level ML-Agents trajectory experiment. R3D replaces that
-experiment with synchronous `DecisionSteps`/`TerminalSteps` collection.
+experiment with synchronous `DecisionSteps`/`TerminalSteps` collection. R3E
+adds deterministic mask-safe epsilon-greedy collection below replay warmup.
 
 The tracked contract chain is:
 
@@ -12,6 +13,8 @@ The tracked contract chain is:
 - `bdq-optimizer-contract-v1.json`: historical R3B optimizer contract;
 - `bdq-llapi-contract-v1.json`: current R3D direct-collection and
   truncation-mask contract.
+- `bdq-epsilon-collection-contract-v1.json`: R3E's hash-bound, fixed-epsilon,
+  exactly-1,000-transition collection contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -24,7 +27,8 @@ boundary:
 - `optimizer.py`: online/target networks, Adam, replay, and exact counters;
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
-  side-channel ingestion.
+  side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
+  selector used by R3E.
 
 The former `Trainer`, `Policy`, `Trajectory`, settings, plugin-registration,
 YAML, and next-mask-registry scaffolding has been removed. `pyproject.toml`
@@ -78,7 +82,23 @@ one replay transition. The gate requires exact trace equality, zero optimizer
 updates, zero target synchronizations, and unchanged online/target weight
 hashes.
 
-This is collection evidence, not training evidence. Epsilon decay, replay
+Run the R3E collection gate against the same saved-scene player:
+
+```powershell
+& $python Research\trainer\run_bdq_epsilon_collection_smoke.py `
+  --env Artifacts\Experiments\r3d-llapi\build\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3e-epsilon-collection\acceptance
+```
+
+R3E fixes epsilon at the registered starting value `1.0` and uses exploration
+seed `61001`; decay is deliberately closed. Each fresh process completes
+exactly 1,000 transitions across resets, stops before issuing a replacement
+action, and therefore leaves no pending decision. The accepted local pair
+completed 18 episodes, exercised all six action tuples, handled one truncation,
+performed zero optimizer updates or target synchronizations, preserved both
+networks, and produced byte-identical traces.
+
+These are collection results, not training evidence. Epsilon decay, replay
 warmup completion, gradient updates on Unity experience, checkpoint/resume,
 ONNX export, ROCm training, learned-policy evaluation, gradual motion,
 strategic combat, reflexes, and LLM work remain outside this slice.

@@ -14,7 +14,7 @@ from mlagents_envs.base_env import BehaviorSpec, DecisionSteps
 from mlagents_envs.side_channel.incoming_message import IncomingMessage
 from mlagents_envs.side_channel.side_channel import SideChannel
 
-from .action_space import BRANCH_SIZES, greedy_actions
+from .action_space import BRANCH_SIZES, epsilon_greedy_actions, greedy_actions
 from .network import DuelingBranchingQNetwork, OBSERVATION_SHAPE
 from .optimizer import BDQOptimizerController, OptimizationStepResult
 from .replay import ReplayTransition
@@ -152,6 +152,59 @@ class GreedyBDQActionSelector:
                     torch.tensor(mask[None, ...], dtype=torch.bool)
                     for mask in validated_masks
                 ),
+            )
+        return selected[0].to(dtype=torch.int64).cpu().numpy()
+
+
+class SeededEpsilonGreedyBDQActionSelector:
+    """Select legal branch actions with one fixed epsilon and RNG seed."""
+
+    def __init__(
+        self,
+        online_network: DuelingBranchingQNetwork,
+        *,
+        epsilon: float,
+        seed: int,
+    ) -> None:
+        if isinstance(epsilon, bool) or not isinstance(epsilon, (int, float)):
+            raise ValueError("Epsilon must be a real number within [0, 1].")
+        if not 0.0 <= float(epsilon) <= 1.0:
+            raise ValueError("Epsilon must be within [0, 1].")
+        if type(seed) is not int or seed < 0:
+            raise ValueError("Exploration seed must be a non-negative integer.")
+        self._online_network = online_network
+        self._epsilon = float(epsilon)
+        self._seed = seed
+        self._generator = torch.Generator(device="cpu").manual_seed(seed)
+
+    @property
+    def epsilon(self) -> float:
+        return self._epsilon
+
+    @property
+    def seed(self) -> int:
+        return self._seed
+
+    def select(
+        self,
+        observation: np.ndarray,
+        action_masks: Sequence[np.ndarray],
+    ) -> np.ndarray:
+        validated_observation = validate_observation(observation, "policy observation")
+        validated_masks = validate_action_masks(action_masks, "policy action_masks")
+        self._online_network.eval()
+        with torch.no_grad():
+            q_values = self._online_network(
+                torch.as_tensor(validated_observation[None, ...], dtype=torch.float32)
+            )
+            selected = epsilon_greedy_actions(
+                q_values,
+                tuple(
+                    torch.tensor(mask[None, ...], dtype=torch.bool)
+                    for mask in validated_masks
+                ),
+                self._epsilon,
+                self._generator,
             )
         return selected[0].to(dtype=torch.int64).cpu().numpy()
 

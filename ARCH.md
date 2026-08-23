@@ -2,7 +2,7 @@
 
 ## Authority and status
 
-`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, R2A Basic environment, R3A pure-Python BDQ foundation, R3B synthetic optimizer smoke, and R3D direct-LLAPI replay collection from the still-unimplemented learning rollout, learned policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
+`CONTEXT.md` is the primary authoritative memory and requirements document. `PROJECT_CONTEXT.md` is its tracked, sanitized backup of public project information and the tracked progress record. This file translates their synchronized public project context into current architecture and code boundaries. It distinguishes the implemented deterministic `Test_Arena`, R1B/R1C communicator smoke, R2A Basic environment, R3A pure-Python BDQ foundation, R3B synthetic optimizer smoke, R3D direct-LLAPI replay collection, and R3E seeded epsilon-greedy collection from the still-unimplemented learning rollout, learned policy, strategic-combat, and LLM architecture; planned contracts must not be described as existing runtime behavior.
 
 ## System overview
 
@@ -18,7 +18,7 @@ Test_Arena (implemented deterministic regression fixture)
 
 Research_Basic (implemented R2A environment benchmark)
   84×84 grayscale frame stack
-    → random/scripted baseline or R3D direct LLAPI BDQ action selector
+    → random/scripted baseline or R3D/R3E direct LLAPI BDQ action selector
       (R3A tensors + R3B optimizer + direct replay collection implemented;
        learning rollout not connected)
     → [lateral movement, shoot] action tuple
@@ -434,7 +434,7 @@ Primary network:
 
 Use Double-DQN online action selection and target-network evaluation, replay capacity 100,000, replay warmup 10,000 decisions, batch 64, `gamma=0.99`, Adam `1e-4`, Huber loss averaged over selected branch values, update every four decisions, hard target synchronization every 10,000 optimizer updates, and epsilon decay `1.0 → 0.1`, followed by a `0.05` evaluation floor only during exploratory validation. Final evaluation is greedy.
 
-R3A implements and tests the immutable replay record/buffer, exact visual network and dueling recombination, legal branch selection, reversible six-action mapping, per-branch Double-DQN target construction, and mean branch Huber loss. True `target_hit` terminals do not bootstrap; registered decision-limit truncations do. R3B adds exact seeded online/target initialization, Adam updates, replay/update gates, metrics, and post-update hard synchronization. The direct collector validates exact `QuickDrawResearchBasic?team=0` behavior, HWC observation and `[3,2]` branch shapes, preserves ML-Agents' `true = unavailable` mask meaning, and holds only the data needed to complete the pending action. Ordinary continuation gets its next mask from the next `DecisionStep`; a true terminal uses an irrelevant all-available sentinel. Unity now sends an authoritative final-state action mask immediately before a decision-limit interruption, so truncated replay can bootstrap without Python inspecting scene state. The verified two-process smoke inserted 302 transitions per process: a two-step online-network terminal episode plus a 300-step truncation at slot `-4` with final movement mask `[false,true,false]`. It performed no update or target sync, preserved all weights, and repeated byte-for-byte. Longer learning collection, ROCm training, checkpoint/resume, ONNX export, and effectiveness claims remain unimplemented.
+R3A implements and tests the immutable replay record/buffer, exact visual network and dueling recombination, legal branch selection, reversible six-action mapping, per-branch Double-DQN target construction, and mean branch Huber loss. True `target_hit` terminals do not bootstrap; registered decision-limit truncations do. R3B adds exact seeded online/target initialization, Adam updates, replay/update gates, metrics, and post-update hard synchronization. The direct collector validates exact `QuickDrawResearchBasic?team=0` behavior, HWC observation and `[3,2]` branch shapes, preserves ML-Agents' `true = unavailable` mask meaning, and holds only the data needed to complete the pending action. Ordinary continuation gets its next mask from the next `DecisionStep`; a true terminal uses an irrelevant all-available sentinel. Unity sends an authoritative final-state action mask immediately before a decision-limit interruption, so truncated replay can bootstrap without Python inspecting scene state. R3D's verified two-process smoke inserted 302 transitions per process: a two-step online-network terminal episode plus a 300-step truncation at slot `-4` with final movement mask `[false,true,false]`. R3E adds a fixed seeded epsilon-greedy selector and exact clean cutoff: each fresh process collected 1,000 legal transitions across 18 resets, exercised all six action tuples, and ended with no pending action. Both gates performed no update or target sync, preserved all weights, and repeated byte-for-byte. Replay-warmup completion, epsilon decay, Unity-derived optimization, ROCm training, checkpoint/resume, ONNX export, and effectiveness claims remain unimplemented.
 
 Train five independent policy seeds. Each seed has its own configuration, learning curves, checkpoint lineage, export-parity test, and SHA-256. The same final strategic checkpoint for a seed is loaded into all factorial conditions for that seed.
 
@@ -683,7 +683,7 @@ Research/                                (non-Unity research source and contract
   schemas/                               (R1A run-manifest schema/example)
   smoke/                                 (R1B config, driver, and instructions)
   basic/                                 (R2A contract, LLAPI baselines, tests, instructions)
-  trainer/                               (R3A foundation + R3B optimizer + R3D direct LLAPI collection)
+  trainer/                               (R3A foundation + R3B optimizer + R3D/R3E direct LLAPI collection)
   analysis/                              (planned)
 
 Artifacts/Experiments/                   (generated/ignored root established by R1A)

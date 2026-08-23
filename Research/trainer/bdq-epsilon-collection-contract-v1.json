@@ -1,0 +1,67 @@
+{
+  "schema_version": "quickdraw.bdq-epsilon-collection.v1",
+  "task": "R3E",
+  "purpose": "Prove deterministic mask-safe epsilon-greedy collection across Basic episode resets while remaining below replay warmup and leaving every learning state unchanged.",
+  "base_llapi_contract": {
+    "path": "Research/trainer/bdq-llapi-contract-v1.json",
+    "sha256": "5e321f320d109c8cc60d65b6993e64e77e5926c95cb5308e6db0ca8b3b7b3c94",
+    "schema_version": "quickdraw.bdq-llapi.v1"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "trainer_entry_points": []
+  },
+  "transport": {
+    "api": "mlagents_envs.environment.UnityEnvironment",
+    "behavior_name": "QuickDrawResearchBasic",
+    "agent_count": 1,
+    "observation_shape": [84, 84, 4],
+    "observation_layout": "HWC",
+    "observation_dtype": "float32",
+    "discrete_branches": [3, 2],
+    "transition_completion": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps",
+    "truncation_mask_transport": "quickdraw.basic-truncation-mask.v1",
+    "privileged_scene_inference_permitted": false
+  },
+  "collection": {
+    "scenario_seed": 31001,
+    "policy_seed": 51001,
+    "exploration_seed": 61001,
+    "selector": "seeded_branch_epsilon_greedy",
+    "epsilon": 1.0,
+    "epsilon_decay_enabled": false,
+    "exploration_unit": "branch",
+    "random_generator": "torch.Generator(cpu)",
+    "random_legal_action_sampling": "uniform over ascending unmasked branch indices",
+    "transition_limit": 1000,
+    "minimum_completed_episodes": 1,
+    "minimum_unique_action_tuples": 2,
+    "require_no_pending_decision_at_cutoff": true,
+    "replay_warmup_decisions": 10000,
+    "learning_enabled": false,
+    "optimizer_updates": 0,
+    "target_synchronizations": 0,
+    "fresh_processes": 2,
+    "exact_trace_equality": true
+  },
+  "exclusions": [
+    "epsilon decay or replay warmup completion",
+    "optimizer updates, gradient steps, or learned-policy claims",
+    "checkpoint, resume, or ONNX export",
+    "ROCm execution or training",
+    "multi-environment collection",
+    "five-seed training or held-out evaluation",
+    "changes to the R2A environment or action contract",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}
