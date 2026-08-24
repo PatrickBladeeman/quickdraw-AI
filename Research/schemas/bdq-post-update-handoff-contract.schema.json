@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-post-update-handoff-contract.schema.json",
+  "title": "QuickDraw post-update greedy-action handoff contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_two_update_contract",
+    "runtime",
+    "package",
+    "transport",
+    "collection",
+    "optimization",
+    "r3g_prefix",
+    "post_update_greedy_handoff",
+    "determinism",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-post-update-handoff.v1"},
+    "task": {"const": "R3H"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_two_update_contract": {
+      "const": {
+        "path": "Research/trainer/bdq-two-update-contract-v1.json",
+        "sha256": "436329e61c3a40d5a7d94df73ff022b89931a6a6927cfe4ab49b391d2877a53d",
+        "schema_version": "quickdraw.bdq-two-update.v1"
+      }
+    },
+    "runtime": {
+      "const": {
+        "python": "3.11.13",
+        "mlagents_envs": "1.1.0",
+        "numpy": "1.23.5",
+        "torch": "2.12.0+cpu",
+        "device": "cpu"
+      }
+    },
+    "package": {
+      "const": {
+        "distribution": "quickdraw-bdq-trainer",
+        "version": "0.3.0",
+        "metadata_path": "Research/trainer/pyproject.toml",
+        "trainer_entry_points": []
+      }
+    },
+    "transport": {
+      "const": {
+        "api": "mlagents_envs.environment.UnityEnvironment",
+        "behavior_name": "QuickDrawResearchBasic",
+        "agent_count": 1,
+        "observation_shape": [84, 84, 4],
+        "observation_layout": "HWC",
+        "observation_dtype": "float32",
+        "discrete_branches": [3, 2],
+        "transition_completion": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps",
+        "truncation_mask_transport": "quickdraw.basic-truncation-mask.v1",
+        "privileged_scene_inference_permitted": false
+      }
+    },
+    "collection": {
+      "const": {
+        "scenario_seed": 31001,
+        "policy_seed": 51001,
+        "exploration_seed": 61001,
+        "selector": "seeded_epsilon_prefix_then_post_update_greedy",
+        "epsilon": 1.0,
+        "epsilon_decay_enabled": false,
+        "seeded_random_transition_prefix": 10004,
+        "post_update_greedy_transition_count": 1,
+        "transition_limit": 10005,
+        "minimum_completed_episodes": 1,
+        "minimum_unique_action_tuples": 6,
+        "require_no_pending_decision_at_cutoff": true
+      }
+    },
+    "optimization": {
+      "const": {
+        "replay_capacity": 100000,
+        "replay_warmup_decisions": 10000,
+        "batch_size": 64,
+        "gamma": 0.99,
+        "optimizer": "Adam",
+        "learning_rate": 0.0001,
+        "optimizer_update_interval_decisions": 4,
+        "hard_target_sync_interval_optimizer_updates": 10000,
+        "expected_first_update_decision": 10000,
+        "expected_update_decisions": [10000, 10004],
+        "expected_optimizer_updates": 2,
+        "expected_target_synchronizations": 0,
+        "require_finite_loss": true,
+        "require_finite_mean_absolute_td_error": true,
+        "require_online_weights_changed_after_each_update": true,
+        "require_target_weights_unchanged": true
+      }
+    },
+    "r3g_prefix": {
+      "const": {
+        "transition_count": 10004,
+        "canonical_transitions_sha256": "45554af94700fa1429e3487dcf2bd62f1c71f7419b4f1f80f0cf0ad905670f69",
+        "online_after_first_update_sha256": "7dd2365b5e219af10aeb4fabb5191df873762fcea6765cb50f83d41525279c8e",
+        "online_after_second_update_sha256": "6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471",
+        "frozen_target_sha256": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb",
+        "first_update_loss": 0.01628389209508896,
+        "first_update_mean_absolute_td_error": 0.06243317946791649,
+        "second_update_loss": 0.014819225296378136,
+        "second_update_mean_absolute_td_error": 0.06711231172084808
+      }
+    },
+    "post_update_greedy_handoff": {
+      "const": {
+        "selection_after_decision_count": 10004,
+        "completed_transition_index": 10004,
+        "required_optimizer_update_count": 2,
+        "epsilon": 0.0,
+        "action_source": "masked_argmax_twice_updated_online_network",
+        "comparison_network": "frozen_initial_target_network",
+        "require_finite_q_values": true,
+        "require_online_target_q_divergence": true,
+        "require_action_legal": true,
+        "require_no_pending_decision_after_completion": true
+      }
+    },
+    "determinism": {
+      "const": {
+        "fresh_processes": 2,
+        "exact_trace_equality": true,
+        "torch_num_threads": 1,
+        "torch_num_interop_threads": 1,
+        "deterministic_algorithms": true
+      }
+    },
+    "exclusions": {
+      "const": [
+        "a third optimizer update or any extended training rollout",
+        "epsilon decay or a production exploration schedule",
+        "target-network synchronization",
+        "checkpoint, resume, or ONNX export",
+        "ROCm execution or training",
+        "multi-environment collection",
+        "five-seed training or held-out evaluation",
+        "learned-policy effectiveness claims",
+        "changes to the R2A environment or action contract",
+        "watch-mode camera maintenance",
+        "gradual-motion Basic variant",
+        "strategic combat, reflex, or LLM runtime"
+      ]
+    }
+  }
+}

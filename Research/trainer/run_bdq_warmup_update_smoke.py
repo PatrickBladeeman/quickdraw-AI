@@ -35,8 +35,11 @@ from quickdraw_bdq import (  # noqa: E402
     LLAPIContractError,
     OptimizationStepResult,
     SeededEpsilonGreedyBDQActionSelector,
+    greedy_actions,
     network_sha256,
+    observation_sha256,
     read_action_masks,
+    validate_action_masks,
     validate_basic_behavior_spec,
     validate_observation,
 )
@@ -219,6 +222,120 @@ def _complete_transition(
     )
 
 
+def _select_post_update_greedy_action(
+    controller: BDQOptimizerController,
+    observation: np.ndarray,
+    action_masks: Sequence[np.ndarray],
+    *,
+    handoff_contract: Dict[str, Any],
+    optimization_events: Sequence[Dict[str, Any]],
+    target_before_sha256: str,
+    episode_index: int,
+    episode_decision_index: int,
+) -> tuple[np.ndarray, Dict[str, Any]]:
+    """Select one live greedy action and bind it to the post-update networks."""
+
+    selection_after = int(handoff_contract["selection_after_decision_count"])
+    required_updates = int(handoff_contract["required_optimizer_update_count"])
+    if controller.decision_count != selection_after:
+        raise LLAPIContractError(
+            "Post-update greedy selection opened at the wrong decision."
+        )
+    if controller.optimizer_update_count != required_updates:
+        raise LLAPIContractError(
+            "Post-update greedy selection observed the wrong optimizer count."
+        )
+    if controller.target_sync_count != 0:
+        raise LLAPIContractError(
+            "Post-update greedy selection observed a target synchronization."
+        )
+    if len(optimization_events) != required_updates:
+        raise LLAPIContractError(
+            "Post-update greedy selection is not bound to every prior update."
+        )
+
+    validated_observation = validate_observation(
+        observation,
+        "post-update greedy observation",
+    )
+    validated_masks = validate_action_masks(
+        action_masks,
+        "post-update greedy action_masks",
+    )
+    online_sha256 = network_sha256(controller.online_network)
+    target_sha256 = network_sha256(controller.target_network)
+    if online_sha256 != optimization_events[-1]["online_after_sha256"]:
+        raise LLAPIContractError(
+            "Post-update greedy selection did not use the latest online network."
+        )
+    if target_sha256 != target_before_sha256:
+        raise LLAPIContractError(
+            "Post-update greedy comparison target changed before synchronization."
+        )
+
+    observation_tensor = torch.as_tensor(
+        validated_observation[None, ...],
+        dtype=torch.float32,
+    )
+    mask_tensors = tuple(
+        torch.tensor(mask[None, ...], dtype=torch.bool)
+        for mask in validated_masks
+    )
+    controller.online_network.eval()
+    controller.target_network.eval()
+    with torch.no_grad():
+        online_q = controller.online_network(observation_tensor)
+        target_q = controller.target_network(observation_tensor)
+        selected = greedy_actions(online_q, mask_tensors)
+
+    online_values = [
+        [float(value) for value in branch[0].cpu().tolist()]
+        for branch in online_q
+    ]
+    target_values = [
+        [float(value) for value in branch[0].cpu().tolist()]
+        for branch in target_q
+    ]
+    maximum_delta = max(
+        abs(online_value - target_value)
+        for online_branch, target_branch in zip(online_values, target_values)
+        for online_value, target_value in zip(online_branch, target_branch)
+    )
+    if not math.isfinite(maximum_delta) or maximum_delta <= 0.0:
+        raise LLAPIContractError(
+            "Post-update online Q-values did not diverge from the frozen target."
+        )
+
+    action = selected[0].to(dtype=torch.int64).cpu().numpy()
+    if any(
+        bool(validated_masks[branch][int(branch_action)])
+        for branch, branch_action in enumerate(action)
+    ):
+        raise LLAPIContractError(
+            "Post-update greedy selection chose an unavailable action."
+        )
+    evidence = {
+        "selection_after_decision_count": controller.decision_count,
+        "transition_index": controller.decision_count,
+        "episode_index": episode_index,
+        "episode_decision_index": episode_decision_index,
+        "epsilon": float(handoff_contract["epsilon"]),
+        "optimizer_update_count": controller.optimizer_update_count,
+        "target_sync_count": controller.target_sync_count,
+        "online_sha256": online_sha256,
+        "target_sha256": target_sha256,
+        "observation_sha256": observation_sha256(validated_observation),
+        "action_masks": _masks_to_json(validated_masks),
+        "online_q_values": online_values,
+        "target_q_values": target_values,
+        "max_absolute_q_delta": maximum_delta,
+        "selected_action": [int(value) for value in action],
+        "selected_action_legal": True,
+        "masked_argmax_verified": True,
+    }
+    return action, evidence
+
+
 def _emit_watch_progress(
     result: OptimizationStepResult,
     transition: Dict[str, Any],
@@ -306,11 +423,11 @@ def execute_update_gate_worker(
         raise LLAPIContractError(
             f"{task_name} first update differs from production replay warmup."
         )
-    if not expected_update_decisions or expected_update_decisions[-1] != (
+    if not expected_update_decisions or expected_update_decisions[-1] > (
         transition_limit
     ):
         raise LLAPIContractError(
-            f"{task_name} cutoff is not its final registered optimizer update."
+            f"{task_name} cutoff precedes its final registered optimizer update."
         )
     registered_update_decisions = optimization.get("expected_update_decisions")
     if registered_update_decisions is not None and tuple(
@@ -319,6 +436,24 @@ def execute_update_gate_worker(
         raise LLAPIContractError(
             f"{task_name} registered update decisions differ from its schedule."
         )
+    handoff_contract = contract.get("post_update_greedy_handoff")
+    if handoff_contract is None:
+        if expected_update_decisions[-1] != transition_limit:
+            raise LLAPIContractError(
+                f"{task_name} cutoff is not its final registered optimizer update."
+            )
+    else:
+        selection_after = int(
+            handoff_contract["selection_after_decision_count"]
+        )
+        if selection_after != expected_update_decisions[-1]:
+            raise LLAPIContractError(
+                f"{task_name} greedy handoff does not follow its final update."
+            )
+        if transition_limit != selection_after + 1:
+            raise LLAPIContractError(
+                f"{task_name} must complete exactly one greedy handoff transition."
+            )
     configure_torch(determinism, task_name)
 
     side_channel = BasicTruncationMaskSideChannel()
@@ -342,6 +477,8 @@ def execute_update_gate_worker(
     episodes: list[Dict[str, Any]] = []
     truncation_events: list[Dict[str, Any]] = []
     optimization_events: list[Dict[str, Any]] = []
+    post_update_greedy_handoff: Dict[str, Any] | None = None
+    seeded_random_selection_count = 0
     active_episode_index = 0
     episode_decision_index = 0
     episode_start_index = 0
@@ -511,7 +648,30 @@ def execute_update_gate_worker(
                     if len(transitions) == transition_limit:
                         reached_limit = True
                         break
-                action = selector.select(observation, action_masks)
+                if (
+                    handoff_contract is not None
+                    and controller.decision_count
+                    == int(handoff_contract["selection_after_decision_count"])
+                ):
+                    if post_update_greedy_handoff is not None:
+                        raise LLAPIContractError(
+                            f"{task_name} repeated its post-update greedy handoff."
+                        )
+                    action, post_update_greedy_handoff = (
+                        _select_post_update_greedy_action(
+                            controller,
+                            observation,
+                            action_masks,
+                            handoff_contract=handoff_contract,
+                            optimization_events=optimization_events,
+                            target_before_sha256=target_before,
+                            episode_index=active_episode_index,
+                            episode_decision_index=episode_decision_index,
+                        )
+                    )
+                else:
+                    action = selector.select(observation, action_masks)
+                    seeded_random_selection_count += 1
                 collector.begin(agent_id, observation, action, action_masks)
                 actions[decision_row] = action
 
@@ -551,6 +711,35 @@ def execute_update_gate_worker(
             raise LLAPIContractError(
                 f"Pending decisions remain at cutoff: {collector.pending_agent_ids}."
             )
+        if handoff_contract is not None:
+            if post_update_greedy_handoff is None:
+                raise LLAPIContractError(
+                    f"{task_name} omitted its post-update greedy handoff."
+                )
+            handoff_index = int(post_update_greedy_handoff["transition_index"])
+            if handoff_index >= len(transitions):
+                raise LLAPIContractError(
+                    f"{task_name} did not complete its greedy handoff transition."
+                )
+            handoff_transition = transitions[handoff_index]
+            if handoff_transition["action"] != post_update_greedy_handoff[
+                "selected_action"
+            ]:
+                raise LLAPIContractError(
+                    f"{task_name} greedy handoff action differs from replay."
+                )
+            if handoff_transition["observation_sha256"] != (
+                post_update_greedy_handoff["observation_sha256"]
+            ):
+                raise LLAPIContractError(
+                    f"{task_name} greedy handoff observation differs from replay."
+                )
+            if handoff_transition["action_masks"] != post_update_greedy_handoff[
+                "action_masks"
+            ]:
+                raise LLAPIContractError(
+                    f"{task_name} greedy handoff masks differ from replay."
+                )
         side_channel.assert_empty()
         completed_episode_count = sum(
             1 for episode in episodes if episode["unity_episode_ended"]
@@ -596,6 +785,30 @@ def execute_update_gate_worker(
                 f"{task_name} did not collect every Basic action tuple."
             )
 
+        selector_trace: Dict[str, Any]
+        if handoff_contract is None:
+            selector_trace = {
+                "name": collection["selector"],
+                "epsilon": selector.epsilon,
+                "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
+                "exploration_seed": selector.seed,
+                "selection_count": sum(action_tuple_counts),
+                "action_tuple_counts": action_tuple_counts,
+                "unique_action_tuple_count": unique_action_tuple_count,
+            }
+        else:
+            selector_trace = {
+                "name": collection["selector"],
+                "epsilon_prefix": selector.epsilon,
+                "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
+                "exploration_seed": selector.seed,
+                "selection_count": sum(action_tuple_counts),
+                "seeded_random_selection_count": seeded_random_selection_count,
+                "post_update_greedy_selection_count": 1,
+                "action_tuple_counts": action_tuple_counts,
+                "unique_action_tuple_count": unique_action_tuple_count,
+            }
+
         trace = {
             "schema_version": trace_schema_version,
             "contract_sha256": sha256_file(contract_path),
@@ -609,15 +822,7 @@ def execute_update_gate_worker(
             },
             "scenario_seed": int(collection["scenario_seed"]),
             "policy_seed": policy_seed,
-            "selector": {
-                "name": collection["selector"],
-                "epsilon": selector.epsilon,
-                "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
-                "exploration_seed": selector.seed,
-                "selection_count": sum(action_tuple_counts),
-                "action_tuple_counts": action_tuple_counts,
-                "unique_action_tuple_count": unique_action_tuple_count,
-            },
+            "selector": selector_trace,
             "execution_determinism": {
                 "torch_num_threads": torch.get_num_threads(),
                 "torch_num_interop_threads": torch.get_num_interop_threads(),
@@ -661,6 +866,8 @@ def execute_update_gate_worker(
                 "target_weights_unchanged": target_before == target_after,
             },
         }
+        if post_update_greedy_handoff is not None:
+            trace["post_update_greedy_handoff"] = post_update_greedy_handoff
         trace_path = worker_output / trace_file_name
         trace_path.write_text(
             json.dumps(trace, indent=2, sort_keys=True) + "\n",

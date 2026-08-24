@@ -1,0 +1,395 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-post-update-handoff-smoke-result.schema.json",
+  "title": "QuickDraw post-update greedy-action handoff smoke result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "fresh_process_count",
+    "exact_trace_equality",
+    "canonical_trace_sha256",
+    "canonical_trace"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-post-update-handoff-smoke-result.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "fresh_process_count": {"const": 2},
+    "exact_trace_equality": {"const": true},
+    "canonical_trace_sha256": {"$ref": "#/$defs/sha256"},
+    "canonical_trace": {"$ref": "#/$defs/trace"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mask3": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "mask2": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "masks": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/mask3"},
+        {"$ref": "#/$defs/mask2"}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "action": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "integer", "minimum": 0, "maximum": 2},
+        {"type": "integer", "minimum": 0, "maximum": 1}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "q_values": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "array",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        {
+          "type": "array",
+          "items": {"type": "number"},
+          "minItems": 2,
+          "maxItems": 2
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "episode_index",
+        "episode_decision_index",
+        "observation_sha256",
+        "next_observation_sha256",
+        "observation_shape",
+        "action",
+        "reward",
+        "action_masks",
+        "next_action_masks",
+        "terminated",
+        "truncated"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0, "maximum": 10004},
+        "episode_index": {"type": "integer", "minimum": 0},
+        "episode_decision_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 299
+        },
+        "observation_sha256": {"$ref": "#/$defs/sha256"},
+        "next_observation_sha256": {"$ref": "#/$defs/sha256"},
+        "observation_shape": {"const": [84, 84, 4]},
+        "action": {"$ref": "#/$defs/action"},
+        "reward": {"type": "number"},
+        "action_masks": {"$ref": "#/$defs/masks"},
+        "next_action_masks": {"$ref": "#/$defs/masks"},
+        "terminated": {"type": "boolean"},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "transition_start_index",
+        "transition_count",
+        "return",
+        "end_kind",
+        "reason",
+        "interrupted",
+        "unity_episode_ended"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "transition_start_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10004
+        },
+        "transition_count": {"type": "integer", "minimum": 1, "maximum": 300},
+        "return": {"type": "number"},
+        "end_kind": {"enum": ["terminal", "truncated", "collection_cutoff"]},
+        "reason": {"enum": ["target_hit", "decision_limit", "collection_limit"]},
+        "interrupted": {"type": "boolean"},
+        "unity_episode_ended": {"type": "boolean"}
+      }
+    },
+    "truncation_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "decision_count",
+        "reason",
+        "position_slot",
+        "next_action_masks"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "decision_count": {"const": 300},
+        "reason": {"const": "decision_limit"},
+        "position_slot": {"type": "integer", "minimum": -4, "maximum": 4},
+        "next_action_masks": {"$ref": "#/$defs/masks"}
+      }
+    },
+    "optimization_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_count",
+        "replay_size",
+        "optimizer_update_count",
+        "target_sync_count",
+        "updated",
+        "target_synced",
+        "loss",
+        "mean_absolute_td_error",
+        "online_after_sha256"
+      ],
+      "properties": {
+        "decision_count": {"enum": [10000, 10004]},
+        "replay_size": {"enum": [10000, 10004]},
+        "optimizer_update_count": {"type": "integer", "minimum": 1, "maximum": 2},
+        "target_sync_count": {"const": 0},
+        "updated": {"const": true},
+        "target_synced": {"const": false},
+        "loss": {"type": "number", "minimum": 0},
+        "mean_absolute_td_error": {"type": "number", "minimum": 0},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_after_decision_count",
+        "transition_index",
+        "episode_index",
+        "episode_decision_index",
+        "epsilon",
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_sha256",
+        "target_sha256",
+        "observation_sha256",
+        "action_masks",
+        "online_q_values",
+        "target_q_values",
+        "max_absolute_q_delta",
+        "selected_action",
+        "selected_action_legal",
+        "masked_argmax_verified"
+      ],
+      "properties": {
+        "selection_after_decision_count": {"const": 10004},
+        "transition_index": {"const": 10004},
+        "episode_index": {"type": "integer", "minimum": 0},
+        "episode_decision_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 299
+        },
+        "epsilon": {"const": 0.0},
+        "optimizer_update_count": {"const": 2},
+        "target_sync_count": {"const": 0},
+        "online_sha256": {"$ref": "#/$defs/sha256"},
+        "target_sha256": {"$ref": "#/$defs/sha256"},
+        "observation_sha256": {"$ref": "#/$defs/sha256"},
+        "action_masks": {"$ref": "#/$defs/masks"},
+        "online_q_values": {"$ref": "#/$defs/q_values"},
+        "target_q_values": {"$ref": "#/$defs/q_values"},
+        "max_absolute_q_delta": {"type": "number", "exclusiveMinimum": 0},
+        "selected_action": {"$ref": "#/$defs/action"},
+        "selected_action_legal": {"const": true},
+        "masked_argmax_verified": {"const": true}
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_sha256",
+        "behavior",
+        "scenario_seed",
+        "policy_seed",
+        "selector",
+        "execution_determinism",
+        "episodes",
+        "completed_episode_count",
+        "episode_reset_count",
+        "truncation_events",
+        "transitions",
+        "replay",
+        "cutoff",
+        "optimization",
+        "post_update_greedy_handoff"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-post-update-handoff-trace.v1"},
+        "contract_sha256": {"$ref": "#/$defs/sha256"},
+        "behavior": {
+          "const": {
+            "name": "QuickDrawResearchBasic",
+            "observation_shape": [84, 84, 4],
+            "wire_layout": "HWC",
+            "dtype": "float32",
+            "discrete_branches": [3, 2],
+            "privileged_observation_count": 0
+          }
+        },
+        "scenario_seed": {"const": 31001},
+        "policy_seed": {"const": 51001},
+        "selector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "epsilon_prefix",
+            "epsilon_decay_enabled",
+            "exploration_seed",
+            "selection_count",
+            "seeded_random_selection_count",
+            "post_update_greedy_selection_count",
+            "action_tuple_counts",
+            "unique_action_tuple_count"
+          ],
+          "properties": {
+            "name": {"const": "seeded_epsilon_prefix_then_post_update_greedy"},
+            "epsilon_prefix": {"const": 1.0},
+            "epsilon_decay_enabled": {"const": false},
+            "exploration_seed": {"const": 61001},
+            "selection_count": {"const": 10005},
+            "seeded_random_selection_count": {"const": 10004},
+            "post_update_greedy_selection_count": {"const": 1},
+            "action_tuple_counts": {
+              "type": "array",
+              "items": {"type": "integer", "minimum": 0, "maximum": 10005},
+              "minItems": 6,
+              "maxItems": 6
+            },
+            "unique_action_tuple_count": {"const": 6}
+          }
+        },
+        "execution_determinism": {
+          "const": {
+            "torch_num_threads": 1,
+            "torch_num_interop_threads": 1,
+            "deterministic_algorithms": true
+          }
+        },
+        "episodes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/episode"},
+          "minItems": 2,
+          "maxItems": 10005
+        },
+        "completed_episode_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10005
+        },
+        "episode_reset_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10005
+        },
+        "truncation_events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/truncation_event"},
+          "maxItems": 34
+        },
+        "transitions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transition"},
+          "minItems": 10005,
+          "maxItems": 10005
+        },
+        "replay": {
+          "const": {
+            "decision_count": 10005,
+            "size": 10005,
+            "capacity": 100000,
+            "warmup_decisions": 10000,
+            "below_warmup": false,
+            "at_warmup": false
+          }
+        },
+        "cutoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transition_limit",
+            "pending_agent_ids",
+            "pending_decision_count",
+            "active_episode_index",
+            "ended_on_unity_boundary"
+          ],
+          "properties": {
+            "transition_limit": {"const": 10005},
+            "pending_agent_ids": {"const": []},
+            "pending_decision_count": {"const": 0},
+            "active_episode_index": {"type": "integer", "minimum": 0},
+            "ended_on_unity_boundary": {"type": "boolean"}
+          }
+        },
+        "optimization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "optimizer_update_count",
+            "target_sync_count",
+            "update_events",
+            "online_before_sha256",
+            "online_after_sha256",
+            "target_before_sha256",
+            "target_after_sha256",
+            "online_weights_changed",
+            "target_weights_unchanged"
+          ],
+          "properties": {
+            "optimizer_update_count": {"const": 2},
+            "target_sync_count": {"const": 0},
+            "update_events": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/optimization_event"},
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "online_before_sha256": {"$ref": "#/$defs/sha256"},
+            "online_after_sha256": {"$ref": "#/$defs/sha256"},
+            "target_before_sha256": {"$ref": "#/$defs/sha256"},
+            "target_after_sha256": {"$ref": "#/$defs/sha256"},
+            "online_weights_changed": {"const": true},
+            "target_weights_unchanged": {"const": true}
+          }
+        },
+        "post_update_greedy_handoff": {"$ref": "#/$defs/handoff"}
+      }
+    }
+  }
+}

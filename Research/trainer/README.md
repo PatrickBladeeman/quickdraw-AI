@@ -1,4 +1,4 @@
-# R3A-R3G BDQ foundation, direct LLAPI collection, and scheduled updates
+# R3A-R3H BDQ foundation, direct LLAPI collection, and policy handoff
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -8,7 +8,9 @@ experiment with synchronous `DecisionSteps`/`TerminalSteps` collection. R3E
 adds deterministic mask-safe epsilon-greedy collection below replay warmup.
 R3F reaches the exact production warmup and performs one CPU update from real
 Unity transitions. R3G extends the same seeded run by four transitions and
-proves the second scheduled CPU update.
+proves the second scheduled CPU update. R3H preserves that entire prefix, then
+uses the twice-updated online network for one legal masked-greedy action and
+completes its Unity transition.
 
 The tracked contract chain is:
 
@@ -22,6 +24,8 @@ The tracked contract chain is:
   transition production-warmup and first-update contract.
 - `bdq-two-update-contract-v1.json`: R3G's hash-bound, exactly-10,004-
   transition recurring-update contract.
+- `bdq-post-update-handoff-contract-v1.json`: R3H's hash-bound R3G-prefix plus
+  one post-update masked-greedy transition contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -174,9 +178,29 @@ The target remained frozen, pending-decision and target-sync counts stayed zero,
 and the two serialized traces matched SHA-256
 `157cc826d99696fa5c137b596e8eafd04b4abba520c8af5d93b7355b8bdc5576`.
 
+Run the R3H post-update policy-handoff gate:
+
+```powershell
+& $python Research\trainer\run_bdq_post_update_handoff_smoke.py `
+  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3h-post-update-handoff\acceptance
+```
+
+Each accepted process preserves all 10,004 R3G transitions and both exact
+optimizer results. At decision 10,004, epsilon switches from the frozen random
+prefix to `0.0` for one decision only. The updated online network evaluates the
+live observation and masks, chooses masked argmax action `[2,1]`, and completes
+transition 10,005. The same observation is evaluated by the frozen target;
+their maximum absolute Q-value difference is `0.08040044084191322`. The action
+is legal under movement mask `[false,true,false]`, no third update opens, no
+target synchronization occurs, and no decision remains pending. Two fresh
+processes produced byte-identical serialized traces with SHA-256
+`4341790871e0b5e3a990923601b45c052e9fb85e1e8ca20ae179421bb7977a87`.
+
 R3D and R3E are collection evidence. R3F and R3G are two minimal scheduled
-learning operations on real Unity experience, not an extended training run or
-effectiveness result. Epsilon decay, a third update, target synchronization,
-checkpoint/resume, ONNX export, ROCm training, learned-policy evaluation,
-gradual motion, strategic combat, reflexes, and LLM work remain outside this
-slice.
+learning operations on real Unity experience. R3H is the first live proof that
+the resulting online weights drive an action; it is not an extended training
+run or effectiveness result. Epsilon decay, a third update, target
+synchronization, checkpoint/resume, ONNX export, ROCm training, learned-policy
+evaluation, gradual motion, strategic combat, reflexes, and LLM work remain
+outside this slice.

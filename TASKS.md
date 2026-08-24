@@ -662,7 +662,7 @@ minimal learning operation on real Unity experience, not an extended training
 session or effectiveness claim. R3F is committed and pushed as `7edf7a3`
 (`R3F: Watch mode and 10000 transition update warmup test`).
 
-### R3G. Second Unity-derived optimizer update — implemented and verified locally
+### R3G. Second Unity-derived optimizer update — completed and pushed
 
 - [x] Added strict `quickdraw.bdq-two-update.v1` and result schemas bound to the
   exact pushed R3F contract and pinned Python 3.11 CPU runtime.
@@ -696,6 +696,44 @@ The target remained
 `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`.
 All 69 trainer tests and all 86 Python research tests pass. R3G proves recurring
 live optimization once; it is not an epsilon-decay or extended-training gate.
+R3G is committed and pushed as `df036eb`
+(`R3G: additional smoke tests with updates`).
+
+### R3H. Post-update online-policy handoff — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-post-update-handoff.v1` contract and result
+  schemas bound to the exact pushed R3G contract and its canonical 10,004-
+  transition prefix.
+- [x] Preserved R3G's fixed seeds, epsilon-`1.0` random prefix, replay contents,
+  update decisions `[10000,10004]`, losses, TD errors, and post-update hashes.
+- [x] Evaluated the live decision-10,004 observation through both the twice-
+  updated online network and frozen initial target network.
+- [x] Selected exactly one epsilon-`0.0` masked online argmax, verified that it
+  was legal, sent it to Unity, and completed transition index 10,004.
+- [x] Stopped at exactly 10,005 transitions with no pending decision, no third
+  optimizer update, and no target synchronization.
+- [x] Recorded both networks' branch Q-values, their maximum absolute delta,
+  observation and mask hashes, selected action, and network hashes in the
+  schema-validated trace.
+- [x] Ran two fresh CPU Python/player processes whose complete trace objects
+  and serialized trace bytes are identical.
+- [x] Excluded epsilon decay, a third optimizer update, checkpoint/export,
+  ROCm training, extended training, learned-policy effectiveness claims,
+  watch-camera maintenance, and changes to the R2A environment.
+
+Each accepted process completed 10,005 transitions across 215 episode resets,
+handled three truncations, and exercised all six action tuples with counts
+`[1854,1741,1592,1605,1593,1620]`. The exact 10,004-transition R3G prefix and
+both optimizer events were preserved. The post-update online policy selected
+legal action `[2,1]` under movement mask `[false,true,false]`; its Q-values
+differed from the frozen target by a maximum of `0.08040044084191322`. The
+online hash remained R3G update 2's
+`6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471`,
+the target remained
+`b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`,
+and the two trace files are byte-identical. All 77 trainer tests and all 94
+Python research tests pass. R3H proves that updated weights reach live action
+selection; it does not claim the two updates learned an effective policy.
 
 Remaining trainer and network work:
 
