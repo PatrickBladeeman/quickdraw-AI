@@ -12,6 +12,7 @@ from .action_space import (
     masked_q_values,
 )
 from .network import DuelingBranchingQNetwork
+from .exploration import LinearEpsilonSchedule
 from .llapi import (
     BASIC_BEHAVIOR_NAME,
     BasicTruncationMaskSideChannel,
@@ -19,6 +20,7 @@ from .llapi import (
     GreedyBDQActionSelector,
     LLAPIContractError,
     PendingDecision,
+    ScheduledEpsilonGreedyBDQActionSelector,
     SeededEpsilonGreedyBDQActionSelector,
     TruncationMaskEvent,
     network_sha256,
@@ -53,7 +55,9 @@ __all__ = [
     "DirectReplayCollector",
     "GreedyBDQActionSelector",
     "LLAPIContractError",
+    "LinearEpsilonSchedule",
     "PendingDecision",
+    "ScheduledEpsilonGreedyBDQActionSelector",
     "SeededEpsilonGreedyBDQActionSelector",
     "TruncationMaskEvent",
     "branch_double_dqn_targets",

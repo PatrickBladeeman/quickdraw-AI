@@ -15,6 +15,7 @@ from mlagents_envs.side_channel.incoming_message import IncomingMessage
 from mlagents_envs.side_channel.side_channel import SideChannel
 
 from .action_space import BRANCH_SIZES, epsilon_greedy_actions, greedy_actions
+from .exploration import LinearEpsilonSchedule
 from .network import DuelingBranchingQNetwork, OBSERVATION_SHAPE
 from .optimizer import BDQOptimizerController, OptimizationStepResult
 from .replay import ReplayTransition
@@ -156,6 +157,43 @@ class GreedyBDQActionSelector:
         return selected[0].to(dtype=torch.int64).cpu().numpy()
 
 
+def _select_seeded_epsilon_greedy_action(
+    online_network: DuelingBranchingQNetwork,
+    observation: np.ndarray,
+    action_masks: Sequence[np.ndarray],
+    epsilon: float,
+    generator: torch.Generator,
+) -> np.ndarray:
+    validated_observation = validate_observation(observation, "policy observation")
+    validated_masks = validate_action_masks(action_masks, "policy action_masks")
+    online_network.eval()
+    with torch.no_grad():
+        if epsilon == 1.0:
+            # Full exploration overwrites every greedy branch choice. Shape-only
+            # zeros preserve the registered RNG sequence without unused inference.
+            q_values = tuple(
+                torch.zeros((1, branch_size), dtype=torch.float32)
+                for branch_size in BRANCH_SIZES
+            )
+        else:
+            q_values = online_network(
+                torch.as_tensor(
+                    validated_observation[None, ...],
+                    dtype=torch.float32,
+                )
+            )
+        selected = epsilon_greedy_actions(
+            q_values,
+            tuple(
+                torch.tensor(mask[None, ...], dtype=torch.bool)
+                for mask in validated_masks
+            ),
+            epsilon,
+            generator,
+        )
+    return selected[0].to(dtype=torch.int64).cpu().numpy()
+
+
 class SeededEpsilonGreedyBDQActionSelector:
     """Select legal branch actions with one fixed epsilon and RNG seed."""
 
@@ -190,34 +228,57 @@ class SeededEpsilonGreedyBDQActionSelector:
         observation: np.ndarray,
         action_masks: Sequence[np.ndarray],
     ) -> np.ndarray:
-        validated_observation = validate_observation(observation, "policy observation")
-        validated_masks = validate_action_masks(action_masks, "policy action_masks")
-        self._online_network.eval()
-        with torch.no_grad():
-            if self._epsilon == 1.0:
-                # Full exploration overwrites every greedy branch choice. Shape-only
-                # zeros preserve the registered RNG sequence without unused inference.
-                q_values = tuple(
-                    torch.zeros((1, branch_size), dtype=torch.float32)
-                    for branch_size in BRANCH_SIZES
-                )
-            else:
-                q_values = self._online_network(
-                    torch.as_tensor(
-                        validated_observation[None, ...],
-                        dtype=torch.float32,
-                    )
-                )
-            selected = epsilon_greedy_actions(
-                q_values,
-                tuple(
-                    torch.tensor(mask[None, ...], dtype=torch.bool)
-                    for mask in validated_masks
-                ),
-                self._epsilon,
-                self._generator,
-            )
-        return selected[0].to(dtype=torch.int64).cpu().numpy()
+        return _select_seeded_epsilon_greedy_action(
+            self._online_network,
+            observation,
+            action_masks,
+            self._epsilon,
+            self._generator,
+        )
+
+
+class ScheduledEpsilonGreedyBDQActionSelector:
+    """Select legal branch actions under a stateless epsilon schedule."""
+
+    def __init__(
+        self,
+        online_network: DuelingBranchingQNetwork,
+        *,
+        schedule: LinearEpsilonSchedule,
+        seed: int,
+    ) -> None:
+        if not isinstance(schedule, LinearEpsilonSchedule):
+            raise ValueError("schedule must be a LinearEpsilonSchedule.")
+        if type(seed) is not int or seed < 0:
+            raise ValueError("Exploration seed must be a non-negative integer.")
+        self._online_network = online_network
+        self._schedule = schedule
+        self._seed = seed
+        self._generator = torch.Generator(device="cpu").manual_seed(seed)
+
+    @property
+    def schedule(self) -> LinearEpsilonSchedule:
+        return self._schedule
+
+    @property
+    def seed(self) -> int:
+        return self._seed
+
+    def select(
+        self,
+        observation: np.ndarray,
+        action_masks: Sequence[np.ndarray],
+        *,
+        completed_transition_count: int,
+    ) -> np.ndarray:
+        epsilon = self._schedule.epsilon_at(completed_transition_count)
+        return _select_seeded_epsilon_greedy_action(
+            self._online_network,
+            observation,
+            action_masks,
+            epsilon,
+            self._generator,
+        )
 
 
 @dataclass(frozen=True)

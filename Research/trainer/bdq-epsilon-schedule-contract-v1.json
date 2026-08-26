@@ -1,0 +1,78 @@
+{
+  "schema_version": "quickdraw.bdq-epsilon-schedule.v1",
+  "task": "R3I",
+  "purpose": "Freeze and unit-test the production Basic training epsilon schedule without launching Unity or opening another optimizer operation.",
+  "base_post_update_handoff_contract": {
+    "path": "Research/trainer/bdq-post-update-handoff-contract-v1.json",
+    "sha256": "53331db49c21d16c005ba6b1e7409a1cf40a1480d4f14d72d325700099bef581",
+    "schema_version": "quickdraw.bdq-post-update-handoff.v1"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "trainer_entry_points": []
+  },
+  "schedule": {
+    "class": "quickdraw_bdq.exploration.LinearEpsilonSchedule",
+    "counter": "BDQOptimizerController.decision_count",
+    "counter_semantics": "number of validated replay transitions already completed",
+    "formula": "initial_epsilon + (final_epsilon - initial_epsilon) * clamp((completed_transition_count - replay_warmup_decisions) / decay_decisions, 0, 1)",
+    "initial_epsilon": 1.0,
+    "final_epsilon": 0.1,
+    "replay_warmup_decisions": 10000,
+    "decay_decisions": 100000,
+    "decay_start_completed_transitions": 10000,
+    "decay_end_completed_transitions": 110000,
+    "epsilon_at_decay_start": 1.0,
+    "epsilon_at_midpoint": 0.55,
+    "midpoint_completed_transitions": 60000,
+    "epsilon_at_decay_end": 0.1,
+    "clamp_before_decay": true,
+    "clamp_after_decay": true,
+    "mutable_schedule_state": false
+  },
+  "selection": {
+    "class": "quickdraw_bdq.llapi.ScheduledEpsilonGreedyBDQActionSelector",
+    "exploration_seed": 61001,
+    "exploration_unit": "branch",
+    "random_generator": "torch.Generator(cpu)",
+    "random_legal_action_sampling": "uniform over ascending unmasked branch indices",
+    "full_exploration_skips_network_forward": true,
+    "existing_fixed_selector_compatibility_required": true
+  },
+  "evaluation": {
+    "training_epsilon_floor": 0.1,
+    "exploratory_validation_epsilon": 0.05,
+    "final_evaluation_epsilon": 0.0,
+    "evaluation_mutates_training_state": false
+  },
+  "verification": {
+    "boundary_completed_transition_counts": [0, 9999, 10000, 10001, 60000, 109999, 110000, 110001],
+    "mask_safe_selection_required": true,
+    "seeded_repeatability_required": true,
+    "invalid_configuration_rejection_required": true,
+    "unity_processes": 0,
+    "optimizer_updates": 0,
+    "target_synchronizations": 0
+  },
+  "exclusions": [
+    "Unity launch, LLAPI collection, or a third live optimizer update",
+    "extended training or target-network synchronization",
+    "checkpoint, resume, or ONNX export",
+    "ROCm execution or training",
+    "multi-environment collection",
+    "five-seed training or held-out evaluation",
+    "learned-policy effectiveness claims",
+    "changes to the R2A environment or action contract",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}

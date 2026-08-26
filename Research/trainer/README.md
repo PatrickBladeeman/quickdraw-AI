@@ -1,4 +1,4 @@
-# R3A-R3H BDQ foundation, direct LLAPI collection, and policy handoff
+# R3A-R3I BDQ foundation, direct LLAPI collection, and exploration schedule
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -10,7 +10,8 @@ R3F reaches the exact production warmup and performs one CPU update from real
 Unity transitions. R3G extends the same seeded run by four transitions and
 proves the second scheduled CPU update. R3H preserves that entire prefix, then
 uses the twice-updated online network for one legal masked-greedy action and
-completes its Unity transition.
+completes its Unity transition. R3I freezes and unit-tests the production
+epsilon schedule without launching Unity or opening another optimizer update.
 
 The tracked contract chain is:
 
@@ -26,6 +27,8 @@ The tracked contract chain is:
   transition recurring-update contract.
 - `bdq-post-update-handoff-contract-v1.json`: R3H's hash-bound R3G-prefix plus
   one post-update masked-greedy transition contract.
+- `bdq-epsilon-schedule-contract-v1.json`: R3I's hash-bound, stateless linear
+  production epsilon-schedule contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -36,11 +39,13 @@ boundary:
 - `action_space.py`: branch/joint mapping and strict mask-aware selection;
 - `targets.py`: per-branch Double-DQN targets and averaged Huber loss;
 - `optimizer.py`: online/target networks, Adam, replay, and exact counters;
+- `exploration.py`: the validated stateless linear production epsilon schedule;
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
   side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E through R3G. At epsilon `1.0`, the selector preserves the
-  exact exploration RNG sequence without evaluating unused network Q-values.
+  selector used by R3E through R3G and R3I's scheduled selector. At epsilon
+  `1.0`, both preserve the exact exploration RNG sequence without evaluating
+  unused network Q-values.
 
 The former `Trainer`, `Policy`, `Trajectory`, settings, plugin-registration,
 YAML, and next-mask-registry scaffolding has been removed. `pyproject.toml`
@@ -197,10 +202,16 @@ target synchronization occurs, and no decision remains pending. Two fresh
 processes produced byte-identical serialized traces with SHA-256
 `4341790871e0b5e3a990923601b45c052e9fb85e1e8ca20ae179421bb7977a87`.
 
+R3I derives training epsilon solely from the number of completed replay
+transitions. Epsilon remains `1.0` through transition 10,000, decays linearly
+over the next 100,000 transitions, reaches `0.1` at transition 110,000, and is
+clamped there. The schedule has no mutable state; the caller supplies the
+optimizer controller's completed-transition count to the scheduled selector.
+
 R3D and R3E are collection evidence. R3F and R3G are two minimal scheduled
 learning operations on real Unity experience. R3H is the first live proof that
-the resulting online weights drive an action; it is not an extended training
-run or effectiveness result. Epsilon decay, a third update, target
-synchronization, checkpoint/resume, ONNX export, ROCm training, learned-policy
-evaluation, gradual motion, strategic combat, reflexes, and LLM work remain
-outside this slice.
+the resulting online weights drive an action. R3I is a contract and unit gate,
+not an epsilon-decay rollout, extended training run, or effectiveness result. A
+third live update, target synchronization, checkpoint/resume, ONNX export,
+ROCm training, learned-policy evaluation, gradual motion, strategic combat,
+reflexes, and LLM work remain outside this slice.

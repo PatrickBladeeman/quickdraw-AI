@@ -699,7 +699,7 @@ live optimization once; it is not an epsilon-decay or extended-training gate.
 R3G is committed and pushed as `df036eb`
 (`R3G: additional smoke tests with updates`).
 
-### R3H. Post-update online-policy handoff — implemented and verified locally
+### R3H. Post-update online-policy handoff — completed and pushed
 
 - [x] Added strict `quickdraw.bdq-post-update-handoff.v1` contract and result
   schemas bound to the exact pushed R3G contract and its canonical 10,004-
@@ -735,6 +735,31 @@ and the two trace files are byte-identical. All 77 trainer tests and all 94
 Python research tests pass. R3H proves that updated weights reach live action
 selection; it does not claim the two updates learned an effective policy.
 
+R3H is committed and pushed as `769c4de` (`R3H: two-update smoke test with
+q-val difference`).
+
+### R3I. Production epsilon-schedule contract and unit gate — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-epsilon-schedule.v1` contract and schema bound
+  to the exact pushed R3H contract and pinned Python 3.11 CPU runtime.
+- [x] Added a frozen `LinearEpsilonSchedule` that derives epsilon only from the
+  completed-transition count: `1.0` through replay warmup, linear decay across
+  the next 100,000 transitions, and a `0.1` clamp from transition 110,000.
+- [x] Added a scheduled seeded branch selector that preserves physical action
+  masks and the epsilon-`1.0` no-inference fast path without changing the fixed
+  selector used by R3E through R3H.
+- [x] Added exact boundary, statelessness, schema drift, seeded repeatability,
+  mask safety, fast-path, and invalid-input tests.
+- [x] Passed all 30 focused R3I tests, all 107 trainer tests, and all 124 Python
+  research tests in the pinned CPU environment.
+- [x] Excluded Unity launch, a third live update, target synchronization,
+  checkpoint/export, ROCm training, extended training, held-out evaluation,
+  learned-policy claims, and changes to the R2A environment.
+
+R3I's contract SHA-256 is
+`0d0f3f855ecf19a642f5dab2e526a1be2d2f0a1a87dca70671f4fad3128c3fa7`.
+It is implemented and verified locally but is not committed or pushed.
+
 Remaining trainer and network work:
 
 - Use four stacked `84×84` grayscale frames.
@@ -744,10 +769,10 @@ Remaining trainer and network work:
   - 64 filters, `3×3`, stride 1;
   - 512-unit shared representation.
 - Use a scalar dueling value head and one mean-centered advantage head per action branch.
-- Add epsilon decay, extended Unity optimization, checkpointing, resume, and
-  inference export around the implemented replay, Double-DQN target, averaged
-  branch Huber loss, and optimizer schedule. Add gradient clipping only if
-  needed and documented.
+- Connect the implemented epsilon schedule to an extended Unity optimization
+  rollout, then add checkpointing, resume, and inference export around the
+  implemented replay, Double-DQN target, averaged branch Huber loss, and
+  optimizer schedule. Add gradient clipping only if needed and documented.
 
 Registered defaults:
 
@@ -758,7 +783,9 @@ Registered defaults:
 - Adam learning rate `1e-4`;
 - optimizer update every four decisions;
 - hard target synchronization every 10,000 optimizer updates;
-- epsilon decay from `1.0` to `0.1`, followed by a `0.05` evaluation floor only during exploratory validation; final evaluation is greedy;
+- epsilon `1.0` through 10,000 completed transitions, then linear decay to
+  `0.1` over 100,000 transitions, followed by a `0.05` evaluation floor only
+  during exploratory validation; final evaluation is greedy;
 - five independent policy-training seeds.
 
 Controls and diagnostics:
