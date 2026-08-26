@@ -1,0 +1,135 @@
+{
+  "schema_version": "quickdraw.bdq-scheduled-epsilon-handoff.v1",
+  "task": "R3J",
+  "purpose": "Preserve the complete R3G two-update prefix while driving every action through the production epsilon schedule, then complete exactly one schedule-derived Unity action after update 2 without opening a third optimizer update.",
+  "base_epsilon_schedule_contract": {
+    "path": "Research/trainer/bdq-epsilon-schedule-contract-v1.json",
+    "sha256": "0d0f3f855ecf19a642f5dab2e526a1be2d2f0a1a87dca70671f4fad3128c3fa7",
+    "schema_version": "quickdraw.bdq-epsilon-schedule.v1"
+  },
+  "live_prefix_source_contract": {
+    "path": "Research/trainer/bdq-post-update-handoff-contract-v1.json",
+    "sha256": "53331db49c21d16c005ba6b1e7409a1cf40a1480d4f14d72d325700099bef581",
+    "schema_version": "quickdraw.bdq-post-update-handoff.v1",
+    "inherited_section": "r3g_prefix"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "trainer_entry_points": []
+  },
+  "transport": {
+    "api": "mlagents_envs.environment.UnityEnvironment",
+    "behavior_name": "QuickDrawResearchBasic",
+    "agent_count": 1,
+    "observation_shape": [84, 84, 4],
+    "observation_layout": "HWC",
+    "observation_dtype": "float32",
+    "discrete_branches": [3, 2],
+    "transition_completion": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps",
+    "truncation_mask_transport": "quickdraw.basic-truncation-mask.v1",
+    "privileged_scene_inference_permitted": false
+  },
+  "collection": {
+    "scenario_seed": 31001,
+    "policy_seed": 51001,
+    "exploration_seed": 61001,
+    "selector": "seeded_scheduled_branch_epsilon_greedy",
+    "epsilon_decay_enabled": true,
+    "scheduled_transition_count": 10005,
+    "transition_limit": 10005,
+    "minimum_completed_episodes": 1,
+    "minimum_unique_action_tuples": 6,
+    "require_no_pending_decision_at_cutoff": true
+  },
+  "optimization": {
+    "replay_capacity": 100000,
+    "replay_warmup_decisions": 10000,
+    "batch_size": 64,
+    "gamma": 0.99,
+    "optimizer": "Adam",
+    "learning_rate": 0.0001,
+    "optimizer_update_interval_decisions": 4,
+    "hard_target_sync_interval_optimizer_updates": 10000,
+    "expected_first_update_decision": 10000,
+    "expected_update_decisions": [10000, 10004],
+    "expected_optimizer_updates": 2,
+    "expected_target_synchronizations": 0,
+    "require_finite_loss": true,
+    "require_finite_mean_absolute_td_error": true,
+    "require_online_weights_changed_after_each_update": true,
+    "require_target_weights_unchanged": true
+  },
+  "epsilon_schedule": {
+    "class": "quickdraw_bdq.exploration.LinearEpsilonSchedule",
+    "selector_class": "quickdraw_bdq.llapi.ScheduledEpsilonGreedyBDQActionSelector",
+    "completed_transition_count_source": "BDQOptimizerController.decision_count",
+    "replay_warmup_decisions": 10000,
+    "decay_decisions": 100000,
+    "initial_epsilon": 1.0,
+    "final_epsilon": 0.1,
+    "trace_sample_completed_transition_counts": [0, 10000, 10001, 10004],
+    "trace_sample_epsilons": [1.0, 1.0, 0.999991, 0.999964],
+    "selection_count": 10005,
+    "full_exploration_selection_count": 10001,
+    "decay_selection_count": 4,
+    "first_decay_completed_transition_count": 10001,
+    "last_selection_completed_transition_count": 10004,
+    "continuous_selector_rng_from_completed_count_zero": true
+  },
+  "r3g_prefix": {
+    "transition_count": 10004,
+    "canonical_transitions_sha256": "45554af94700fa1429e3487dcf2bd62f1c71f7419b4f1f80f0cf0ad905670f69",
+    "online_after_first_update_sha256": "7dd2365b5e219af10aeb4fabb5191df873762fcea6765cb50f83d41525279c8e",
+    "online_after_second_update_sha256": "6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471",
+    "frozen_target_sha256": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb",
+    "first_update_loss": 0.01628389209508896,
+    "first_update_mean_absolute_td_error": 0.06243317946791649,
+    "second_update_loss": 0.014819225296378136,
+    "second_update_mean_absolute_td_error": 0.06711231172084808
+  },
+  "scheduled_epsilon_handoff": {
+    "selection_after_decision_count": 10004,
+    "completed_transition_index": 10004,
+    "selection_ordinal": 10004,
+    "required_optimizer_update_count": 2,
+    "completed_transition_count_source": "BDQOptimizerController.decision_count",
+    "epsilon": 0.999964,
+    "expected_observation_sha256": "8d10e324956e2d5b7b8a7d70da58d33a9b170598727998146dcfec858bab8a83",
+    "expected_action_masks": [[false, true, false], [false, false]],
+    "expected_selected_action": [0, 0],
+    "action_source": "continuous_seeded_production_epsilon_schedule",
+    "require_latest_online_network": true,
+    "require_frozen_target_network": true,
+    "require_action_legal": true,
+    "require_no_pending_decision_after_completion": true
+  },
+  "determinism": {
+    "fresh_processes": 2,
+    "exact_trace_equality": true,
+    "torch_num_threads": 1,
+    "torch_num_interop_threads": 1,
+    "deterministic_algorithms": true
+  },
+  "exclusions": [
+    "a third optimizer update or any extended training rollout",
+    "target-network synchronization",
+    "checkpoint, resume, or ONNX export",
+    "ROCm execution or training",
+    "multi-environment collection",
+    "five-seed training or held-out evaluation",
+    "learned-policy effectiveness claims",
+    "changes to the R2A environment or action contract",
+    "watch-mode camera maintenance",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}

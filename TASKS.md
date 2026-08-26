@@ -738,7 +738,7 @@ selection; it does not claim the two updates learned an effective policy.
 R3H is committed and pushed as `769c4de` (`R3H: two-update smoke test with
 q-val difference`).
 
-### R3I. Production epsilon-schedule contract and unit gate — implemented and verified locally
+### R3I. Production epsilon-schedule contract and unit gate — completed and pushed
 
 - [x] Added strict `quickdraw.bdq-epsilon-schedule.v1` contract and schema bound
   to the exact pushed R3H contract and pinned Python 3.11 CPU runtime.
@@ -758,7 +758,38 @@ q-val difference`).
 
 R3I's contract SHA-256 is
 `0d0f3f855ecf19a642f5dab2e526a1be2d2f0a1a87dca70671f4fad3128c3fa7`.
-It is implemented and verified locally but is not committed or pushed.
+R3I is committed and pushed as `8d999d4` (`R3I: deterministic episilon greedy
+tests`).
+
+### R3J. Live scheduled-epsilon handoff — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-scheduled-epsilon-handoff.v1` contract plus
+  contract/result schemas bound to pushed R3I and R3H's embedded R3G prefix.
+- [x] Reused one `ScheduledEpsilonGreedyBDQActionSelector` continuously from
+  completed-transition count 0 through 10,004 and passed the optimizer
+  controller's live `decision_count` directly into every selection.
+- [x] Preserved the canonical 10,004-transition R3G prefix, both exact update
+  metrics and online hashes, and the frozen target hash.
+- [x] Verified the exact boundary samples `1.0` at counts 0 and 10,000,
+  `0.999991` at 10,001, and `0.999964` at 10,004.
+- [x] Completed transition 10,005 with deterministic legal exploratory action
+  `[0,0]` under movement mask `[false,true,false]`, with no pending decision,
+  third optimizer update, or target synchronization.
+- [x] Two fresh Python/Unity processes completed 215 episodes, handled three
+  truncations, exercised all six action tuples, and produced byte-identical
+  traces.
+- [x] Passed all 11 focused R3J tests, all 118 trainer tests, and all 135 Python
+  research tests in the pinned CPU environment.
+- [x] Excluded an extended decay rollout, checkpoint/export, ROCm training,
+  held-out evaluation, learned-policy claims, and Unity/environment changes.
+
+R3J's contract SHA-256 is
+`a8d47b166cdf1d553a9da5dbe0b028b7a658341bea894de359848644fa3be8a5`.
+Its canonical trace SHA-256 is
+`5e3a8ea3d2c0f0afb87fd87f92f6bf90036a6a95fc3f6124ccc0910ca07aa906`;
+both serialized worker traces have SHA-256
+`135d6a30c8526cd7422f9e30ff21cd997bd05a0ccbcdc5efd75b6fe1182d04a7`.
+R3J is implemented and verified locally but is not committed or pushed.
 
 Remaining trainer and network work:
 

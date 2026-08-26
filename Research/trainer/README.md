@@ -1,4 +1,4 @@
-# R3A-R3I BDQ foundation, direct LLAPI collection, and exploration schedule
+# R3A-R3J BDQ foundation, direct LLAPI collection, and exploration schedule
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -12,6 +12,9 @@ proves the second scheduled CPU update. R3H preserves that entire prefix, then
 uses the twice-updated online network for one legal masked-greedy action and
 completes its Unity transition. R3I freezes and unit-tests the production
 epsilon schedule without launching Unity or opening another optimizer update.
+R3J then drives every action in a bounded two-process Unity run through one
+continuous production scheduled selector and completes one live scheduled
+handoff after update 2 without opening update 3.
 
 The tracked contract chain is:
 
@@ -29,6 +32,8 @@ The tracked contract chain is:
   one post-update masked-greedy transition contract.
 - `bdq-epsilon-schedule-contract-v1.json`: R3I's hash-bound, stateless linear
   production epsilon-schedule contract.
+- `bdq-scheduled-epsilon-handoff-contract-v1.json`: R3J's hash-bound,
+  exactly-10,005-transition continuous scheduled-selector handoff contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -43,7 +48,7 @@ boundary:
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
   side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E through R3G and R3I's scheduled selector. At epsilon
+  selector used by R3E through R3G and R3I/R3J's scheduled selector. At epsilon
   `1.0`, both preserve the exact exploration RNG sequence without evaluating
   unused network Q-values.
 
@@ -208,10 +213,32 @@ over the next 100,000 transitions, reaches `0.1` at transition 110,000, and is
 clamped there. The schedule has no mutable state; the caller supplies the
 optimizer controller's completed-transition count to the scheduled selector.
 
+Run the R3J scheduled-epsilon live handoff gate:
+
+```powershell
+& $python Research\trainer\run_bdq_scheduled_epsilon_handoff_smoke.py `
+  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3j-scheduled-epsilon-handoff\acceptance
+```
+
+Each accepted process uses one scheduled selector continuously for all 10,005
+actions. Counts 0 through 10,000 use epsilon `1.0`; counts 10,001 through
+10,004 use the first four decay values. The exact 10,004-transition R3G prefix,
+two optimizer results, online hashes, and frozen target hash remain unchanged.
+At completed-transition count 10,004, epsilon is `0.999964` and the continuous
+seed-`61001` stream selects legal exploratory action `[0,0]` under movement mask
+`[false,true,false]`. The action completes transition 10,005. Two fresh traces
+match byte-for-byte with SHA-256
+`135d6a30c8526cd7422f9e30ff21cd997bd05a0ccbcdc5efd75b6fe1182d04a7`;
+the canonical trace SHA-256 is
+`5e3a8ea3d2c0f0afb87fd87f92f6bf90036a6a95fc3f6124ccc0910ca07aa906`.
+
 R3D and R3E are collection evidence. R3F and R3G are two minimal scheduled
 learning operations on real Unity experience. R3H is the first live proof that
-the resulting online weights drive an action. R3I is a contract and unit gate,
-not an epsilon-decay rollout, extended training run, or effectiveness result. A
-third live update, target synchronization, checkpoint/resume, ONNX export,
-ROCm training, learned-policy evaluation, gradual motion, strategic combat,
-reflexes, and LLM work remain outside this slice.
+the resulting online weights drive a greedy action. R3I is the schedule unit
+gate, and R3J proves its bounded live counter/RNG/mask integration. Because the
+R3J action is exploratory, it is not evidence that learned weights chose that
+action or that a useful policy exists. A third live update, extended decay
+rollout, target synchronization, checkpoint/resume, ONNX export, ROCm training,
+learned-policy evaluation, gradual motion, strategic combat, reflexes, and LLM
+work remain outside this slice.

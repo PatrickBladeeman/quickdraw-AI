@@ -33,7 +33,9 @@ from quickdraw_bdq import (  # noqa: E402
     BasicTruncationMaskSideChannel,
     DirectReplayCollector,
     LLAPIContractError,
+    LinearEpsilonSchedule,
     OptimizationStepResult,
+    ScheduledEpsilonGreedyBDQActionSelector,
     SeededEpsilonGreedyBDQActionSelector,
     greedy_actions,
     network_sha256,
@@ -336,6 +338,125 @@ def _select_post_update_greedy_action(
     return action, evidence
 
 
+def _select_scheduled_epsilon_handoff_action(
+    controller: BDQOptimizerController,
+    selector: ScheduledEpsilonGreedyBDQActionSelector,
+    observation: np.ndarray,
+    action_masks: Sequence[np.ndarray],
+    *,
+    handoff_contract: Dict[str, Any],
+    optimization_events: Sequence[Dict[str, Any]],
+    target_before_sha256: str,
+    episode_index: int,
+    episode_decision_index: int,
+) -> tuple[np.ndarray, Dict[str, Any]]:
+    """Select one live scheduled action after the registered optimizer prefix."""
+
+    selection_after = int(handoff_contract["selection_after_decision_count"])
+    required_updates = int(handoff_contract["required_optimizer_update_count"])
+    if controller.decision_count != selection_after:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection opened at the wrong decision."
+        )
+    if controller.optimizer_update_count != required_updates:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection observed the wrong optimizer count."
+        )
+    if controller.target_sync_count != 0:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection observed a target synchronization."
+        )
+    if len(optimization_events) != required_updates:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection is not bound to every prior update."
+        )
+
+    epsilon = selector.schedule.epsilon_at(controller.decision_count)
+    if not math.isclose(
+        epsilon,
+        float(handoff_contract["epsilon"]),
+        rel_tol=0.0,
+        abs_tol=1.0e-12,
+    ):
+        raise LLAPIContractError(
+            "Scheduled epsilon selection used the wrong epsilon."
+        )
+    validated_observation = validate_observation(
+        observation,
+        "scheduled epsilon handoff observation",
+    )
+    validated_masks = validate_action_masks(
+        action_masks,
+        "scheduled epsilon handoff action_masks",
+    )
+    online_sha256 = network_sha256(controller.online_network)
+    target_sha256 = network_sha256(controller.target_network)
+    if online_sha256 != optimization_events[-1]["online_after_sha256"]:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection did not use the latest online network."
+        )
+    if target_sha256 != target_before_sha256:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection observed a changed target network."
+        )
+
+    action = selector.select(
+        validated_observation,
+        validated_masks,
+        completed_transition_count=controller.decision_count,
+    )
+    if any(
+        bool(validated_masks[branch][int(branch_action)])
+        for branch, branch_action in enumerate(action)
+    ):
+        raise LLAPIContractError(
+            "Scheduled epsilon selection chose an unavailable action."
+        )
+    masks_json = _masks_to_json(validated_masks)
+    action_json = [int(value) for value in action]
+    expected_masks = handoff_contract.get("expected_action_masks")
+    if expected_masks is not None and masks_json != expected_masks:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection observed unexpected action masks."
+        )
+    expected_action = handoff_contract.get("expected_selected_action")
+    if expected_action is not None and action_json != expected_action:
+        raise LLAPIContractError(
+            "Scheduled epsilon selection differs from its registered action."
+        )
+    observation_hash = observation_sha256(validated_observation)
+    expected_observation_hash = handoff_contract.get(
+        "expected_observation_sha256"
+    )
+    if (
+        expected_observation_hash is not None
+        and observation_hash != expected_observation_hash
+    ):
+        raise LLAPIContractError(
+            "Scheduled epsilon selection observed the wrong live state."
+        )
+    evidence = {
+        "selection_after_decision_count": controller.decision_count,
+        "transition_index": controller.decision_count,
+        "selection_ordinal": controller.decision_count,
+        "episode_index": episode_index,
+        "episode_decision_index": episode_decision_index,
+        "completed_transition_count_source": handoff_contract[
+            "completed_transition_count_source"
+        ],
+        "epsilon": epsilon,
+        "optimizer_update_count": controller.optimizer_update_count,
+        "target_sync_count": controller.target_sync_count,
+        "online_sha256": online_sha256,
+        "target_sha256": target_sha256,
+        "observation_sha256": observation_hash,
+        "action_masks": masks_json,
+        "selected_action": action_json,
+        "selected_action_legal": True,
+    }
+    return action, evidence
+
+
 def _emit_watch_progress(
     result: OptimizationStepResult,
     transition: Dict[str, Any],
@@ -436,23 +557,34 @@ def execute_update_gate_worker(
         raise LLAPIContractError(
             f"{task_name} registered update decisions differ from its schedule."
         )
-    handoff_contract = contract.get("post_update_greedy_handoff")
-    if handoff_contract is None:
+    greedy_handoff_contract = contract.get("post_update_greedy_handoff")
+    scheduled_handoff_contract = contract.get("scheduled_epsilon_handoff")
+    if (
+        greedy_handoff_contract is not None
+        and scheduled_handoff_contract is not None
+    ):
+        raise LLAPIContractError(
+            f"{task_name} cannot register two policy handoffs."
+        )
+    continuation_handoff_contract = (
+        greedy_handoff_contract or scheduled_handoff_contract
+    )
+    if continuation_handoff_contract is None:
         if expected_update_decisions[-1] != transition_limit:
             raise LLAPIContractError(
                 f"{task_name} cutoff is not its final registered optimizer update."
             )
     else:
         selection_after = int(
-            handoff_contract["selection_after_decision_count"]
+            continuation_handoff_contract["selection_after_decision_count"]
         )
         if selection_after != expected_update_decisions[-1]:
             raise LLAPIContractError(
-                f"{task_name} greedy handoff does not follow its final update."
+                f"{task_name} policy handoff does not follow its final update."
             )
         if transition_limit != selection_after + 1:
             raise LLAPIContractError(
-                f"{task_name} must complete exactly one greedy handoff transition."
+                f"{task_name} must complete exactly one policy handoff transition."
             )
     configure_torch(determinism, task_name)
 
@@ -461,11 +593,36 @@ def execute_update_gate_worker(
     policy_seed = int(collection["policy_seed"])
     controller = BDQOptimizerController(policy_seed, settings)
     collector = DirectReplayCollector(controller)
-    selector = SeededEpsilonGreedyBDQActionSelector(
-        controller.online_network,
-        epsilon=float(collection["epsilon"]),
-        seed=int(collection["exploration_seed"]),
-    )
+    fixed_selector: SeededEpsilonGreedyBDQActionSelector | None = None
+    scheduled_selector: ScheduledEpsilonGreedyBDQActionSelector | None = None
+    schedule_sample_counts: tuple[int, ...] = ()
+    if scheduled_handoff_contract is None:
+        fixed_selector = SeededEpsilonGreedyBDQActionSelector(
+            controller.online_network,
+            epsilon=float(collection["epsilon"]),
+            seed=int(collection["exploration_seed"]),
+        )
+    else:
+        schedule_contract = contract["epsilon_schedule"]
+        schedule = LinearEpsilonSchedule(
+            replay_warmup_decisions=int(
+                schedule_contract["replay_warmup_decisions"]
+            ),
+            decay_decisions=int(schedule_contract["decay_decisions"]),
+            initial_epsilon=float(schedule_contract["initial_epsilon"]),
+            final_epsilon=float(schedule_contract["final_epsilon"]),
+        )
+        scheduled_selector = ScheduledEpsilonGreedyBDQActionSelector(
+            controller.online_network,
+            schedule=schedule,
+            seed=int(collection["exploration_seed"]),
+        )
+        schedule_sample_counts = tuple(
+            int(value)
+            for value in schedule_contract[
+                "trace_sample_completed_transition_counts"
+            ]
+        )
     online_before = network_sha256(controller.online_network)
     target_before = network_sha256(controller.target_network)
     if online_before != target_before:
@@ -478,7 +635,10 @@ def execute_update_gate_worker(
     truncation_events: list[Dict[str, Any]] = []
     optimization_events: list[Dict[str, Any]] = []
     post_update_greedy_handoff: Dict[str, Any] | None = None
+    scheduled_epsilon_handoff: Dict[str, Any] | None = None
     seeded_random_selection_count = 0
+    scheduled_selection_count = 0
+    observed_epsilon_samples: list[Dict[str, Any]] = []
     active_episode_index = 0
     episode_decision_index = 0
     episode_start_index = 0
@@ -649,9 +809,13 @@ def execute_update_gate_worker(
                         reached_limit = True
                         break
                 if (
-                    handoff_contract is not None
+                    greedy_handoff_contract is not None
                     and controller.decision_count
-                    == int(handoff_contract["selection_after_decision_count"])
+                    == int(
+                        greedy_handoff_contract[
+                            "selection_after_decision_count"
+                        ]
+                    )
                 ):
                     if post_update_greedy_handoff is not None:
                         raise LLAPIContractError(
@@ -662,15 +826,65 @@ def execute_update_gate_worker(
                             controller,
                             observation,
                             action_masks,
-                            handoff_contract=handoff_contract,
+                            handoff_contract=greedy_handoff_contract,
                             optimization_events=optimization_events,
                             target_before_sha256=target_before,
                             episode_index=active_episode_index,
                             episode_decision_index=episode_decision_index,
                         )
                     )
+                elif scheduled_selector is not None:
+                    completed_transition_count = controller.decision_count
+                    epsilon = scheduled_selector.schedule.epsilon_at(
+                        completed_transition_count
+                    )
+                    if completed_transition_count in schedule_sample_counts:
+                        observed_epsilon_samples.append(
+                            {
+                                "completed_transition_count": (
+                                    completed_transition_count
+                                ),
+                                "epsilon": epsilon,
+                            }
+                        )
+                    if (
+                        scheduled_handoff_contract is not None
+                        and completed_transition_count
+                        == int(
+                            scheduled_handoff_contract[
+                                "selection_after_decision_count"
+                            ]
+                        )
+                    ):
+                        if scheduled_epsilon_handoff is not None:
+                            raise LLAPIContractError(
+                                f"{task_name} repeated its scheduled handoff."
+                            )
+                        action, scheduled_epsilon_handoff = (
+                            _select_scheduled_epsilon_handoff_action(
+                                controller,
+                                scheduled_selector,
+                                observation,
+                                action_masks,
+                                handoff_contract=scheduled_handoff_contract,
+                                optimization_events=optimization_events,
+                                target_before_sha256=target_before,
+                                episode_index=active_episode_index,
+                                episode_decision_index=episode_decision_index,
+                            )
+                        )
+                    else:
+                        action = scheduled_selector.select(
+                            observation,
+                            action_masks,
+                            completed_transition_count=(
+                                completed_transition_count
+                            ),
+                        )
+                    scheduled_selection_count += 1
                 else:
-                    action = selector.select(observation, action_masks)
+                    assert fixed_selector is not None
+                    action = fixed_selector.select(observation, action_masks)
                     seeded_random_selection_count += 1
                 collector.begin(agent_id, observation, action, action_masks)
                 actions[decision_row] = action
@@ -711,7 +925,7 @@ def execute_update_gate_worker(
             raise LLAPIContractError(
                 f"Pending decisions remain at cutoff: {collector.pending_agent_ids}."
             )
-        if handoff_contract is not None:
+        if greedy_handoff_contract is not None:
             if post_update_greedy_handoff is None:
                 raise LLAPIContractError(
                     f"{task_name} omitted its post-update greedy handoff."
@@ -739,6 +953,35 @@ def execute_update_gate_worker(
             ]:
                 raise LLAPIContractError(
                     f"{task_name} greedy handoff masks differ from replay."
+                )
+        if scheduled_handoff_contract is not None:
+            if scheduled_epsilon_handoff is None:
+                raise LLAPIContractError(
+                    f"{task_name} omitted its scheduled epsilon handoff."
+                )
+            handoff_index = int(scheduled_epsilon_handoff["transition_index"])
+            if handoff_index >= len(transitions):
+                raise LLAPIContractError(
+                    f"{task_name} did not complete its scheduled handoff transition."
+                )
+            handoff_transition = transitions[handoff_index]
+            if handoff_transition["action"] != scheduled_epsilon_handoff[
+                "selected_action"
+            ]:
+                raise LLAPIContractError(
+                    f"{task_name} scheduled handoff action differs from replay."
+                )
+            if handoff_transition["observation_sha256"] != (
+                scheduled_epsilon_handoff["observation_sha256"]
+            ):
+                raise LLAPIContractError(
+                    f"{task_name} scheduled handoff observation differs from replay."
+                )
+            if handoff_transition["action_masks"] != scheduled_epsilon_handoff[
+                "action_masks"
+            ]:
+                raise LLAPIContractError(
+                    f"{task_name} scheduled handoff masks differ from replay."
                 )
         side_channel.assert_empty()
         completed_episode_count = sum(
@@ -786,22 +1029,67 @@ def execute_update_gate_worker(
             )
 
         selector_trace: Dict[str, Any]
-        if handoff_contract is None:
+        if scheduled_selector is not None:
+            if scheduled_selection_count != transition_limit:
+                raise LLAPIContractError(
+                    f"{task_name} scheduled selector count differs from cutoff."
+                )
+            if [
+                sample["completed_transition_count"]
+                for sample in observed_epsilon_samples
+            ] != list(schedule_sample_counts):
+                raise LLAPIContractError(
+                    f"{task_name} omitted a registered epsilon sample."
+                )
             selector_trace = {
                 "name": collection["selector"],
-                "epsilon": selector.epsilon,
                 "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
-                "exploration_seed": selector.seed,
+                "exploration_seed": scheduled_selector.seed,
+                "selection_count": scheduled_selection_count,
+                "full_exploration_selection_count": min(
+                    transition_limit,
+                    scheduled_selector.schedule.replay_warmup_decisions + 1,
+                ),
+                "decay_selection_count": max(
+                    0,
+                    transition_limit
+                    - scheduled_selector.schedule.replay_warmup_decisions
+                    - 1,
+                ),
+                "first_decay_completed_transition_count": (
+                    scheduled_selector.schedule.replay_warmup_decisions + 1
+                ),
+                "completed_transition_count_source": (
+                    scheduled_handoff_contract[
+                        "completed_transition_count_source"
+                    ]
+                ),
+                "first_selection_completed_transition_count": 0,
+                "last_selection_completed_transition_count": (
+                    transition_limit - 1
+                ),
+                "epsilon_samples": observed_epsilon_samples,
+                "action_tuple_counts": action_tuple_counts,
+                "unique_action_tuple_count": unique_action_tuple_count,
+            }
+        elif greedy_handoff_contract is None:
+            assert fixed_selector is not None
+            selector_trace = {
+                "name": collection["selector"],
+                "epsilon": fixed_selector.epsilon,
+                "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
+                "exploration_seed": fixed_selector.seed,
                 "selection_count": sum(action_tuple_counts),
                 "action_tuple_counts": action_tuple_counts,
                 "unique_action_tuple_count": unique_action_tuple_count,
             }
         else:
+            assert fixed_selector is not None
             selector_trace = {
                 "name": collection["selector"],
-                "epsilon_prefix": selector.epsilon,
+                "epsilon_prefix": fixed_selector.epsilon,
                 "epsilon_decay_enabled": collection["epsilon_decay_enabled"],
-                "exploration_seed": selector.seed,
+                "exploration_seed": fixed_selector.seed,
                 "selection_count": sum(action_tuple_counts),
                 "seeded_random_selection_count": seeded_random_selection_count,
                 "post_update_greedy_selection_count": 1,
@@ -868,6 +1156,8 @@ def execute_update_gate_worker(
         }
         if post_update_greedy_handoff is not None:
             trace["post_update_greedy_handoff"] = post_update_greedy_handoff
+        if scheduled_epsilon_handoff is not None:
+            trace["scheduled_epsilon_handoff"] = scheduled_epsilon_handoff
         trace_path = worker_output / trace_file_name
         trace_path.write_text(
             json.dumps(trace, indent=2, sort_keys=True) + "\n",
