@@ -792,7 +792,7 @@ both serialized worker traces have SHA-256
 R3J is committed and pushed as `32e78c6` (`R3J: deterministic epsilon greedy
 decay tests`).
 
-### R3K. Scheduled third Unity-derived optimizer update — implemented and verified locally
+### R3K. Scheduled third Unity-derived optimizer update — complete and pushed
 
 - [x] Added strict `quickdraw.bdq-third-update.v1` contract and contract/result
   schemas bound to pushed R3J and its exact 10,005-transition prefix.
@@ -825,7 +825,54 @@ Its canonical trace SHA-256 is
 `c3fafe259dfc03d69e06c758af0c2ba4df3b5da3322d325a5e361cdcf3a4ff02`;
 both serialized worker traces have SHA-256
 `4e4733dd5e5cbfbd7daa21f6d2ad8c48981b4369769d8df000b709e9c115dde4`.
-R3K is implemented and verified locally but is not committed or pushed.
+R3K is committed and pushed as `2960e5b` (`R3K: 3rd optimizer update`).
+
+### R3L. Update-3 live masked-greedy handoff — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-third-update-greedy-handoff.v1` contract and
+  contract/result schemas bound to pushed R3K and its exact 10,008-transition
+  prefix.
+- [x] Preserved the same scheduled selector, RNG, controller, replay, networks,
+  optimizer, three update events, online hashes, metrics, and frozen target
+  throughout that prefix.
+- [x] At completed-transition count 10,008, bypassed rather than consumed the
+  production schedule's epsilon `0.999928`, and performed exactly one explicit
+  epsilon-zero diagnostic selection from the update-3 online network.
+- [x] Selected legal masked online argmax `[2,1]` under movement mask
+  `[false,true,false]`, completed transition 10,009, and stopped with three
+  optimizer updates, zero target synchronizations, and no pending decision.
+- [x] Recorded the online and target Q arrays and maximum absolute Q delta
+  `0.08219506591558456`; the handoff online hash is update 3's
+  `4f78e397e87ad6cea1ada78d49dea808337c401f6478970d1a4439065743775b`
+  and the target remains
+  `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`.
+- [x] Validated two completed traces from independent fresh Unity/Python
+  processes. They are object-equal and raw-byte-equal, with canonical trace
+  SHA-256
+  `19d5681bc78d8b1c7df0bef0e4ea3a5a32f757629428e11fa2961c5cafd581e3`
+  and serialized SHA-256
+  `1334f396fa0445cf4c4563c28ef22e8fa8cfc8ce383687b3c2918d1515bc4665`.
+- [x] Added a fail-closed recovery comparison mode for completed workers from
+  separate parent attempts. It revalidates both full traces, rejects the same
+  file, and still requires parsed and raw-byte equality; failed or partial
+  workers do not count.
+- [x] Passed all 22 focused R3L cases, all 153 trainer tests, all 170 Python
+  research tests, result/schema revalidation, bytecode compilation, and the
+  pinned environment's dependency check.
+- [x] Preserved the negative execution record: three attempted Unity workers
+  timed out at the LLAPI transport boundary and two retries were
+  operator-stopped (one for the requested cleanup and one to correct the
+  sleep-suppression wrapper); no threshold or trace requirement was weakened,
+  and only two independently completed workers supply acceptance evidence.
+- [x] Excluded update 4, an extended decay or training rollout, target
+  synchronization, checkpoint/export, ROCm training, held-out evaluation,
+  policy-effectiveness claims, and Unity/environment changes.
+
+R3L's contract SHA-256 is
+`f56cfab90ba82e616e0e2be55f5d77d3262c98ac2dcc9bd604e735831f4b0ce6`.
+The accepted generated result SHA-256 is
+`d53971c1155634722375cdc564f7c4a5207c2fa59b0d27c1abacd3d70de898ac`.
+R3L is not committed or pushed.
 
 Remaining trainer and network work:
 

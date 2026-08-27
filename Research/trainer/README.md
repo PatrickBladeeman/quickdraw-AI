@@ -1,4 +1,4 @@
-# R3A-R3K BDQ foundation, direct LLAPI collection, and exploration schedule
+# R3A-R3L BDQ foundation, direct LLAPI collection, and exploration schedule
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -18,6 +18,10 @@ handoff after update 2 without opening update 3.
 R3K preserves that complete 10,005-transition prefix, consumes exactly three
 more scheduled actions, and stops when optimizer update 3 completes at decision
 10,008 without selecting a post-update action.
+R3L preserves all 10,008 R3K transitions, then deliberately bypasses the
+production schedule for one epsilon-zero diagnostic handoff from the update-3
+online network. It completes that legal masked-greedy action and stops before
+update 4.
 
 The tracked contract chain is:
 
@@ -39,6 +43,8 @@ The tracked contract chain is:
   exactly-10,005-transition continuous scheduled-selector handoff contract.
 - `bdq-third-update-contract-v1.json`: R3K's hash-bound, exactly-10,008-
   transition continuous scheduled-selector third-update contract.
+- `bdq-third-update-greedy-handoff-contract-v1.json`: R3L's hash-bound R3K
+  prefix plus one update-3 masked-greedy transition contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -53,7 +59,7 @@ boundary:
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
   side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E through R3G and R3I-R3K's scheduled selector. At epsilon
+  selector used by R3E through R3G and R3I-R3L's scheduled selector. At epsilon
   `1.0`, both preserve the exact exploration RNG sequence without evaluating
   unused network Q-values.
 
@@ -258,13 +264,50 @@ after update 3. Two fresh serialized traces match byte-for-byte with SHA-256
 the canonical trace SHA-256 is
 `c3fafe259dfc03d69e06c758af0c2ba4df3b5da3322d325a5e361cdcf3a4ff02`.
 
+Run the R3L update-3 masked-greedy handoff gate:
+
+```powershell
+& $python Research\trainer\run_bdq_third_update_greedy_handoff_smoke.py `
+  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3l-third-update-greedy-handoff\acceptance
+```
+
+Each accepted process preserves R3K's exact 10,008-transition scheduled prefix
+and all three optimizer events. At completed-transition count 10,008, R3L does
+not consume the production schedule's epsilon `0.999928`; it instead performs
+one diagnostic epsilon-zero evaluation of the live observation with the
+update-3 online network and frozen target. The legal masked online argmax is
+`[2,1]`, completing transition 10,009 with no pending decision, fourth update,
+or target synchronization. The maximum online-versus-target Q delta is
+`0.08219506591558456`. Two independent fresh-process traces have canonical
+SHA-256 `19d5681bc78d8b1c7df0bef0e4ea3a5a32f757629428e11fa2961c5cafd581e3`
+and serialized SHA-256
+`1334f396fa0445cf4c4563c28ef22e8fa8cfc8ce383687b3c2918d1515bc4665`.
+
+If valid workers finish in separate parent attempts because a later Unity
+process times out, compare only the completed trace files and write a fresh
+result with the recovery-validation mode:
+
+```powershell
+& $python Research\trainer\run_bdq_third_update_greedy_handoff_smoke.py `
+  --output Artifacts\Experiments\r3l-third-update-greedy-handoff\accepted-pair `
+  --first-trace <first-complete-trace.json> `
+  --second-trace <second-complete-trace.json>
+```
+
+This path still validates both full traces against the frozen contract and
+requires distinct files, object equality, and raw-byte equality. Failed or
+partial workers never count toward `fresh_process_count`.
+
 R3D and R3E are collection evidence. R3F, R3G, and R3K are three minimal scheduled
 learning operations on real Unity experience. R3H is the first live proof that
 the resulting online weights drive a greedy action. R3I is the schedule unit
 gate, and R3J proves its bounded live counter/RNG/mask integration. Because the
 R3J action is exploratory, it is not evidence that learned weights chose that
 action or that a useful policy exists. R3K proves only that the same scheduled
-loop reaches update 3 and stops cleanly. Extended decay rollout, target
+loop reaches update 3 and stops cleanly. R3L proves that the update-3 weights
+reach one live greedy selection; it does not prove the third update changed the
+chosen action or that the policy is effective. Extended decay rollout, target
 synchronization, checkpoint/resume, ONNX export, ROCm training, learned-policy
 evaluation, gradual motion, strategic combat, reflexes, and LLM work remain
 outside this slice.

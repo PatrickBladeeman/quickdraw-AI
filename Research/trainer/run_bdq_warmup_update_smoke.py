@@ -1031,9 +1031,22 @@ def execute_update_gate_worker(
         selector_trace: Dict[str, Any]
         if scheduled_selector is not None:
             assert schedule_contract is not None
-            if scheduled_selection_count != transition_limit:
+            expected_scheduled_selection_count = int(
+                schedule_contract["selection_count"]
+            )
+            if scheduled_selection_count != expected_scheduled_selection_count:
                 raise LLAPIContractError(
-                    f"{task_name} scheduled selector count differs from cutoff."
+                    f"{task_name} scheduled selector count differs from contract."
+                )
+            post_update_greedy_selection_count = int(
+                post_update_greedy_handoff is not None
+            )
+            if (
+                scheduled_selection_count + post_update_greedy_selection_count
+                != transition_limit
+            ):
+                raise LLAPIContractError(
+                    f"{task_name} selector counts differ from cutoff."
                 )
             if [
                 sample["completed_transition_count"]
@@ -1048,12 +1061,12 @@ def execute_update_gate_worker(
                 "exploration_seed": scheduled_selector.seed,
                 "selection_count": scheduled_selection_count,
                 "full_exploration_selection_count": min(
-                    transition_limit,
+                    scheduled_selection_count,
                     scheduled_selector.schedule.replay_warmup_decisions + 1,
                 ),
                 "decay_selection_count": max(
                     0,
-                    transition_limit
+                    scheduled_selection_count
                     - scheduled_selector.schedule.replay_warmup_decisions
                     - 1,
                 ),
@@ -1067,12 +1080,20 @@ def execute_update_gate_worker(
                 ),
                 "first_selection_completed_transition_count": 0,
                 "last_selection_completed_transition_count": (
-                    transition_limit - 1
+                    scheduled_selection_count - 1
                 ),
                 "epsilon_samples": observed_epsilon_samples,
                 "action_tuple_counts": action_tuple_counts,
                 "unique_action_tuple_count": unique_action_tuple_count,
             }
+            if greedy_handoff_contract is not None:
+                selector_trace["selection_count"] = sum(action_tuple_counts)
+                selector_trace["scheduled_selection_count"] = (
+                    scheduled_selection_count
+                )
+                selector_trace["post_update_greedy_selection_count"] = (
+                    post_update_greedy_selection_count
+                )
         elif greedy_handoff_contract is None:
             assert fixed_selector is not None
             selector_trace = {
