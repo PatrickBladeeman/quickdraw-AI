@@ -559,6 +559,7 @@ def execute_update_gate_worker(
         )
     greedy_handoff_contract = contract.get("post_update_greedy_handoff")
     scheduled_handoff_contract = contract.get("scheduled_epsilon_handoff")
+    schedule_contract = contract.get("epsilon_schedule")
     if (
         greedy_handoff_contract is not None
         and scheduled_handoff_contract is not None
@@ -596,14 +597,13 @@ def execute_update_gate_worker(
     fixed_selector: SeededEpsilonGreedyBDQActionSelector | None = None
     scheduled_selector: ScheduledEpsilonGreedyBDQActionSelector | None = None
     schedule_sample_counts: tuple[int, ...] = ()
-    if scheduled_handoff_contract is None:
+    if schedule_contract is None:
         fixed_selector = SeededEpsilonGreedyBDQActionSelector(
             controller.online_network,
             epsilon=float(collection["epsilon"]),
             seed=int(collection["exploration_seed"]),
         )
     else:
-        schedule_contract = contract["epsilon_schedule"]
         schedule = LinearEpsilonSchedule(
             replay_warmup_decisions=int(
                 schedule_contract["replay_warmup_decisions"]
@@ -1030,6 +1030,7 @@ def execute_update_gate_worker(
 
         selector_trace: Dict[str, Any]
         if scheduled_selector is not None:
+            assert schedule_contract is not None
             if scheduled_selection_count != transition_limit:
                 raise LLAPIContractError(
                     f"{task_name} scheduled selector count differs from cutoff."
@@ -1060,7 +1061,7 @@ def execute_update_gate_worker(
                     scheduled_selector.schedule.replay_warmup_decisions + 1
                 ),
                 "completed_transition_count_source": (
-                    scheduled_handoff_contract[
+                    schedule_contract[
                         "completed_transition_count_source"
                     ]
                 ),

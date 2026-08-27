@@ -761,7 +761,7 @@ R3I's contract SHA-256 is
 R3I is committed and pushed as `8d999d4` (`R3I: deterministic episilon greedy
 tests`).
 
-### R3J. Live scheduled-epsilon handoff — implemented and verified locally
+### R3J. Live scheduled-epsilon handoff — complete and pushed
 
 - [x] Added strict `quickdraw.bdq-scheduled-epsilon-handoff.v1` contract plus
   contract/result schemas bound to pushed R3I and R3H's embedded R3G prefix.
@@ -789,7 +789,43 @@ Its canonical trace SHA-256 is
 `5e3a8ea3d2c0f0afb87fd87f92f6bf90036a6a95fc3f6124ccc0910ca07aa906`;
 both serialized worker traces have SHA-256
 `135d6a30c8526cd7422f9e30ff21cd997bd05a0ccbcdc5efd75b6fe1182d04a7`.
-R3J is implemented and verified locally but is not committed or pushed.
+R3J is committed and pushed as `32e78c6` (`R3J: deterministic epsilon greedy
+decay tests`).
+
+### R3K. Scheduled third Unity-derived optimizer update — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-third-update.v1` contract and contract/result
+  schemas bound to pushed R3J and its exact 10,005-transition prefix.
+- [x] Generalized the reusable live worker so the production epsilon schedule
+  can continue independently of R3J's one-action handoff boundary, without
+  resetting the selector, RNG, controller, replay, networks, or optimizer.
+- [x] Preserved all 10,005 R3J transitions and both optimizer events exactly,
+  then selected only at completed counts 10,005, 10,006, and 10,007 with
+  epsilons `0.999955`, `0.999946`, and `0.999937`.
+- [x] Completed transition 10,008 and optimizer update 3 with loss
+  `0.008735351264476776`, mean absolute TD error `0.06769348680973053`, and
+  online hash
+  `4f78e397e87ad6cea1ada78d49dea808337c401f6478970d1a4439065743775b`.
+- [x] Kept the target hash frozen at
+  `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`,
+  performed zero target synchronizations, and stopped with no pending decision
+  or action selection at count 10,008.
+- [x] Two fresh Python/Unity processes completed 215 episodes, handled three
+  truncations, exercised all six action tuples, and produced equal parsed
+  traces and byte-identical serialized traces.
+- [x] Passed all 13 focused R3K cases, all 131 trainer tests, all 148 Python
+  research tests, and the pinned environment's dependency check.
+- [x] Excluded update 4, a post-update policy handoff, an extended decay or
+  training rollout, target synchronization, checkpoint/export, ROCm training,
+  held-out evaluation, learned-policy claims, and Unity/environment changes.
+
+R3K's contract SHA-256 is
+`930839d2a19022b6debc0ad48cfc7f64cd86ff948be2690a9989a48598cda528`.
+Its canonical trace SHA-256 is
+`c3fafe259dfc03d69e06c758af0c2ba4df3b5da3322d325a5e361cdcf3a4ff02`;
+both serialized worker traces have SHA-256
+`4e4733dd5e5cbfbd7daa21f6d2ad8c48981b4369769d8df000b709e9c115dde4`.
+R3K is implemented and verified locally but is not committed or pushed.
 
 Remaining trainer and network work:
 
