@@ -827,7 +827,7 @@ both serialized worker traces have SHA-256
 `4e4733dd5e5cbfbd7daa21f6d2ad8c48981b4369769d8df000b709e9c115dde4`.
 R3K is committed and pushed as `2960e5b` (`R3K: 3rd optimizer update`).
 
-### R3L. Update-3 live masked-greedy handoff — implemented and verified locally
+### R3L. Update-3 live masked-greedy handoff — complete and pushed
 
 - [x] Added strict `quickdraw.bdq-third-update-greedy-handoff.v1` contract and
   contract/result schemas bound to pushed R3K and its exact 10,008-transition
@@ -872,7 +872,61 @@ R3L's contract SHA-256 is
 `f56cfab90ba82e616e0e2be55f5d77d3262c98ac2dcc9bd604e735831f4b0ce6`.
 The accepted generated result SHA-256 is
 `d53971c1155634722375cdc564f7c4a5207c2fa59b0d27c1abacd3d70de898ac`.
-R3L is not committed or pushed.
+R3L is committed and pushed as `f586507` (`R3K/L: greedy action with updated
+weights`).
+
+### R3M. Scheduled fourth Unity-derived optimizer update — implemented and verified locally
+
+- [x] Added strict `quickdraw.bdq-fourth-update.v1` contract and contract/result
+  schemas bound to pushed R3K and its exact 10,008-transition production
+  prefix. R3L's diagnostic epsilon-zero transition is explicitly excluded.
+- [x] Continued the same scheduled selector, RNG, controller, replay, networks,
+  and optimizer without resetting state. Counts 10,008 through 10,011 use
+  epsilons `0.999928`, `0.999919`, `0.99991`, and `0.999901`.
+- [x] Completed transitions 10,009 through 10,012 and triggered optimizer
+  update 4 exactly at decision 10,012. Update 4 has loss
+  `0.0085072573274374`, mean absolute TD error `0.06249994412064552`, and
+  online hash
+  `a8356df1531b99a42966578c6fd784cd384c8bcd3d3c3092124df13b2587268f`.
+- [x] Kept the target hash frozen at
+  `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`,
+  performed zero target synchronizations, stopped with no pending decision,
+  and selected no action after update 4.
+- [x] Enabled Unity standalone-player background execution and rebuilt the
+  unchanged Basic scene so LLAPI automation cannot pause when its window loses
+  focus. The rebuilt `globalgamemanagers` SHA-256 is
+  `23cce72e183cbb7c4c78850f1ba46d819e9d1bc60fbafbe970a112fa65cf4a47`;
+  exact R3K-prefix validation proves this player-setting change did not alter
+  accepted observations or transitions.
+- [x] Validated two independent fresh Unity/Python processes. Each completed
+  10,012 transitions, 215 episodes, three truncations, four optimizer updates,
+  zero target synchronizations, and no pending decision. Their parsed traces
+  and serialized bytes match exactly.
+- [x] Added a fail-closed comparison mode for independently completed traces,
+  plus non-watch progress reporting and a 300-second communicator tolerance.
+  Progress output does not enable watch-mode engine configuration or change
+  trace contents.
+- [x] Preserved negative evidence: five background-disabled player attempts
+  timed out at `environment.step()`. A `-batchmode` experiment completed but
+  was rejected because camera-observation hashes diverged at transition 0; no
+  acceptance threshold or canonical prefix was weakened.
+- [x] Passed all 15 focused R3M cases, all 168 trainer tests, all 185 Python
+  research tests, all 31 Unity EditMode tests, the pinned environment's
+  dependency check, the Unity player build, and accepted-result/schema
+  revalidation.
+- [x] Excluded update 5, target synchronization, an extended decay/training
+  rollout, checkpoint/export, ROCm training, held-out evaluation,
+  policy-effectiveness claims, and R3L's diagnostic action.
+
+R3M's contract SHA-256 is
+`0a6f209d93ef6d522a53f24807d4ce48e6e820a344905e9762583bbe13a72dbb`.
+Its canonical trace SHA-256 is
+`cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940`;
+both serialized worker traces have SHA-256
+`762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`,
+and the accepted generated result has SHA-256
+`b79a1ba8ab0d23964c225a9b33236226b1c033f8e3de972d61e759f90d890d67`.
+R3M is not committed or pushed.
 
 Remaining trainer and network work:
 

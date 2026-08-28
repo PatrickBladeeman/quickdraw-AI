@@ -1,4 +1,4 @@
-# R3A-R3L BDQ foundation, direct LLAPI collection, and exploration schedule
+# R3A-R3M BDQ foundation, direct LLAPI collection, and exploration schedule
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -22,6 +22,9 @@ R3L preserves all 10,008 R3K transitions, then deliberately bypasses the
 production schedule for one epsilon-zero diagnostic handoff from the update-3
 online network. It completes that legal masked-greedy action and stops before
 update 4.
+R3M instead returns to R3K's uninterrupted production trajectory, consumes
+scheduled selections at counts 10,008 through 10,011, and stops exactly when
+optimizer update 4 completes at decision 10,012.
 
 The tracked contract chain is:
 
@@ -45,6 +48,8 @@ The tracked contract chain is:
   transition continuous scheduled-selector third-update contract.
 - `bdq-third-update-greedy-handoff-contract-v1.json`: R3L's hash-bound R3K
   prefix plus one update-3 masked-greedy transition contract.
+- `bdq-fourth-update-contract-v1.json`: R3M's hash-bound, exactly-10,012-
+  transition continuous scheduled-selector fourth-update contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
@@ -59,7 +64,7 @@ boundary:
 - `llapi.py`: behavior validation, online-network action selection, one pending
   decision per agent, direct replay completion, and strict truncation-mask
   side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E through R3G and R3I-R3L's scheduled selector. At epsilon
+  selector used by R3E through R3G and R3I-R3M's scheduled selector. At epsilon
   `1.0`, both preserve the exact exploration RNG sequence without evaluating
   unused network Q-values.
 
@@ -299,7 +304,57 @@ This path still validates both full traces against the frozen contract and
 requires distinct files, object equality, and raw-byte equality. Failed or
 partial workers never count toward `fresh_process_count`.
 
-R3D and R3E are collection evidence. R3F, R3G, and R3K are three minimal scheduled
+Build the R3M player with background execution enabled, then run the scheduled
+fourth-update gate:
+
+```powershell
+$unity = "$env:LOCALAPPDATA\Unity\bin\unity.exe"
+& $unity --non-interactive build . `
+  --target StandaloneWindows64 `
+  --execute-method QuickDraw.Editor.ResearchBasicBuild.BuildWindows `
+  --args '-quickdrawBasicOutput Artifacts/Experiments/r3m-fourth-update/build/QuickDrawResearchBasic.exe' `
+  --log-file Artifacts/Experiments/r3m-fourth-update/build.log `
+  --allow-dirty-build --no-tail
+
+& $python Research\trainer\run_bdq_fourth_update_smoke.py `
+  --env Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3m-fourth-update\acceptance
+```
+
+`ProjectSettings/ProjectSettings.asset` keeps `runInBackground` enabled so a
+standalone LLAPI worker does not pause when its window loses focus. Graphics
+remain enabled and R3M passes no standalone-player arguments; the camera sensor
+therefore retains the normal renderer path. Each accepted worker preserves
+R3K's exact 10,008-transition prefix, selects at completed counts 10,008 through
+10,011 with epsilons `0.999928`, `0.999919`, `0.99991`, and `0.999901`, and
+completes update 4 at decision 10,012. Update 4 has loss
+`0.0085072573274374`, mean absolute TD error `0.06249994412064552`, and online
+hash `a8356df1531b99a42966578c6fd784cd384c8bcd3d3c3092124df13b2587268f`.
+The target remains frozen, no decision remains pending, and no action is
+selected after update 4. Two fresh traces have canonical SHA-256
+`cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940`
+and byte-identical serialized SHA-256
+`762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`.
+The contract SHA-256 is
+`0a6f209d93ef6d522a53f24807d4ce48e6e820a344905e9762583bbe13a72dbb`,
+and the accepted result SHA-256 is
+`b79a1ba8ab0d23964c225a9b33236226b1c033f8e3de972d61e759f90d890d67`.
+
+R3M also supports the same fail-closed completed-trace comparison pattern:
+
+```powershell
+& $python Research\trainer\run_bdq_fourth_update_smoke.py `
+  --output Artifacts\Experiments\r3m-fourth-update\accepted-pair `
+  --first-trace <first-complete-trace.json> `
+  --second-trace <second-complete-trace.json>
+```
+
+Five runs of the older background-disabled player timed out at
+`environment.step()`. A `-batchmode` experiment completed but changed the first
+camera observation and was rejected by the canonical R3K-prefix gate. Those
+negative results do not count toward acceptance and no threshold was weakened.
+
+R3D and R3E are collection evidence. R3F, R3G, R3K, and R3M are four minimal scheduled
 learning operations on real Unity experience. R3H is the first live proof that
 the resulting online weights drive a greedy action. R3I is the schedule unit
 gate, and R3J proves its bounded live counter/RNG/mask integration. Because the
@@ -307,7 +362,9 @@ R3J action is exploratory, it is not evidence that learned weights chose that
 action or that a useful policy exists. R3K proves only that the same scheduled
 loop reaches update 3 and stops cleanly. R3L proves that the update-3 weights
 reach one live greedy selection; it does not prove the third update changed the
-chosen action or that the policy is effective. Extended decay rollout, target
+chosen action or that the policy is effective. R3M proves only that the
+uninterrupted production loop reaches update 4 and stops cleanly. Extended
+decay rollout, update 5, target
 synchronization, checkpoint/resume, ONNX export, ROCm training, learned-policy
 evaluation, gradual motion, strategic combat, reflexes, and LLM work remain
 outside this slice.

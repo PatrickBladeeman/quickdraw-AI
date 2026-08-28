@@ -731,7 +731,7 @@ def execute_update_gate_worker(
                     optimization_events[-1]["online_after_sha256"] = network_sha256(
                         controller.online_network
                     )
-                if watch:
+                if progress_interval > 0:
                     _emit_watch_progress(
                         optimization_result,
                         transitions[-1],
@@ -794,7 +794,7 @@ def execute_update_gate_worker(
                         optimization_events[-1][
                             "online_after_sha256"
                         ] = network_sha256(controller.online_network)
-                    if watch:
+                    if progress_interval > 0:
                         _emit_watch_progress(
                             optimization_result,
                             transitions[-1],
