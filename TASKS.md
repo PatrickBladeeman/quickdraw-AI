@@ -875,7 +875,7 @@ The accepted generated result SHA-256 is
 R3L is committed and pushed as `f586507` (`R3K/L: greedy action with updated
 weights`).
 
-### R3M. Scheduled fourth Unity-derived optimizer update — implemented and verified locally
+### R3M. Scheduled fourth Unity-derived optimizer update — complete and pushed
 
 - [x] Added strict `quickdraw.bdq-fourth-update.v1` contract and contract/result
   schemas bound to pushed R3K and its exact 10,008-transition production
@@ -926,7 +926,57 @@ both serialized worker traces have SHA-256
 `762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`,
 and the accepted generated result has SHA-256
 `b79a1ba8ab0d23964c225a9b33236226b1c033f8e3de972d61e759f90d890d67`.
-R3M is not committed or pushed.
+R3M is committed and pushed as `2ec3ec3`
+(`R3M: 4th update tested with seeded episilon greedy`).
+
+### R3N. Lossless, memory-bounded replay storage — implemented and verified locally
+
+- [x] Replaced retained full-transition observation arrays with exact
+  content-addressed float32 channel frames plus preallocated columnar replay
+  metadata. The public float32 HWC `[84,84,4]` transition and batch interface,
+  physical ring indices, fields, and seeded uniform sampling order remain
+  unchanged.
+- [x] Added reference counting and orphan reclamation so overwritten ring slots
+  release frames that no retained transition uses. The buffer owns immutable
+  frame bytes and reconstructs C-contiguous batches without quantization or
+  lossy compression.
+- [x] Added transactional fail-closed accounting with a 4 GiB ceiling. The old
+  separate `s`/`s'` arrays require `22,579,200,000` bytes (`21.03 GiB`) at the
+  registered 100,000-transition capacity before Python overhead. The registered
+  Basic upper bound of 81 rendered states accounts for `12,037,184` bytes; a
+  conservative 100,004-distinct-frame projection accounts for
+  `2,934,585,088` bytes. A higher-entropy stream that cannot fit losslessly is
+  rejected atomically rather than silently exceeding the ceiling.
+- [x] Added strict `quickdraw.bdq-replay-storage.v1` contract/schema, exact
+  accounting and legacy-oracle tests, production replay-index hash checks, and
+  `validate_bdq_replay_storage_regression.py` for one fresh post-change R3M
+  trace.
+- [x] Rebuilt the current player and completed one fresh 10,012-transition R3M
+  worker. Its serialized SHA-256
+  `762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`
+  and canonical SHA-256
+  `cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940`
+  exactly match the frozen pre-R3N trace. All four update losses, TD errors,
+  online hashes, the frozen target hash, sampling behavior, and transition
+  evidence remain exact.
+- [x] The accepted trace contains 1,549 distinct full-stack hashes. Treating
+  every channel in those stacks as distinct gives a conservative 6,196-frame,
+  `190,888,704`-byte accounted upper bound, below the 4 GiB ceiling.
+- [x] Passed all 12 focused R3N cases, all 180 trainer tests, all 197 Python
+  research tests, all 31 Unity EditMode tests with normal graphics, contract
+  and live-trace validation, bytecode compilation, the pinned dependency
+  check, and the Unity player build.
+- [x] Preserved the one invalid Unity test attempt: running the visual-sensor
+  suite with `-nographics` forced a null graphics device and produced 30 passes
+  plus one expected camera-rendering failure. The unchanged normal-graphics
+  rerun passed 31 of 31; no code or acceptance threshold changed.
+- [x] Excluded update 5, target synchronization, extended training,
+  checkpoint/resume/export, ROCm training, Unity behavior changes, and policy
+  effectiveness claims.
+
+R3N's contract SHA-256 is
+`ece35b60208adbb9ca0d36f8d61b3be652aae4a94ffdb7d2bcafc9ace58e16a9`.
+R3N is not committed or pushed.
 
 Remaining trainer and network work:
 

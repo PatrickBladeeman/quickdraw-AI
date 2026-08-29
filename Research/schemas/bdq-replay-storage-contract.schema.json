@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-replay-storage-contract.schema.json",
+  "title": "QuickDraw R3N lossless replay-storage contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_fourth_update_contract",
+    "runtime",
+    "package",
+    "public_replay_interface",
+    "legacy_storage",
+    "lossless_storage",
+    "memory_budget",
+    "equivalence",
+    "r3m_regression",
+    "test_scope",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-replay-storage.v1"},
+    "task": {"const": "R3N"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_fourth_update_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version", "pushed_commit"],
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-fourth-update-contract-v1.json"},
+        "sha256": {"const": "0a6f209d93ef6d522a53f24807d4ce48e6e820a344905e9762583bbe13a72dbb"},
+        "schema_version": {"const": "quickdraw.bdq-fourth-update.v1"},
+        "pushed_commit": {"const": "2ec3ec39d25d5d3bb5686574255898f3f5605d3f"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "device": {"const": "cpu"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "version", "metadata_path", "trainer_entry_points"],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.3.0"},
+        "metadata_path": {"const": "Research/trainer/pyproject.toml"},
+        "trainer_entry_points": {"const": []}
+      }
+    },
+    "public_replay_interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "capacity",
+        "batch_size",
+        "observation_shape",
+        "observation_layout",
+        "observation_dtype",
+        "transition_fields",
+        "sampling",
+        "rng",
+        "ring_indices",
+        "overwrite",
+        "batch_classes"
+      ],
+      "properties": {
+        "class": {"const": "quickdraw_bdq.replay.ReplayBuffer"},
+        "capacity": {"const": 100000},
+        "batch_size": {"const": 64},
+        "observation_shape": {"const": [84, 84, 4]},
+        "observation_layout": {"const": "HWC"},
+        "observation_dtype": {"const": "float32"},
+        "transition_fields": {
+          "const": [
+            "observation",
+            "action",
+            "reward",
+            "next_observation",
+            "action_masks",
+            "next_action_masks",
+            "terminated",
+            "truncated"
+          ]
+        },
+        "sampling": {"const": "uniform_without_replacement"},
+        "rng": {"const": "numpy.random.Generator.PCG64"},
+        "ring_indices": {"const": "physical_slots_zero_through_size_minus_one"},
+        "overwrite": {"const": "replace_next_physical_slot_at_capacity"},
+        "batch_classes": {
+          "const": [
+            "quickdraw_bdq.replay.ReplayBatch",
+            "quickdraw_bdq.replay.TorchReplayBatch"
+          ]
+        }
+      }
+    },
+    "legacy_storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "bytes_per_observation",
+        "bytes_per_transition_observations",
+        "capacity_observation_payload_bytes"
+      ],
+      "properties": {
+        "representation": {"const": "two_owned_float32_observation_stacks_per_transition"},
+        "bytes_per_observation": {"const": 112896},
+        "bytes_per_transition_observations": {"const": 225792},
+        "capacity_observation_payload_bytes": {"const": 22579200000}
+      }
+    },
+    "lossless_storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "frame_shape",
+        "frame_dtype",
+        "frame_payload_bytes",
+        "frame_key",
+        "frame_reference_dtype",
+        "frame_references_per_transition",
+        "reference_counting",
+        "orphan_reclamation_on_ring_overwrite",
+        "reconstruction",
+        "input_copy_and_immutability_preserved",
+        "lossy_quantization",
+        "lossy_compression",
+        "arbitrary_stream_rule"
+      ],
+      "properties": {
+        "representation": {"const": "content_addressed_raw_float32_frames_plus_columnar_transition_metadata"},
+        "frame_shape": {"const": [84, 84]},
+        "frame_dtype": {"const": "float32"},
+        "frame_payload_bytes": {"const": 28224},
+        "frame_key": {"const": "exact_c_contiguous_float32_bytes"},
+        "frame_reference_dtype": {"const": "uint64"},
+        "frame_references_per_transition": {"const": 8},
+        "reference_counting": {"const": true},
+        "orphan_reclamation_on_ring_overwrite": {"const": true},
+        "reconstruction": {"const": "bit_exact_hwc_float32"},
+        "input_copy_and_immutability_preserved": {"const": true},
+        "lossy_quantization": {"const": false},
+        "lossy_compression": {"const": false},
+        "arbitrary_stream_rule": {"type": "string", "minLength": 1}
+      }
+    },
+    "memory_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_accounted_storage_bytes",
+        "accounting",
+        "frame_accounting_overhead_bytes",
+        "metadata_array_accounting_overhead_bytes",
+        "fixed_accounting_overhead_bytes",
+        "metadata_array_count",
+        "metadata_payload_bytes_at_capacity",
+        "metadata_accounted_bytes_at_capacity",
+        "registered_basic_distinct_render_states_upper_bound",
+        "registered_basic_projection_accounted_bytes",
+        "conservative_sequential_unique_frame_count",
+        "conservative_sequential_projection_accounted_bytes",
+        "maximum_unique_frames_within_budget",
+        "excluded_transient_allocations",
+        "budget_failure"
+      ],
+      "properties": {
+        "max_accounted_storage_bytes": {"const": 4294967296},
+        "accounting": {"const": "preallocated_numpy_payload_plus_conservative_array_frame_and_container_overhead"},
+        "frame_accounting_overhead_bytes": {"const": 1024},
+        "metadata_array_accounting_overhead_bytes": {"const": 256},
+        "fixed_accounting_overhead_bytes": {"const": 65536},
+        "metadata_array_count": {"const": 10},
+        "metadata_payload_bytes_at_capacity": {"const": 9600000},
+        "metadata_accounted_bytes_at_capacity": {"const": 9668096},
+        "registered_basic_distinct_render_states_upper_bound": {"const": 81},
+        "registered_basic_projection_accounted_bytes": {"const": 12037184},
+        "conservative_sequential_unique_frame_count": {"const": 100004},
+        "conservative_sequential_projection_accounted_bytes": {"const": 2934585088},
+        "maximum_unique_frames_within_budget": {"const": 146515},
+        "excluded_transient_allocations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "budget_failure": {"const": "MemoryError before any visible replay mutation"}
+      }
+    },
+    "equivalence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison",
+        "required_exact_batch_fields",
+        "float_comparison",
+        "preserve_shapes_dtypes_and_order",
+        "preserve_seeded_rng_consumption",
+        "cover_ring_wraparound",
+        "cover_terminal_and_truncation_discontinuities",
+        "production_sample_index_sha256",
+        "combined_production_sample_indices_sha256"
+      ],
+      "properties": {
+        "comparison": {"const": "legacy retained-transition oracle versus compact replay"},
+        "required_exact_batch_fields": {
+          "const": [
+            "indices",
+            "observations",
+            "actions",
+            "rewards",
+            "next_observations",
+            "action_masks",
+            "next_action_masks",
+            "terminated",
+            "truncated"
+          ]
+        },
+        "float_comparison": {"const": "bitwise"},
+        "preserve_shapes_dtypes_and_order": {"const": true},
+        "preserve_seeded_rng_consumption": {"const": true},
+        "cover_ring_wraparound": {"const": true},
+        "cover_terminal_and_truncation_discontinuities": {"const": true},
+        "production_sample_index_sha256": {
+          "const": [
+            {
+              "replay_size": 10000,
+              "sha256": "ce3daae8cb092f11074c30299313c8e61052bb42f76e8b90bb46281af53c9a49"
+            },
+            {
+              "replay_size": 10004,
+              "sha256": "c1a8b2fd7fcd64dc8c1375e536d8d2e5cd9e88809349d79336cf63777f8284f4"
+            },
+            {
+              "replay_size": 10008,
+              "sha256": "c2e180bea9bd403ae2b0296fe55478aea10a44cbb6d1d1726e966c0df8dcbb4d"
+            },
+            {
+              "replay_size": 10012,
+              "sha256": "de8af0d1e05eecfcb37bb52015fbd61f7124ec6ce46f3c3eef35e72cea86750a"
+            }
+          ]
+        },
+        "combined_production_sample_indices_sha256": {"const": "f2e64136bd4dda6500e3a12c34ba9f4c362d0c1afba9e0743d766a786dd1ff9b"}
+      }
+    },
+    "r3m_regression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fresh_process_count",
+        "comparison",
+        "serialized_trace_sha256",
+        "canonical_trace_sha256",
+        "all_transitions_sha256",
+        "tail_four_transitions_sha256",
+        "update_events_sha256",
+        "unique_full_stack_count",
+        "conservative_unique_frame_upper_bound",
+        "conservative_frame_payload_upper_bound_bytes",
+        "conservative_accounted_storage_upper_bound_bytes",
+        "update_decisions",
+        "update_losses",
+        "update_mean_absolute_td_errors",
+        "online_hashes_after_updates",
+        "target_hash",
+        "target_sync_count",
+        "optimizer_update_count",
+        "transition_count"
+      ],
+      "properties": {
+        "fresh_process_count": {"const": 1},
+        "comparison": {"const": "one fresh post-R3N worker against the frozen pre-R3N accepted trace"},
+        "serialized_trace_sha256": {"const": "762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51"},
+        "canonical_trace_sha256": {"const": "cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940"},
+        "all_transitions_sha256": {"const": "9b3fc70c5e3cdbc40c9332460ef702304086aa6d07c8467a411c31bcba059bef"},
+        "tail_four_transitions_sha256": {"const": "6c5d8647a1868f4f3c770b98e5bd8077f6b12a24bafceb4f5f384751156104e1"},
+        "update_events_sha256": {"const": "7f8d558ae177c52170841b8b48136e4b35eccb9fb478e9c0ce42d3193deaceba"},
+        "unique_full_stack_count": {"const": 1549},
+        "conservative_unique_frame_upper_bound": {"const": 6196},
+        "conservative_frame_payload_upper_bound_bytes": {"const": 174875904},
+        "conservative_accounted_storage_upper_bound_bytes": {"const": 190888704},
+        "update_decisions": {"const": [10000, 10004, 10008, 10012]},
+        "update_losses": {
+          "const": [
+            0.01628389209508896,
+            0.014819225296378136,
+            0.008735351264476776,
+            0.0085072573274374
+          ]
+        },
+        "update_mean_absolute_td_errors": {
+          "const": [
+            0.06243317946791649,
+            0.06711231172084808,
+            0.06769348680973053,
+            0.06249994412064552
+          ]
+        },
+        "online_hashes_after_updates": {
+          "const": [
+            "7dd2365b5e219af10aeb4fabb5191df873762fcea6765cb50f83d41525279c8e",
+            "6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471",
+            "4f78e397e87ad6cea1ada78d49dea808337c401f6478970d1a4439065743775b",
+            "a8356df1531b99a42966578c6fd784cd384c8bcd3d3c3092124df13b2587268f"
+          ]
+        },
+        "target_hash": {"const": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb"},
+        "target_sync_count": {"const": 0},
+        "optimizer_update_count": {"const": 4},
+        "transition_count": {"const": 10012}
+      }
+    },
+    "test_scope": {"type": "string", "minLength": 1},
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

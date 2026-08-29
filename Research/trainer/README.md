@@ -1,4 +1,4 @@
-# R3A-R3M BDQ foundation, direct LLAPI collection, and exploration schedule
+# R3A-R3N BDQ foundation, direct LLAPI collection, and bounded replay
 
 This directory contains QuickDraw's bounded Branching Double DQN implementation.
 R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
@@ -25,6 +25,10 @@ update 4.
 R3M instead returns to R3K's uninterrupted production trajectory, consumes
 scheduled selections at counts 10,008 through 10,011, and stops exactly when
 optimizer update 4 completes at decision 10,012.
+R3N preserves that entire public transition/batch and optimizer boundary while
+replacing retained full observation arrays with exact content-addressed
+float32 frames and fixed columnar metadata under a fail-closed 4 GiB storage
+ceiling.
 
 The tracked contract chain is:
 
@@ -50,11 +54,15 @@ The tracked contract chain is:
   prefix plus one update-3 masked-greedy transition contract.
 - `bdq-fourth-update-contract-v1.json`: R3M's hash-bound, exactly-10,012-
   transition continuous scheduled-selector fourth-update contract.
+- `bdq-replay-storage-contract-v1.json`: R3N's hash-bound lossless storage,
+  accounting, and frozen R3M regression contract.
 
 `quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
 boundary:
 
-- `replay.py`: immutable validated transitions and seeded uniform replay;
+- `replay.py`: immutable validated transitions, seeded uniform sampling,
+  exact frame interning, columnar metadata, ring-overwrite reclamation, and
+  transactional storage-budget enforcement;
 - `network.py`: the three-convolution visual encoder and dueling `[3,2]`
   branch heads;
 - `action_space.py`: branch/joint mapping and strict mask-aware selection;
@@ -354,16 +362,59 @@ Five runs of the older background-disabled player timed out at
 camera observation and was rejected by the canonical R3K-prefix gate. Those
 negative results do not count toward acceptance and no threshold was weakened.
 
-R3D and R3E are collection evidence. R3F, R3G, R3K, and R3M are four minimal scheduled
-learning operations on real Unity experience. R3H is the first live proof that
-the resulting online weights drive a greedy action. R3I is the schedule unit
-gate, and R3J proves its bounded live counter/RNG/mask integration. Because the
+R3N makes the registered 100,000-transition replay capacity feasible without
+changing its public API or learning semantics. The former separate full
+float32 `s` and `s'` payloads require `22,579,200,000` bytes (`21.03 GiB`) at
+capacity before Python overhead. Replay now stores every exact C-contiguous
+float32 channel frame once and holds eight frame IDs plus actions, rewards,
+masks, and terminal flags in preallocated NumPy columns for each ring slot.
+Reference counts reclaim frames after overwrite. Sampled batches are rebuilt
+as the same C-contiguous float32 HWC `[84,84,4]` arrays with the same seeded
+physical indices and all prior fields.
+
+The deterministic accounting ceiling is 4 GiB. It covers the replay's
+preallocated metadata payload and reserves plus retained frame bytes and a
+conservative per-frame container reserve; it intentionally excludes
+caller-owned transitions, transient sampled batches, networks, and optimizer
+state. Registered Basic's 81 possible agent/target render states project to
+`12,037,184` accounted bytes. A conservative 100,004-distinct-frame sequence
+projects to `2,934,585,088` bytes. Because arbitrary float32 input cannot be
+compressed losslessly into a universal fixed bound, an insertion that would
+exceed the ceiling raises `MemoryError` and rolls back without changing replay
+contents.
+
+Validate the R3N contract and focused storage behavior, then validate one fresh
+post-R3N R3M trace against the frozen pre-R3N evidence:
+
+```powershell
+& $python -B -m pytest -p no:cacheprovider `
+  Research\trainer\test_bdq_replay_storage.py
+
+& $python -B Research\trainer\validate_bdq_replay_storage_regression.py `
+  --trace Artifacts\Experiments\r3n-replay-storage\live-regression\run-1\r3m-fourth-update-trace.json
+```
+
+The accepted trace keeps serialized SHA-256
+`762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`
+and canonical SHA-256
+`cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940`
+exactly. Its 1,549 distinct stack hashes imply a conservative 6,196-frame,
+`190,888,704`-byte accounted upper bound. The R3N contract SHA-256 is
+`ece35b60208adbb9ca0d36f8d61b3be652aae4a94ffdb7d2bcafc9ace58e16a9`.
+
+R3D and R3E are collection evidence. R3F, R3G, R3K, and R3M are four minimal
+scheduled learning operations on real Unity experience. R3H is the first live
+proof that the resulting online weights drive a greedy action. R3I is the
+schedule unit gate, and R3J proves its bounded live counter/RNG/mask
+integration. Because the
 R3J action is exploratory, it is not evidence that learned weights chose that
 action or that a useful policy exists. R3K proves only that the same scheduled
 loop reaches update 3 and stops cleanly. R3L proves that the update-3 weights
 reach one live greedy selection; it does not prove the third update changed the
 chosen action or that the policy is effective. R3M proves only that the
-uninterrupted production loop reaches update 4 and stops cleanly. Extended
+uninterrupted production loop reaches update 4 and stops cleanly. R3N proves
+lossless replay equivalence and bounded accounting for this registered stream;
+it is not a throughput benchmark or an effectiveness study. Extended
 decay rollout, update 5, target
 synchronization, checkpoint/resume, ONNX export, ROCm training, learned-policy
 evaluation, gradual motion, strategic combat, reflexes, and LLM work remain

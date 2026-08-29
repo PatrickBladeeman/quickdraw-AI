@@ -35,7 +35,14 @@ from .optimizer import (
     BDQOptimizerController,
     OptimizationStepResult,
 )
-from .replay import ReplayBatch, ReplayBuffer, ReplayTransition, TorchReplayBatch
+from .replay import (
+    REPLAY_MAX_ACCOUNTED_BYTES,
+    ReplayBatch,
+    ReplayBuffer,
+    ReplayStorageMetrics,
+    ReplayTransition,
+    TorchReplayBatch,
+)
 from .targets import branch_double_dqn_targets, mean_branch_huber_loss
 
 __all__ = [
@@ -48,7 +55,9 @@ __all__ = [
     "OptimizationStepResult",
     "ReplayBatch",
     "ReplayBuffer",
+    "ReplayStorageMetrics",
     "ReplayTransition",
+    "REPLAY_MAX_ACCOUNTED_BYTES",
     "TorchReplayBatch",
     "BASIC_BEHAVIOR_NAME",
     "BasicTruncationMaskSideChannel",
