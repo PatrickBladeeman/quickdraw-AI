@@ -1,6 +1,17 @@
 # Research_Basic environment baselines
 
-This directory is the R2A environment-only validation surface. It does not train a model. The Unity scene provides one deterministic visual agent, and this runner exercises random and scripted policies through the same ML-Agents low-level `ActionTuple` interface that a learned policy will use later.
+This directory is the R2A environment-only validation surface. It does not
+train a model. The Unity scene provides one deterministic visual agent, and
+this runner exercises random and scripted policies through the same ML-Agents
+low-level `ActionTuple` interface that a learned policy uses.
+
+- Exact registered environment values: [`RESEARCH.md`](../../RESEARCH.md)
+- Unity/Python component boundary: [`ARCH.md`](../../ARCH.md)
+- Accepted R2A results: [`DETERMINISTIC-R0-R2.md`](../../docs/evidence/DETERMINISTIC-R0-R2.md)
+- Current implementation status: [`STATE.md`](../../STATE.md)
+
+This file owns baseline operating commands. Accepted hashes, test counts, and
+claim limitations belong in the evidence record.
 
 The actual observation is uncompressed float32 HWC `[84, 84, 4]`: four Rec. 601 grayscale frames ordered oldest to newest. The room uses a registered directional key light and lit high-contrast materials; the compact cyan reticle is unlit and remains aligned with the hitscan. At reset, Unity captures one post-reset image and copies it into all four channels. If Domain Reload off exposes a missing first-reset ordering, the sensor starts a real deterministic episode and recaptures its post-reset frame before writing an observation. The policy receives no vector observation, target coordinate, object identifier, scene matrix, or debug label.
 
@@ -45,3 +56,7 @@ $basicPlayer = 'Artifacts\Experiments\r2a-basic\build\QuickDrawResearchBasic.exe
 ```
 
 Repeat those two commands with `--policy random` and distinct output directories. A comparison pass means actions, observation hashes, rewards, episode ends, and episode summaries matched across fresh standalone processes for that policy and its registered seed.
+
+Use fresh output directories. Generated traces and players remain ignored under
+`Artifacts/Experiments/`; a successful comparison is an environment
+repeatability gate, not learned-policy evidence.

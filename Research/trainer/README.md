@@ -1,319 +1,64 @@
-# R3A-R3N BDQ foundation, direct LLAPI collection, and bounded replay
+# BDQ trainer and LLAPI runbook
 
-This directory contains QuickDraw's bounded Branching Double DQN implementation.
-R3A freezes tensors, replay, masks, the visual network, Double-DQN targets, and
-Huber loss. R3B freezes the optimizer and update schedule. R3C records the
-superseded high-level ML-Agents trajectory experiment. R3D replaces that
-experiment with synchronous `DecisionSteps`/`TerminalSteps` collection. R3E
-adds deterministic mask-safe epsilon-greedy collection below replay warmup.
-R3F reaches the exact production warmup and performs one CPU update from real
-Unity transitions. R3G extends the same seeded run by four transitions and
-proves the second scheduled CPU update. R3H preserves that entire prefix, then
-uses the twice-updated online network for one legal masked-greedy action and
-completes its Unity transition. R3I freezes and unit-tests the production
-epsilon schedule without launching Unity or opening another optimizer update.
-R3J then drives every action in a bounded two-process Unity run through one
-continuous production scheduled selector and completes one live scheduled
-handoff after update 2 without opening update 3.
-R3K preserves that complete 10,005-transition prefix, consumes exactly three
-more scheduled actions, and stops when optimizer update 3 completes at decision
-10,008 without selecting a post-update action.
-R3L preserves all 10,008 R3K transitions, then deliberately bypasses the
-production schedule for one epsilon-zero diagnostic handoff from the update-3
-online network. It completes that legal masked-greedy action and stops before
-update 4.
-R3M instead returns to R3K's uninterrupted production trajectory, consumes
-scheduled selections at counts 10,008 through 10,011, and stops exactly when
-optimizer update 4 completes at decision 10,012.
-R3N preserves that entire public transition/batch and optimizer boundary while
-replacing retained full observation arrays with exact content-addressed
-float32 frames and fixed columnar metadata under a fail-closed 4 GiB storage
-ceiling.
+This directory contains QuickDraw's reusable Branching Double DQN core,
+synchronous ML-Agents low-level-API boundary, versioned milestone contracts,
+bounded runners, validators, and focused tests.
 
-The tracked contract chain is:
+- Architecture and module ownership: [`ARCH.md`](../../ARCH.md)
+- Registered network/training values: [`RESEARCH.md`](../../RESEARCH.md)
+- Current implementation boundary: [`STATE.md`](../../STATE.md)
+- Exact R3 results, hashes, failures, and limitations:
+  [`docs/evidence`](../../docs/evidence/README.md)
 
-- `bdq-foundation-contract-v1.json`: historical R3A foundation;
-- `bdq-optimizer-contract-v1.json`: historical R3B optimizer contract;
-- `bdq-llapi-contract-v1.json`: current R3D direct-collection and
-  truncation-mask contract.
-- `bdq-epsilon-collection-contract-v1.json`: R3E's hash-bound, fixed-epsilon,
-  exactly-1,000-transition collection contract.
-- `bdq-warmup-update-contract-v1.json`: R3F's hash-bound, exactly-10,000-
-  transition production-warmup and first-update contract.
-- `bdq-two-update-contract-v1.json`: R3G's hash-bound, exactly-10,004-
-  transition recurring-update contract.
-- `bdq-post-update-handoff-contract-v1.json`: R3H's hash-bound R3G-prefix plus
-  one post-update masked-greedy transition contract.
-- `bdq-epsilon-schedule-contract-v1.json`: R3I's hash-bound, stateless linear
-  production epsilon-schedule contract.
-- `bdq-scheduled-epsilon-handoff-contract-v1.json`: R3J's hash-bound,
-  exactly-10,005-transition continuous scheduled-selector handoff contract.
-- `bdq-third-update-contract-v1.json`: R3K's hash-bound, exactly-10,008-
-  transition continuous scheduled-selector third-update contract.
-- `bdq-third-update-greedy-handoff-contract-v1.json`: R3L's hash-bound R3K
-  prefix plus one update-3 masked-greedy transition contract.
-- `bdq-fourth-update-contract-v1.json`: R3M's hash-bound, exactly-10,012-
-  transition continuous scheduled-selector fourth-update contract.
-- `bdq-replay-storage-contract-v1.json`: R3N's hash-bound lossless storage,
-  accounting, and frozen R3M regression contract.
+This file owns operating commands. It does not duplicate accepted result
+records. All output paths below are generated and ignored.
 
-`quickdraw_bdq` now contains only the reusable learning core and direct LLAPI
-boundary:
+## Package map
 
-- `replay.py`: immutable validated transitions, seeded uniform sampling,
-  exact frame interning, columnar metadata, ring-overwrite reclamation, and
-  transactional storage-budget enforcement;
-- `network.py`: the three-convolution visual encoder and dueling `[3,2]`
-  branch heads;
-- `action_space.py`: branch/joint mapping and strict mask-aware selection;
-- `targets.py`: per-branch Double-DQN targets and averaged Huber loss;
-- `optimizer.py`: online/target networks, Adam, replay, and exact counters;
-- `exploration.py`: the validated stateless linear production epsilon schedule;
-- `llapi.py`: behavior validation, online-network action selection, one pending
-  decision per agent, direct replay completion, and strict truncation-mask
-  side-channel ingestion. It also exposes the fixed seeded epsilon-greedy
-  selector used by R3E through R3G and R3I-R3M's scheduled selector. At epsilon
-  `1.0`, both preserve the exact exploration RNG sequence without evaluating
-  unused network Q-values.
+`quickdraw_bdq` contains:
 
-The former `Trainer`, `Policy`, `Trajectory`, settings, plugin-registration,
-YAML, and next-mask-registry scaffolding has been removed. `pyproject.toml`
-therefore registers no `mlagents.trainer_type` entry point and depends only on
-`mlagents-envs`, NumPy, and PyTorch.
+- `action_space.py` — branch/joint mapping and strict mask-aware selection;
+- `network.py` — the visual dueling branching network;
+- `targets.py` — per-branch Double-DQN targets and Huber loss;
+- `replay.py` — immutable transitions, exact frame interning, columnar ring
+  storage, seeded sampling, reclamation, and fail-closed accounting;
+- `optimizer.py` — online/target networks, Adam, update and target-sync
+  counters;
+- `exploration.py` — the stateless epsilon schedule and seeded selector; and
+- `llapi.py` — behavior validation, pending decisions, transition completion,
+  action selection, and truncation-mask side-channel ingestion.
 
-For each agent, the runner stores `(observation, action, current masks)` when a
-decision is sent. When that agent next appears, it completes exactly one replay
-transition with the delivered reward and next observation. A `DecisionStep`
-supplies the next masks for ordinary continuation. A true terminal uses an
-irrelevant all-available sentinel because it does not bootstrap. A decision-limit
-truncation receives the authoritative final-state mask from Unity over the
-dedicated `quickdraw.basic-truncation-mask.v1` side channel; Python never infers
-that mask from privileged scene state.
+The former high-level ML-Agents trainer, policy, trajectory, settings, YAML,
+plugin registration, and next-mask registry were superseded and removed.
+`pyproject.toml` intentionally registers no `mlagents.trainer_type` entry point.
 
-Install the editable package in the isolated Python 3.11 environment:
+For each agent, LLAPI collection stores `(observation, action, current masks)`
+when an action is sent and completes one transition only after Unity supplies
+the next `DecisionStep` or `TerminalStep`. Ordinary continuation gets its next
+mask from `DecisionSteps`; a true terminal uses a non-bootstrapped sentinel;
+truncation uses Unity's authoritative final-state side-channel mask.
+
+## Python environment and tests
+
+Use the isolated Python 3.11 CPU environment established by the research
+environment runbook:
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = '1'
 $python = 'Artifacts\Experiments\.venvs\r1f-cpu-py311\Scripts\python.exe'
 & $python -B -m pip install --no-deps -e Research\trainer
-```
-
-Run the focused trainer suite:
-
-```powershell
 & $python -B -m pytest -p no:cacheprovider Research\trainer
 ```
 
-Build the already-saved `Research_Basic` scene, then run the real two-process
-gate:
+The package expects the pinned versions recorded in `pyproject.toml` and the
+environment contracts. Do not upgrade them as part of running a gate.
 
-```powershell
-& 'C:\Program Files\Unity\Hub\Editor\6000.0.57f1\Editor\Unity.exe' `
-  -batchmode -nographics -quit `
-  -projectPath 'C:\projects\quickdraw-AI' `
-  -executeMethod QuickDraw.Editor.ResearchBasicBuild.BuildWindows `
-  -quickdrawBasicOutput 'Artifacts\Experiments\r3d-llapi\build\QuickDrawResearchBasic.exe' `
-  -logFile 'Artifacts\Experiments\r3d-llapi\build.log'
+## Build the current Basic player
 
-& $python Research\trainer\run_bdq_llapi_smoke.py `
-  --env Artifacts\Experiments\r3d-llapi\build\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3d-llapi\live-smoke
-```
+The camera observation requires normal graphics. The player may run while
+unfocused, but runners must not add headless or batch-mode player arguments.
 
-Each fresh process collects two episodes. The unchanged online network greedily
-finishes the first. The second moves left four times, idles through decision
-300, and ends as an interrupted truncation at slot `-4`, whose Unity-authored
-movement mask is `[false,true,false]`. Every one of the 302 decisions becomes
-one replay transition. The gate requires exact trace equality, zero optimizer
-updates, zero target synchronizations, and unchanged online/target weight
-hashes.
-
-Run the R3E collection gate against the same saved-scene player:
-
-```powershell
-& $python Research\trainer\run_bdq_epsilon_collection_smoke.py `
-  --env Artifacts\Experiments\r3d-llapi\build\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3e-epsilon-collection\acceptance
-```
-
-R3E fixes epsilon at the registered starting value `1.0` and uses exploration
-seed `61001`; decay is deliberately closed. Each fresh process completes
-exactly 1,000 transitions across resets, stops before issuing a replacement
-action, and therefore leaves no pending decision. The accepted local pair
-completed 18 episodes, exercised all six action tuples, handled one truncation,
-performed zero optimizer updates or target synchronizations, preserved both
-networks, and produced byte-identical traces.
-
-Run the R3F production-warmup and first-update gate:
-
-```powershell
-& $python Research\trainer\run_bdq_warmup_update_smoke.py `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3f-warmup-update\acceptance
-```
-
-Each accepted fresh process collected exactly 10,000 complete transitions,
-crossed 215 episode resets, handled three truncations, and exercised all six
-action tuples. No update occurred through transition 9,999. Transition 10,000
-opened exactly one registered batch-64 Adam update with loss
-`0.01628389209508896` and mean absolute TD error `0.06243317946791649`. The
-online weights changed, the target weights remained frozen, target-sync and
-pending-decision counts stayed zero, and the two complete traces matched byte
-for byte.
-
-To watch one diagnostic run in the Unity Editor, open `Research_Basic` but
-leave the Editor out of Play Mode, then start Python:
-
-```powershell
-& $python Research\trainer\run_bdq_warmup_update_smoke.py `
-  --watch `
-  --output Artifacts\Experiments\r3f-warmup-update\editor-watch
-```
-
-When Python reports that it is listening on port `5004`, press Play in Unity.
-The runner forces `Time.timeScale` to `1`, targets 60 frames per second, and
-prints the completed transition count, current episode and episode decision,
-selected action, reward, replay size, optimizer-update count, and target-sync
-count every 100 transitions. `--progress-interval N` changes that terminal
-reporting interval. The run stops after transition 10,000 and its first update;
-stop Play Mode manually afterward.
-
-The same one-run diagnostic can launch a visible standalone player:
-
-```powershell
-& $python Research\trainer\run_bdq_warmup_update_smoke.py `
-  --watch `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3f-warmup-update\standalone-watch
-```
-
-Both watch forms write one validated trace only. They are explicitly
-observational and never produce the two-fresh-process `result.json` required by
-the unchanged R3F acceptance gate. A local standalone watch validation completed
-all 10,000 transitions at time scale 1, performed the same single update, and
-produced trace SHA-256
-`aee36f7bc5c2e2202e2738709c021826878de717d22b91345001dafd8599f0b2`,
-byte-identical to each accepted worker trace, without creating `result.json`.
-
-Run the R3G second-update gate against the same saved-scene player:
-
-```powershell
-& $python Research\trainer\run_bdq_two_update_smoke.py `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3g-two-update\acceptance
-```
-
-Each accepted fresh process completed exactly 10,004 transitions. The first
-10,000 transitions and first-update evidence exactly preserve R3F. Update 2
-opened at decision 10,004 with loss `0.014819225296378136`, mean absolute TD
-error `0.06711231172084808`, and online SHA-256
-`6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471`.
-The target remained frozen, pending-decision and target-sync counts stayed zero,
-and the two serialized traces matched SHA-256
-`157cc826d99696fa5c137b596e8eafd04b4abba520c8af5d93b7355b8bdc5576`.
-
-Run the R3H post-update policy-handoff gate:
-
-```powershell
-& $python Research\trainer\run_bdq_post_update_handoff_smoke.py `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3h-post-update-handoff\acceptance
-```
-
-Each accepted process preserves all 10,004 R3G transitions and both exact
-optimizer results. At decision 10,004, epsilon switches from the frozen random
-prefix to `0.0` for one decision only. The updated online network evaluates the
-live observation and masks, chooses masked argmax action `[2,1]`, and completes
-transition 10,005. The same observation is evaluated by the frozen target;
-their maximum absolute Q-value difference is `0.08040044084191322`. The action
-is legal under movement mask `[false,true,false]`, no third update opens, no
-target synchronization occurs, and no decision remains pending. Two fresh
-processes produced byte-identical serialized traces with SHA-256
-`4341790871e0b5e3a990923601b45c052e9fb85e1e8ca20ae179421bb7977a87`.
-
-R3I derives training epsilon solely from the number of completed replay
-transitions. Epsilon remains `1.0` through transition 10,000, decays linearly
-over the next 100,000 transitions, reaches `0.1` at transition 110,000, and is
-clamped there. The schedule has no mutable state; the caller supplies the
-optimizer controller's completed-transition count to the scheduled selector.
-
-Run the R3J scheduled-epsilon live handoff gate:
-
-```powershell
-& $python Research\trainer\run_bdq_scheduled_epsilon_handoff_smoke.py `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3j-scheduled-epsilon-handoff\acceptance
-```
-
-Each accepted process uses one scheduled selector continuously for all 10,005
-actions. Counts 0 through 10,000 use epsilon `1.0`; counts 10,001 through
-10,004 use the first four decay values. The exact 10,004-transition R3G prefix,
-two optimizer results, online hashes, and frozen target hash remain unchanged.
-At completed-transition count 10,004, epsilon is `0.999964` and the continuous
-seed-`61001` stream selects legal exploratory action `[0,0]` under movement mask
-`[false,true,false]`. The action completes transition 10,005. Two fresh traces
-match byte-for-byte with SHA-256
-`135d6a30c8526cd7422f9e30ff21cd997bd05a0ccbcdc5efd75b6fe1182d04a7`;
-the canonical trace SHA-256 is
-`5e3a8ea3d2c0f0afb87fd87f92f6bf90036a6a95fc3f6124ccc0910ca07aa906`.
-
-Run the R3K scheduled third-update gate:
-
-```powershell
-& $python Research\trainer\run_bdq_third_update_smoke.py `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3k-third-update\acceptance
-```
-
-Each accepted process preserves all 10,005 R3J transitions, then selects only
-at completed counts 10,005, 10,006, and 10,007 with epsilons `0.999955`,
-`0.999946`, and `0.999937`. Completing transition 10,008 triggers optimizer
-update 3 with loss `0.008735351264476776`, mean absolute TD error
-`0.06769348680973053`, and online hash
-`4f78e397e87ad6cea1ada78d49dea808337c401f6478970d1a4439065743775b`.
-The target remains frozen, no decision remains pending, and no action is selected
-after update 3. Two fresh serialized traces match byte-for-byte with SHA-256
-`4e4733dd5e5cbfbd7daa21f6d2ad8c48981b4369769d8df000b709e9c115dde4`;
-the canonical trace SHA-256 is
-`c3fafe259dfc03d69e06c758af0c2ba4df3b5da3322d325a5e361cdcf3a4ff02`.
-
-Run the R3L update-3 masked-greedy handoff gate:
-
-```powershell
-& $python Research\trainer\run_bdq_third_update_greedy_handoff_smoke.py `
-  --env Artifacts\Experiments\r3e-epsilon-collection\build-final\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3l-third-update-greedy-handoff\acceptance
-```
-
-Each accepted process preserves R3K's exact 10,008-transition scheduled prefix
-and all three optimizer events. At completed-transition count 10,008, R3L does
-not consume the production schedule's epsilon `0.999928`; it instead performs
-one diagnostic epsilon-zero evaluation of the live observation with the
-update-3 online network and frozen target. The legal masked online argmax is
-`[2,1]`, completing transition 10,009 with no pending decision, fourth update,
-or target synchronization. The maximum online-versus-target Q delta is
-`0.08219506591558456`. Two independent fresh-process traces have canonical
-SHA-256 `19d5681bc78d8b1c7df0bef0e4ea3a5a32f757629428e11fa2961c5cafd581e3`
-and serialized SHA-256
-`1334f396fa0445cf4c4563c28ef22e8fa8cfc8ce383687b3c2918d1515bc4665`.
-
-If valid workers finish in separate parent attempts because a later Unity
-process times out, compare only the completed trace files and write a fresh
-result with the recovery-validation mode:
-
-```powershell
-& $python Research\trainer\run_bdq_third_update_greedy_handoff_smoke.py `
-  --output Artifacts\Experiments\r3l-third-update-greedy-handoff\accepted-pair `
-  --first-trace <first-complete-trace.json> `
-  --second-trace <second-complete-trace.json>
-```
-
-This path still validates both full traces against the frozen contract and
-requires distinct files, object equality, and raw-byte equality. Failed or
-partial workers never count toward `fresh_process_count`.
-
-Build the R3M player with background execution enabled, then run the scheduled
-fourth-update gate:
+With the installed Unity CLI:
 
 ```powershell
 $unity = "$env:LOCALAPPDATA\Unity\bin\unity.exe"
@@ -323,68 +68,128 @@ $unity = "$env:LOCALAPPDATA\Unity\bin\unity.exe"
   --args '-quickdrawBasicOutput Artifacts/Experiments/r3m-fourth-update/build/QuickDrawResearchBasic.exe' `
   --log-file Artifacts/Experiments/r3m-fourth-update/build.log `
   --allow-dirty-build --no-tail
-
-& $python Research\trainer\run_bdq_fourth_update_smoke.py `
-  --env Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.exe `
-  --output Artifacts\Experiments\r3m-fourth-update\acceptance
 ```
 
-`ProjectSettings/ProjectSettings.asset` keeps `runInBackground` enabled so a
-standalone LLAPI worker does not pause when its window loses focus. Graphics
-remain enabled and R3M passes no standalone-player arguments; the camera sensor
-therefore retains the normal renderer path. Each accepted worker preserves
-R3K's exact 10,008-transition prefix, selects at completed counts 10,008 through
-10,011 with epsilons `0.999928`, `0.999919`, `0.99991`, and `0.999901`, and
-completes update 4 at decision 10,012. Update 4 has loss
-`0.0085072573274374`, mean absolute TD error `0.06249994412064552`, and online
-hash `a8356df1531b99a42966578c6fd784cd384c8bcd3d3c3092124df13b2587268f`.
-The target remains frozen, no decision remains pending, and no action is
-selected after update 4. Two fresh traces have canonical SHA-256
-`cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940`
-and byte-identical serialized SHA-256
-`762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`.
-The contract SHA-256 is
-`0a6f209d93ef6d522a53f24807d4ce48e6e820a344905e9762583bbe13a72dbb`,
-and the accepted result SHA-256 is
-`b79a1ba8ab0d23964c225a9b33236226b1c033f8e3de972d61e759f90d890d67`.
+Legacy Unity Editor batch mode may also invoke the same
+`QuickDraw.Editor.ResearchBasicBuild.BuildWindows` method. Build logs may
+contain sensitive command-line context; retain only necessary excerpts.
 
-R3M also supports the same fail-closed completed-trace comparison pattern:
+## Milestone runners
+
+Each acceptance runner requires a fresh `--output` directory. It starts two
+fresh workers unless its contract says otherwise, validates the complete trace,
+and fails closed on contract, prefix, behavior, shape, mask, schedule, hash, or
+pending-decision drift.
+
+| Gate | Runner | Canonical evidence |
+| --- | --- | --- |
+| R3D direct collection | `run_bdq_llapi_smoke.py` | [`R3D.md`](../../docs/evidence/R3D.md) |
+| R3E fixed epsilon collection | `run_bdq_epsilon_collection_smoke.py` | [`R3E.md`](../../docs/evidence/R3E.md) |
+| R3F warmup/update 1 | `run_bdq_warmup_update_smoke.py` | [`R3F.md`](../../docs/evidence/R3F.md) |
+| R3G update 2 | `run_bdq_two_update_smoke.py` | [`R3G.md`](../../docs/evidence/R3G.md) |
+| R3H greedy handoff | `run_bdq_post_update_handoff_smoke.py` | [`R3H.md`](../../docs/evidence/R3H.md) |
+| R3I schedule unit gate | `test_bdq_epsilon_schedule.py` | [`R3I.md`](../../docs/evidence/R3I.md) |
+| R3J scheduled handoff | `run_bdq_scheduled_epsilon_handoff_smoke.py` | [`R3J.md`](../../docs/evidence/R3J.md) |
+| R3K update 3 | `run_bdq_third_update_smoke.py` | [`R3K.md`](../../docs/evidence/R3K.md) |
+| R3L diagnostic greedy handoff | `run_bdq_third_update_greedy_handoff_smoke.py` | [`R3L.md`](../../docs/evidence/R3L.md) |
+| R3M update 4 | `run_bdq_fourth_update_smoke.py` | [`R3M.md`](../../docs/evidence/R3M.md) |
+| R3N replay regression | `validate_bdq_replay_storage_regression.py` | [`R3N.md`](../../docs/evidence/R3N.md) |
+
+Set the player once, then select the required command:
 
 ```powershell
+$player = 'Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.exe'
+
+& $python Research\trainer\run_bdq_llapi_smoke.py `
+  --env $player --output Artifacts\Experiments\r3d-llapi\acceptance
+
+& $python Research\trainer\run_bdq_epsilon_collection_smoke.py `
+  --env $player --output Artifacts\Experiments\r3e-epsilon-collection\acceptance
+
+& $python Research\trainer\run_bdq_warmup_update_smoke.py `
+  --env $player --output Artifacts\Experiments\r3f-warmup-update\acceptance
+
+& $python Research\trainer\run_bdq_two_update_smoke.py `
+  --env $player --output Artifacts\Experiments\r3g-two-update\acceptance
+
+& $python Research\trainer\run_bdq_post_update_handoff_smoke.py `
+  --env $player --output Artifacts\Experiments\r3h-post-update-handoff\acceptance
+
+& $python Research\trainer\run_bdq_scheduled_epsilon_handoff_smoke.py `
+  --env $player --output Artifacts\Experiments\r3j-scheduled-epsilon-handoff\acceptance
+
+& $python Research\trainer\run_bdq_third_update_smoke.py `
+  --env $player --output Artifacts\Experiments\r3k-third-update\acceptance
+
+& $python Research\trainer\run_bdq_third_update_greedy_handoff_smoke.py `
+  --env $player --output Artifacts\Experiments\r3l-third-update-greedy-handoff\acceptance
+
+& $python Research\trainer\run_bdq_fourth_update_smoke.py `
+  --env $player --output Artifacts\Experiments\r3m-fourth-update\acceptance
+```
+
+R3I is a Python-only unit gate:
+
+```powershell
+& $python -B -m pytest -p no:cacheprovider `
+  Research\trainer\test_bdq_epsilon_schedule.py
+```
+
+Do not interpret a later gate as authorization to regenerate an earlier
+accepted result. Consult its evidence record before reproduction.
+
+## Watch mode
+
+Watch mode is a one-worker diagnostic path. It writes one validated trace but
+cannot create the two-fresh-process acceptance result.
+
+To watch in the Unity Editor, open `Research_Basic`, leave Play Mode off, run:
+
+```powershell
+& $python Research\trainer\run_bdq_warmup_update_smoke.py `
+  --watch `
+  --output Artifacts\Experiments\r3f-warmup-update\editor-watch
+```
+
+When Python reports that it is listening on port `5004`, enter Play Mode. The
+runner forces time scale `1` and prints progress every 100 transitions by
+default; use `--progress-interval N` to change that interval. Stop Play Mode
+after the runner finishes.
+
+To launch a visible standalone player instead:
+
+```powershell
+& $python Research\trainer\run_bdq_warmup_update_smoke.py `
+  --watch --env $player `
+  --output Artifacts\Experiments\r3f-warmup-update\standalone-watch
+```
+
+Every rerun needs a new output directory or the previous diagnostic directory
+must be deliberately handled under a separately authorized cleanup task.
+
+## Completed-trace recovery comparison
+
+R3L and R3M can compare two already completed worker traces when valid workers
+finished under separate parent attempts. This mode still validates full
+contracts and requires distinct files, object equality, and raw-byte equality.
+Failed or partial traces cannot count.
+
+```powershell
+& $python Research\trainer\run_bdq_third_update_greedy_handoff_smoke.py `
+  --output Artifacts\Experiments\r3l-third-update-greedy-handoff\accepted-pair `
+  --first-trace <first-complete-trace.json> `
+  --second-trace <second-complete-trace.json>
+
 & $python Research\trainer\run_bdq_fourth_update_smoke.py `
   --output Artifacts\Experiments\r3m-fourth-update\accepted-pair `
   --first-trace <first-complete-trace.json> `
   --second-trace <second-complete-trace.json>
 ```
 
-Five runs of the older background-disabled player timed out at
-`environment.step()`. A `-batchmode` experiment completed but changed the first
-camera observation and was rejected by the canonical R3K-prefix gate. Those
-negative results do not count toward acceptance and no threshold was weakened.
+## R3N replay validation
 
-R3N makes the registered 100,000-transition replay capacity feasible without
-changing its public API or learning semantics. The former separate full
-float32 `s` and `s'` payloads require `22,579,200,000` bytes (`21.03 GiB`) at
-capacity before Python overhead. Replay now stores every exact C-contiguous
-float32 channel frame once and holds eight frame IDs plus actions, rewards,
-masks, and terminal flags in preallocated NumPy columns for each ring slot.
-Reference counts reclaim frames after overwrite. Sampled batches are rebuilt
-as the same C-contiguous float32 HWC `[84,84,4]` arrays with the same seeded
-physical indices and all prior fields.
-
-The deterministic accounting ceiling is 4 GiB. It covers the replay's
-preallocated metadata payload and reserves plus retained frame bytes and a
-conservative per-frame container reserve; it intentionally excludes
-caller-owned transitions, transient sampled batches, networks, and optimizer
-state. Registered Basic's 81 possible agent/target render states project to
-`12,037,184` accounted bytes. A conservative 100,004-distinct-frame sequence
-projects to `2,934,585,088` bytes. Because arbitrary float32 input cannot be
-compressed losslessly into a universal fixed bound, an insertion that would
-exceed the ceiling raises `MemoryError` and rolls back without changing replay
-contents.
-
-Validate the R3N contract and focused storage behavior, then validate one fresh
-post-R3N R3M trace against the frozen pre-R3N evidence:
+Run the focused storage tests, then validate a fresh post-R3N R3M trace against
+the frozen pre-R3N contract:
 
 ```powershell
 & $python -B -m pytest -p no:cacheprovider `
@@ -394,28 +199,14 @@ post-R3N R3M trace against the frozen pre-R3N evidence:
   --trace Artifacts\Experiments\r3n-replay-storage\live-regression\run-1\r3m-fourth-update-trace.json
 ```
 
-The accepted trace keeps serialized SHA-256
-`762fd1d090dc88529f3ad86cd0ad87080aff6494587c10223ae89118bb910a51`
-and canonical SHA-256
-`cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940`
-exactly. Its 1,549 distinct stack hashes imply a conservative 6,196-frame,
-`190,888,704`-byte accounted upper bound. The R3N contract SHA-256 is
-`ece35b60208adbb9ca0d36f8d61b3be652aae4a94ffdb7d2bcafc9ace58e16a9`.
+The validator owns bit-exact legacy-oracle, sample-index, accounting, and
+frozen-trace checks. Exact accepted values and the first invalid `-nographics`
+Unity invocation are preserved in [`R3N.md`](../../docs/evidence/R3N.md).
 
-R3D and R3E are collection evidence. R3F, R3G, R3K, and R3M are four minimal
-scheduled learning operations on real Unity experience. R3H is the first live
-proof that the resulting online weights drive a greedy action. R3I is the
-schedule unit gate, and R3J proves its bounded live counter/RNG/mask
-integration. Because the
-R3J action is exploratory, it is not evidence that learned weights chose that
-action or that a useful policy exists. R3K proves only that the same scheduled
-loop reaches update 3 and stops cleanly. R3L proves that the update-3 weights
-reach one live greedy selection; it does not prove the third update changed the
-chosen action or that the policy is effective. R3M proves only that the
-uninterrupted production loop reaches update 4 and stops cleanly. R3N proves
-lossless replay equivalence and bounded accounting for this registered stream;
-it is not a throughput benchmark or an effectiveness study. Extended
-decay rollout, update 5, target
-synchronization, checkpoint/resume, ONNX export, ROCm training, learned-policy
-evaluation, gradual motion, strategic combat, reflexes, and LLM work remain
-outside this slice.
+## Claim boundary
+
+These runners are bounded collection/integration gates. They do not demonstrate
+extended training, target synchronization, checkpoint/export, learned-policy
+evaluation, ROCm training, strategic combat, reflex behavior, local-model
+behavior, or policy effectiveness. Current truth is maintained in
+[`STATE.md`](../../STATE.md).

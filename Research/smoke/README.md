@@ -1,29 +1,30 @@
-# R1B communicator smoke, R1C CPU reference, R1E reuse, and R1F parity
+# Communicator, CPU-reference, and parity runbook
 
-R1B proves the version-locked Unity/Python communication boundary without
-starting either learned benchmark. The fixture is a deterministic abstract
-state machine, not gameplay and not a training environment for effectiveness
-claims.
+`Research_Smoke` is a deterministic abstract ML-Agents transport and lifecycle
+fixture. It is not gameplay and is not a policy-training or effectiveness
+environment.
+
+- Component architecture: [`ARCH.md`](../../ARCH.md)
+- Registered cross-cutting design: [`RESEARCH.md`](../../RESEARCH.md)
+- Exact R1B/R1C/R1E/R1F results and limitations:
+  [`DETERMINISTIC-R0-R2.md`](../../docs/evidence/DETERMINISTIC-R0-R2.md)
+- Environment construction: [`Research/environment/README.md`](../environment/README.md)
+
+This file owns operating commands. Raw builds, traces, manifests, and logs stay
+under ignored `Artifacts/Experiments/`.
 
 ## Implemented boundary
 
-- Unity package: `com.unity.ml-agents` `4.0.0`.
-- Python packages: `mlagents`/`mlagents-envs` `1.1.0` in the R1A Python 3.10.12
-  CPU reference environment.
-- Unity behavior: one four-float vector observation and two discrete branches
-  sized `[3, 2]`.
-- Episodes: one true terminal (`smoke_goal`) and one decision-limit truncation
-  (`decision_limit`, `interrupted=true`).
-- Custom side channel: the frozen
-  `quickdraw.research-side-channel.v1` UUID and envelope contract.
-- Evidence: complete observations, action masks, actions, rewards, next
-  observations, terminal flags, side-channel events, and a schema-validated run
-  manifest.
+The fixture contains one four-float vector observation, discrete branches
+`[3,2]`, deterministic legal masks/rewards, one true terminal, one
+decision-limit truncation, and a strict ordered custom side channel.
+`smoke-contract-v1.json` owns the default run; `cpu-reference-contract-v1.json`
+owns the 10,000-decision timing mode.
 
-The tracked smoke definition is `smoke-contract-v1.json`. The separate
-`cpu-reference-contract-v1.json` registers one 10,000-decision truncation and
-its timing boundary. Generated builds, logs, traces, and manifests remain below
-ignored `Artifacts/Experiments/`.
+`run_smoke.py` validates behavior shape, observations, masks, actions, rewards,
+episode ends, side-channel schema/hash/run/sequence identity, run manifests,
+and ignored-artifact boundaries. `--compare-to` performs structural and numeric
+canonical-trace comparison.
 
 ## Rebuild and test
 
@@ -41,7 +42,7 @@ $project = 'C:\projects\quickdraw-AI'
   -logFile "$project\Logs\R1B-EditMode.log"
 ```
 
-Build the isolated smoke player:
+Build the isolated player:
 
 ```powershell
 $smokePlayer = "$project\Artifacts\Experiments\r1b-smoke\build\QuickDrawResearchSmoke.exe"
@@ -51,7 +52,9 @@ $smokePlayer = "$project\Artifacts\Experiments\r1b-smoke\build\QuickDrawResearch
   -logFile "$project\Logs\R1B-SmokeBuild.log"
 ```
 
-Run two identical traces from the pinned Python environment:
+## Default communicator smoke
+
+Run from the historical pinned CPU environment:
 
 ```powershell
 $python = "$project\Artifacts\Experiments\.venvs\r1a-py31012\python.exe"
@@ -67,14 +70,15 @@ $runRoot = "$project\Artifacts\Experiments\r1b-smoke"
   --compare-to "$runRoot\run-1\trace.json"
 ```
 
-The second command fails unless the canonical trace is structurally and
-numerically identical to the first. The runner also fails on a contract-hash,
-behavior-shape, side-channel sequence, end-reason, manifest-schema, dependency,
-or artifact-boundary mismatch.
+Use fresh output directories. The comparison fails on contract, shape,
+sequence, outcome, manifest, dependency, artifact, or canonical-trace drift.
 
-## Run the R1C CPU reference
+## CPU transport reference
 
-Use the same player and Python environment, adding the dedicated mode:
+The dedicated mode runs one decision-limit episode and times only the
+synchronous LLAPI action/step loop, including scripted selection and in-memory
+transition capture. Startup, trace comparison, and JSON serialization are
+outside the timing window.
 
 ```powershell
 $runRoot = "$project\Artifacts\Experiments\r1c-cpu-reference"
@@ -89,27 +93,13 @@ $runRoot = "$project\Artifacts\Experiments\r1c-cpu-reference"
   --compare-to "$runRoot\run-1\trace.json"
 ```
 
-Timing begins immediately before the first LLAPI action submission and ends
-when the 10,000th `environment.step()` returns. The measured synchronous driver
-loop includes scripted action selection and in-memory transition capture.
-Player startup, trace comparison, and JSON serialization are excluded. The
-canonical trace also excludes timing so deterministic state evidence can be
-compared exactly while each run manifest retains its own performance result.
+This mode measures Unity/Python communicator transport, not trainer throughput,
+network inference throughput, sample efficiency, or policy quality.
 
-The two accepted base-seed-`21001` runs both produced trace SHA-256
-`d5080b62ea3cc6c33a18567461f690a568339d2168f9d253ea3134b7c85572c5`.
-They recorded 108.636 and 107.434 decisions/s. This is CPU Unity/Python LLAPI
-transport throughput, not trainer or model-inference throughput.
+## Python 3.11 / ROCm communicator check
 
-## R1E Python 3.11 / ROCm communicator check
-
-R1E deliberately reuses the same standalone player and default two-episode
-contract. The runner's `--accelerator-candidate rocm` option records that the
-Python process belongs to the isolated ROCm candidate environment; it does not
-move Unity communication onto the GPU or claim training throughput.
-
-From each independently constructed Python 3.11.13 environment, run the default
-smoke twice:
+R1E reuses the default communicator contract. The candidate marker records the
+environment under test; it does not move Unity transport onto the GPU.
 
 ```powershell
 $python = "$project\Artifacts\Experiments\.venvs\r1e-rocm-mlagents-py311\python.exe"
@@ -127,40 +117,32 @@ $runRoot = "$project\Artifacts\Experiments\r1e-rocm-mlagents"
   --compare-to "$runRoot\communicator-run-1\trace.json"
 ```
 
-The same pair was repeated from a second clean environment. All four canonical
-traces had SHA-256
-`5c5a5190f36e320a7bf05f85543681ba8f98e04aef1e71922d277f805ccf42b5`.
-Their manifests record Python 3.11.13, ML-Agents 1.1.0, ROCm as the candidate,
-and successful Unity communication. This proves the revised Python package
-boundary can drive the Unity communicator; the separate R1E tensor probe proves
-the GPU path.
+Repeatability across independently constructed environments is validated by
+the environment probe, not by this runner alone.
 
-## R1F fixed-policy parity mode
+## Fixed-policy backend parity mode
 
-`--mode backend-parity` selects the registered two-episode R1F contract. The
-first 1,000-decision truncation is an untimed in-process warmup. Timing starts
-before fixed-policy inference on the first decision of the second episode and
-ends after its 10,000th `environment.step()` returns. It therefore includes
-synchronous backend inference, mask-and-argmax action selection, in-memory
-transition/logit capture, and the LLAPI loop while excluding process startup,
-warmup, serialization, and aggregate comparison.
+`--mode backend-parity` runs the registered warmup followed by one separately
+timed fixed-policy episode. It requires:
 
-The mode requires `--policy-checkpoint`, `--policy-model`, and
-`--policy-backend cpu|rocm`. The registered scenario seed is `21001`; policy
-weights use the distinct seed `11001`. Each trace records checkpoint, canonical
-state-dictionary, ONNX, backend, PyTorch/HIP, and exact-device metadata. The
-aggregate evaluator compares the registered R1C trace, all four R1F traces,
-PyTorch logits/actions, and CPU ONNX Runtime output before applying the frozen
-median-throughput decision.
+- `--policy-checkpoint`;
+- `--policy-model`;
+- `--policy-backend cpu|rocm`; and
+- the registered scenario seed, distinct from the policy seed.
 
-The accepted R1F runs and qualifications are summarized in
-`Research/environment/amd-backend-parity-result-v1.json`. ROCm is accepted for
-this batch-size-one inference fixture only.
+The timed section includes synchronous backend inference, legal mask/argmax
+selection, in-memory transition/logit capture, and LLAPI stepping. Process
+startup, warmup, serialization, and aggregate comparison are excluded.
+
+The aggregate evaluator in `Research/environment/evaluate_r1f_parity.py`
+compares the frozen CPU reference, all registered CPU/ROCm traces,
+PyTorch logits/actions, CPU ONNX Runtime output, checkpoint lineage, and the
+frozen throughput decision. Exact accepted values belong in the evidence record
+and `amd-backend-parity-result-v1.json`.
 
 ## Deliberate exclusions
 
-R1B/R1C/R1E/R1F do not add `Research_Basic`, visual observations, combat, a
-replay buffer, a trainer, learned weights, or LLM integration. R1F executes the
-fixed-policy checkpoint/export/throughput procedure but does not establish
-training throughput or model-quality evidence. The R1C CPU result remains the
-deterministic transport baseline.
+These modes do not implement `Research_Basic`, visual learning observations,
+replay, training, combat, a strategic reflex, or an LLM. Fixed-policy parity is
+limited to its registered batch-size-one inference fixture and does not establish
+training support or learned-model quality.
