@@ -66,4 +66,3 @@ that the twice-updated online weights reach one legal live action-selection
 boundary. It does not prove that either update caused the chosen action, that
 the policy is effective, or that extended training, epsilon decay, update 3,
 target synchronization, checkpoint/export, or ROCm training works.
-

@@ -118,10 +118,11 @@ support.
 - Strategic reward-shaping potentials and coefficients remain intentionally
   unregistered until R4; they must be fixed before strategic training rather
   than invented during implementation.
-- `AGENTS.md` is currently an untracked, user-owned file. The hierarchical
-  documentation system will not be complete in a fresh checkout unless that
-  file and the new tracked documentation are included in a later user-approved
-  commit.
+- The documentation migration, including `AGENTS.md` and the new tracked
+  documentation, is staged but not committed or pushed. The subsequent QA
+  cleanup edits remain unstaged until a user-authorized staging operation. A
+  fresh checkout will not contain the complete documentation system until a
+  later user-approved commit.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 

@@ -97,4 +97,3 @@ next-mask registry, and focused trajectory tests. R3C therefore supplies no
 current runtime, contract hash, accepted trace, training result, or policy
 claim. Its only durable conclusion is the architectural decision to use the
 direct synchronous low-level API boundary established by R3D.
-

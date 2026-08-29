@@ -76,4 +76,3 @@ updates and zero target synchronizations. Update 5, an extended epsilon-decay
 rollout, checkpoint/resume, inference export, ROCm training, held-out learned-
 policy evaluation, strategic combat, the research evade reflex, and the local
 LLM runtime are not demonstrated by this archive.
-

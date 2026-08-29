@@ -56,4 +56,3 @@ All `69` trainer tests and all `86` Python research tests passed. R3G proves
 one recurrence of the production update boundary. It does not demonstrate a
 third update, epsilon decay, target synchronization, an extended training
 rollout, checkpoint/export, ROCm training, or learned-policy effectiveness.
-

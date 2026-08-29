@@ -240,4 +240,3 @@ completed all `12` episodes with one aligned hit and zero misses per episode.
 
 R2A is environment-only evidence. It contains no replay buffer, optimizer,
 BDQ training run, learned weight, strategic combat expansion, or LLM runtime.
-

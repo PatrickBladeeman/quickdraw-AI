@@ -61,4 +61,3 @@ handoff action was exploratory; it is not evidence that updated weights chose
 the action or that a useful policy exists. It does not demonstrate update 3,
 target synchronization, extended decay/training, checkpoint/export, ROCm
 training, or held-out evaluation.
-

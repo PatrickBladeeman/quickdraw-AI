@@ -62,4 +62,3 @@ tests, and the pinned dependency check passed. R3K proves the recurring update
 boundary through update 3 only. It does not demonstrate update 4, a post-update
 action, extended training, target sync, checkpoint/export, ROCm training, or
 policy effectiveness.
-

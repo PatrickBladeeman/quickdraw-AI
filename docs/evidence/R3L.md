@@ -79,4 +79,3 @@ does not prove that update 3 changed the chosen action or that the policy is
 effective. It excludes update 4, production epsilon consumption at `10008`,
 extended training, target sync, checkpoint/export, ROCm training, and held-out
 evaluation.
-

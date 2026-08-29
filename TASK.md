@@ -12,8 +12,8 @@ hierarchical, selectively loaded documentation system without losing public
 project knowledge, registered research values, acceptance evidence, historical
 provenance, or the local/private boundary.
 
-Status: **implemented and documentation-verified locally; not committed or
-pushed**.
+Status: **implemented, QA-audited, and minor cleanup applied locally; not
+committed or pushed**.
 
 ## Current implementation frontier
 
@@ -82,6 +82,13 @@ implementation.
 - Inspect the complete documentation diff, `git diff --check`, new-file list,
   line endings, and final `git status`.
 - Confirm only authorized Markdown files changed and no commit or push occurred.
+
+## Completion transition
+
+This completed migration remains the current task until it is included in a
+user-approved commit. After that commit, replace this file with either the next
+explicitly authorized task or a clear statement that no implementation task is
+currently authorized. Do not infer the next task from `ROADMAP.md`.
 
 ## Relevant context
 

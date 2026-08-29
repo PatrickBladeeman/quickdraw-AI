@@ -73,4 +73,3 @@ R3D is terminal/truncation transport and replay-construction evidence. It is
 not a training session and demonstrates no optimizer update, target sync,
 epsilon schedule, checkpoint, export, ROCm training, learned-policy quality,
 strategic combat, reflex, or LLM behavior.
-

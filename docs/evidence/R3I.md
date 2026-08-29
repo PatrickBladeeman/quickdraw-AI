@@ -53,4 +53,3 @@ invalid inputs.
 R3I launched no Unity process and collected no live trace. It performed no
 optimizer update or target synchronization and produced no trained weight,
 checkpoint, export, held-out evaluation, or effectiveness evidence.
-
