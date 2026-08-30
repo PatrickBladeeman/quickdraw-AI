@@ -1,0 +1,23 @@
+# Superseded/non-authoritative project history
+docs/history/**
+
+# Raw/generated experiment artifacts
+**/*.jsonl
+**/*.log
+**/artifacts/**
+**/checkpoints/**
+**/runs/**
+
+# Generated/build material if not already ignored
+Library/**
+Temp/**
+Logs/**
+Build/**
+Builds/**
+obj/**
+bin/**
+
+# Python generated/cache material
+**/__pycache__/**
+**/.pytest_cache/**
+**/.venv/**

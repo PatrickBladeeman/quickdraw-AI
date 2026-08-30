@@ -15,14 +15,18 @@ or detailed acceptance evidence.
 ## Repository checkpoint
 
 - Branch: `main`.
-- Verified implementation commit: `ca66335ce4e413ce7c4c35827d71154a254b850e`
-  (`R3N: lossless replay storage optimization`).
-- At the start of the documentation migration, `HEAD`, `origin/main`, and the
-  configured upstream all resolved to that commit.
+- `HEAD`, the configured upstream, and `origin/main` all resolve to
+  `abd240f9551bfc077e38672f06e7071d5480bc44`
+  (`documentation clean up pt 2`).
+- The hierarchical documentation migration and its QA cleanup are committed
+  and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
+  `abd240f9551bfc077e38672f06e7071d5480bc44`.
+- The verified research implementation frontier remains
+  `ca66335ce4e413ce7c4c35827d71154a254b850e`
+  (`R3N: lossless replay storage optimization`); the two later commits are
+  documentation-only.
 - R3N is committed and pushed. Earlier wording that placed the frontier at an
   uncommitted R3M was stale and was resolved from Git state.
-- The documentation architecture migration in [`TASK.md`](TASK.md) is local
-  work and is not committed or pushed.
 
 ## Current research phase
 
@@ -118,16 +122,15 @@ support.
 - Strategic reward-shaping potentials and coefficients remain intentionally
   unregistered until R4; they must be fixed before strategic training rather
   than invented during implementation.
-- The documentation migration, including `AGENTS.md` and the new tracked
-  documentation, is staged but not committed or pushed. The subsequent QA
-  cleanup edits remain unstaged until a user-authorized staging operation. A
-  fresh checkout will not contain the complete documentation system until a
-  later user-approved commit.
+- R3O is defined as the next bounded SSNT, but its implementation requires a
+  separate explicit go-ahead. Defining it does not open an extended training
+  rollout, update 6, a post-update action, or target synchronization.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 
 ## Current boundary
 
-No post-R3N research implementation milestone is authorized by the current
-documentation-only task. See [`TASK.md`](TASK.md). Future ordering is retained
-in [`ROADMAP.md`](ROADMAP.md), but roadmap order is not authorization.
+R3O is the defined next task: reproduce the accepted R3N/R3M production prefix,
+extend it by exactly four transitions, and stop immediately after scheduled
+optimizer update 5 at transition 10,016. The current request authorizes the
+task definition only, not implementation. See [`TASK.md`](TASK.md).

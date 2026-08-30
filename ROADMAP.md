@@ -70,7 +70,10 @@ Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 Remaining R3 work, in dependency order:
 
 1. Extend the same production selector/optimizer loop beyond the bounded
-   fourth-update smoke, beginning with a separately authorized boundary.
+   fourth-update smoke. The defined first boundary is R3O: reproduce the
+   accepted R3N/R3M prefix, add exactly four transitions, perform update 5 at
+   transition 10,016, and stop before a post-update action. R3O implementation
+   requires a separate explicit go-ahead.
 2. Add durable checkpoint/resume and learned-policy export parity without
    weakening deterministic replay or schedule contracts.
 3. Run the five registered Basic training seeds and retain complete lineage,
@@ -138,5 +141,6 @@ analysis command.
 
 ## Current authorization
 
-The active task is the documentation architecture migration. No new research
-implementation milestone is authorized. See [`TASK.md`](TASK.md).
+R3O is the defined next SSNT. The current request authorizes its task definition
+only; implementation requires a separate explicit go-ahead. See
+[`TASK.md`](TASK.md).

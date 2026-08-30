@@ -65,9 +65,18 @@ not copied into tracked documentation. Existing ignore rules matched local
 memory filenames exactly, so local archival safety had to be established before
 shrinking or renaming any ignored source.
 
-## Completion criterion
+## Completion
 
-This migration is complete only when all canonical files exist, legacy entry
-points route rather than mirror, current Git state agrees with `STATE.md`, the
-registered contract preserves exact values, links resolve, privacy boundaries
-hold, and a final diff/status audit finds only intended documentation changes.
+The structural migration was committed and pushed in
+`563c726fb3e782bd3bece11c0ce38dbcf3a8feed` (`documentation clean up`). Its
+read-only QA follow-up and whitespace cleanup were committed and pushed in
+`abd240f9551bfc077e38672f06e7071d5480bc44`
+(`documentation clean up pt 2`). At synchronization, `main`, its configured
+upstream, and `origin/main` all resolved to the latter commit.
+
+The completed migration established all canonical files, converted legacy
+entry points to routers rather than mirrors, preserved the registered contract
+and evidence, resolved documentation links, retained privacy boundaries, and
+passed its final intended-documentation audit. Subsequent task definitions and
+state updates belong in the current root documents, not in this historical
+record.
