@@ -40,6 +40,7 @@ __pycache__/
 *.egg-info/
 
 # Local AI/session memory
+/.kilo/kilo.jsonc
 CONTEXT.md
 QUICKDRAW_SESSION_HANDOFF.md
 SESSION HANDOFF.md

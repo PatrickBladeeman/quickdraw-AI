@@ -64,22 +64,18 @@ Completed boundaries:
 - R3L: diagnostic update-3 greedy handoff.
 - R3N: lossless, memory-bounded replay representation with frozen-trace
   regression.
+- R3O: bounded scheduled optimizer update 5 at transition 10,016.
 
 Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 
 Remaining R3 work, in dependency order:
 
-1. Extend the same production selector/optimizer loop beyond the bounded
-   fourth-update smoke. The defined first boundary is R3O: reproduce the
-   accepted R3N/R3M prefix, add exactly four transitions, perform update 5 at
-   transition 10,016, and stop before a post-update action. R3O implementation
-   requires a separate explicit go-ahead.
-2. Add durable checkpoint/resume and learned-policy export parity without
+1. Add durable checkpoint/resume and learned-policy export parity without
    weakening deterministic replay or schedule contracts.
-3. Run the five registered Basic training seeds and retain complete lineage,
+2. Run the five registered Basic training seeds and retain complete lineage,
    curves, manifests, and hashes.
-4. Evaluate held-out Basic success and random-policy improvement.
-5. Run and report the joint-action Double DQN factorization control.
+3. Evaluate held-out Basic success and random-policy improvement.
+4. Run and report the joint-action Double DQN factorization control.
 
 The first target synchronization is scheduled by optimizer-update count; it
 has not occurred. A roadmap item is not permission to start it or to choose the
@@ -141,6 +137,6 @@ analysis command.
 
 ## Current authorization
 
-R3O is the defined next SSNT. The current request authorizes its task definition
-only; implementation requires a separate explicit go-ahead. See
-[`TASK.md`](TASK.md).
+R3O is completed and accepted in the working tree; no next SSNT is currently
+authorized. See [`TASK.md`](TASK.md) for the completed boundary and
+[`STATE.md`](STATE.md) for current truth.

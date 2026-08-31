@@ -1,0 +1,149 @@
+{
+  "schema_version": "quickdraw.bdq-fifth-update.v1",
+  "task": "R3O",
+  "purpose": "Preserve the complete accepted R3M/R3N production prefix through transition 10012, continue the same scheduled selector, replay, and optimizer state for exactly four more Unity transitions, and stop exactly when optimizer update 5 completes at decision count 10016.",
+  "base_fourth_update_contract": {
+    "path": "Research/trainer/bdq-fourth-update-contract-v1.json",
+    "sha256": "0a6f209d93ef6d522a53f24807d4ce48e6e820a344905e9762583bbe13a72dbb",
+    "schema_version": "quickdraw.bdq-fourth-update.v1",
+    "pushed_commit": "2ec3ec39d25d5d3bb5686574255898f3f5605d3f"
+  },
+  "base_replay_storage_contract": {
+    "path": "Research/trainer/bdq-replay-storage-contract-v1.json",
+    "sha256": "ece35b60208adbb9ca0d36f8d61b3be652aae4a94ffdb7d2bcafc9ace58e16a9",
+    "schema_version": "quickdraw.bdq-replay-storage.v1",
+    "pushed_commit": "ca66335ce4e413ce7c4c35827d71154a254b850e"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "trainer_entry_points": []
+  },
+  "transport": {
+    "api": "mlagents_envs.environment.UnityEnvironment",
+    "behavior_name": "QuickDrawResearchBasic",
+    "agent_count": 1,
+    "observation_shape": [84, 84, 4],
+    "observation_layout": "HWC",
+    "observation_dtype": "float32",
+    "discrete_branches": [3, 2],
+    "transition_completion": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps",
+    "truncation_mask_transport": "quickdraw.basic-truncation-mask.v1",
+    "privileged_scene_inference_permitted": false
+  },
+  "player_execution": {
+    "project_settings_path": "ProjectSettings/ProjectSettings.asset",
+    "run_in_background": true,
+    "no_graphics": false,
+    "standalone_player_arguments": []
+  },
+  "collection": {
+    "scenario_seed": 31001,
+    "policy_seed": 51001,
+    "exploration_seed": 61001,
+    "selector": "seeded_scheduled_branch_epsilon_greedy",
+    "epsilon_decay_enabled": true,
+    "scheduled_transition_count": 10016,
+    "transition_limit": 10016,
+    "minimum_completed_episodes": 1,
+    "minimum_unique_action_tuples": 6,
+    "require_no_pending_decision_at_cutoff": true
+  },
+  "optimization": {
+    "replay_capacity": 100000,
+    "replay_warmup_decisions": 10000,
+    "batch_size": 64,
+    "gamma": 0.99,
+    "optimizer": "Adam",
+    "learning_rate": 0.0001,
+    "optimizer_update_interval_decisions": 4,
+    "hard_target_sync_interval_optimizer_updates": 10000,
+    "expected_first_update_decision": 10000,
+    "expected_update_decisions": [10000, 10004, 10008, 10012, 10016],
+    "expected_optimizer_updates": 5,
+    "expected_target_synchronizations": 0,
+    "require_finite_loss": true,
+    "require_finite_mean_absolute_td_error": true,
+    "require_online_weights_changed_after_each_update": true,
+    "require_target_weights_unchanged": true
+  },
+  "epsilon_schedule": {
+    "class": "quickdraw_bdq.exploration.LinearEpsilonSchedule",
+    "selector_class": "quickdraw_bdq.llapi.ScheduledEpsilonGreedyBDQActionSelector",
+    "completed_transition_count_source": "BDQOptimizerController.decision_count",
+    "replay_warmup_decisions": 10000,
+    "decay_decisions": 100000,
+    "initial_epsilon": 1.0,
+    "final_epsilon": 0.1,
+    "trace_sample_completed_transition_counts": [0, 10000, 10001, 10004, 10005, 10006, 10007, 10008, 10009, 10010, 10011, 10012, 10013, 10014, 10015],
+    "trace_sample_epsilons": [1.0, 1.0, 0.999991, 0.999964, 0.999955, 0.999946, 0.999937, 0.999928, 0.999919, 0.99991, 0.999901, 0.999892, 0.999883, 0.999874, 0.999865],
+    "selection_count": 10016,
+    "full_exploration_selection_count": 10001,
+    "decay_selection_count": 15,
+    "first_decay_completed_transition_count": 10001,
+    "last_selection_completed_transition_count": 10015,
+    "continuous_selector_rng_from_completed_count_zero": true
+  },
+  "r3m_prefix": {
+    "transition_count": 10012,
+    "canonical_transitions_sha256": "9b3fc70c5e3cdbc40c9332460ef702304086aa6d07c8467a411c31bcba059bef",
+    "source_canonical_trace_sha256": "cd2fa70672432e74c16c34c0525035953961ac3845cbe3362e061373cf48a940",
+    "online_after_first_update_sha256": "7dd2365b5e219af10aeb4fabb5191df873762fcea6765cb50f83d41525279c8e",
+    "online_after_second_update_sha256": "6248f286191da322a52ad0c97f569d30ecd49a1c86e9810bda4cb96ccc6b9471",
+    "online_after_third_update_sha256": "4f78e397e87ad6cea1ada78d49dea808337c401f6478970d1a4439065743775b",
+    "online_after_fourth_update_sha256": "a8356df1531b99a42966578c6fd784cd384c8bcd3d3c3092124df13b2587268f",
+    "frozen_target_sha256": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb",
+    "first_update_loss": 0.01628389209508896,
+    "first_update_mean_absolute_td_error": 0.06243317946791649,
+    "second_update_loss": 0.014819225296378136,
+    "second_update_mean_absolute_td_error": 0.06711231172084808,
+    "third_update_loss": 0.008735351264476776,
+    "third_update_mean_absolute_td_error": 0.06769348680973053,
+    "fourth_update_loss": 0.0085072573274374,
+    "fourth_update_mean_absolute_td_error": 0.06249994412064552
+  },
+  "fifth_update_boundary": {
+    "continuation_after_transition_count": 10012,
+    "new_transition_count": 4,
+    "first_new_selection_completed_transition_count": 10012,
+    "last_new_selection_completed_transition_count": 10015,
+    "completion_decision_count": 10016,
+    "optimizer_update_count_before_continuation": 4,
+    "optimizer_update_count_after_completion": 5,
+    "target_sync_count_after_completion": 0,
+    "select_action_after_fifth_update": false,
+    "require_online_weights_changed_by_fifth_update": true,
+    "require_frozen_target_network": true,
+    "require_no_pending_decision_after_completion": true
+  },
+  "determinism": {
+    "fresh_processes": 2,
+    "exact_trace_equality": true,
+    "torch_num_threads": 1,
+    "torch_num_interop_threads": 1,
+    "deterministic_algorithms": true
+  },
+  "exclusions": [
+    "a sixth optimizer update or any extended training rollout",
+    "action selection using optimizer update 5 weights",
+    "target-network synchronization",
+    "checkpoint, resume, or ONNX export",
+    "ROCm execution or training",
+    "multi-environment collection",
+    "five-seed training or held-out evaluation",
+    "learned-policy effectiveness claims",
+    "changes to the R2A environment or action contract",
+    "changes to the R3N replay representation, sampling, accounting, or storage ceiling",
+    "watch-mode camera maintenance",
+    "gradual-motion Basic variant",
+    "strategic combat, reflex, or LLM runtime"
+  ]
+}

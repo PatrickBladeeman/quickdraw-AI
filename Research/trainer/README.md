@@ -94,6 +94,7 @@ pending-decision drift.
 | R3L diagnostic greedy handoff | `run_bdq_third_update_greedy_handoff_smoke.py` | [`R3L.md`](../../docs/evidence/R3L.md) |
 | R3M update 4 | `run_bdq_fourth_update_smoke.py` | [`R3M.md`](../../docs/evidence/R3M.md) |
 | R3N replay regression | `validate_bdq_replay_storage_regression.py` | [`R3N.md`](../../docs/evidence/R3N.md) |
+| R3O update 5 | `run_bdq_fifth_update_smoke.py` | [`R3O.md`](../../docs/evidence/R3O.md) |
 
 Set the player once, then select the required command:
 
@@ -126,6 +127,10 @@ $player = 'Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.
 
 & $python Research\trainer\run_bdq_fourth_update_smoke.py `
   --env $player --output Artifacts\Experiments\r3m-fourth-update\acceptance
+
+& $python Research\trainer\run_bdq_fifth_update_smoke.py `
+  --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3o-fifth-update\acceptance
 ```
 
 R3I is a Python-only unit gate:
@@ -169,8 +174,8 @@ must be deliberately handled under a separately authorized cleanup task.
 
 ## Completed-trace recovery comparison
 
-R3L and R3M can compare two already completed worker traces when valid workers
-finished under separate parent attempts. This mode still validates full
+R3L, R3M, and R3O can compare two already completed worker traces when valid
+workers finished under separate parent attempts. This mode still validates full
 contracts and requires distinct files, object equality, and raw-byte equality.
 Failed or partial traces cannot count.
 
@@ -182,6 +187,11 @@ Failed or partial traces cannot count.
 
 & $python Research\trainer\run_bdq_fourth_update_smoke.py `
   --output Artifacts\Experiments\r3m-fourth-update\accepted-pair `
+  --first-trace <first-complete-trace.json> `
+  --second-trace <second-complete-trace.json>
+
+& $python Research\trainer\run_bdq_fifth_update_smoke.py `
+  --output Artifacts\Experiments\r3o-fifth-update\accepted-pair `
   --first-trace <first-complete-trace.json> `
   --second-trace <second-complete-trace.json>
 ```

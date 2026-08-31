@@ -49,8 +49,9 @@ study unless its milestone file explicitly says otherwise.
 | R3L | [R3L.md](R3L.md) | Diagnostic greedy handoff after update 3 |
 | R3M | [R3M.md](R3M.md) | Optimizer update 4 and rejected operational attempts |
 | R3N | [R3N.md](R3N.md) | Lossless memory-bounded replay and frozen R3M regression |
+| R3O | [R3O.md](R3O.md) | Bounded scheduled optimizer update 5 |
 
-## Shared R3D-R3N runtime and optimizer reference
+## Shared R3D-R3O runtime and optimizer reference
 
 The individual R3D-R3N contracts pin Python `3.11.13`,
 `mlagents_envs==1.1.0`, NumPy `1.23.5`, PyTorch `2.12.0+cpu`, device `cpu`,
@@ -71,8 +72,8 @@ The initial online and frozen target network SHA-256 is:
 
 `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`
 
-Through R3N, the accepted live boundary contains exactly four optimizer
-updates and zero target synchronizations. Update 5, an extended epsilon-decay
+Through R3O, the accepted live boundary contains exactly five optimizer
+updates and zero target synchronizations. Update 6, an extended epsilon-decay
 rollout, checkpoint/resume, inference export, ROCm training, held-out learned-
 policy evaluation, strategic combat, the research evade reflex, and the local
 LLM runtime are not demonstrated by this archive.

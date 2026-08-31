@@ -1,6 +1,6 @@
 # quickdraw-AI — Current State
 
-Last verified: 2026-08-29
+Last verified: 2026-08-30
 
 This file is the canonical answer to **what is true right now**. It records
 implementation and verification status, not the registered experiment design
@@ -16,26 +16,29 @@ or detailed acceptance evidence.
 
 - Branch: `main`.
 - `HEAD`, the configured upstream, and `origin/main` all resolve to
-  `abd240f9551bfc077e38672f06e7071d5480bc44`
-  (`documentation clean up pt 2`).
+  `55b324ed3b9100055fc84d348f3010710931cb19`
+  (`task update and kilo setup`).
 - The hierarchical documentation migration and its QA cleanup are committed
   and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
   `abd240f9551bfc077e38672f06e7071d5480bc44`.
 - The verified research implementation frontier remains
   `ca66335ce4e413ce7c4c35827d71154a254b850e`
-  (`R3N: lossless replay storage optimization`); the two later commits are
-  documentation-only.
+  (`R3N: lossless replay storage optimization`); later documentation and agent-
+  tooling commits do not advance that research implementation frontier.
 - R3N is committed and pushed. Earlier wording that placed the frontier at an
   uncommitted R3M was stale and was resolved from Git state.
+- R3O (bounded scheduled optimizer update 5) is implemented and accepted in
+  the working tree as of 2026-08-30; it is not yet committed. It adds the
+  R3O contract/schemas/runner/tests and synchronized documentation only.
 
 ## Current research phase
 
 The project is in **R3 — Branching Double DQN implementation and acceptance
 infrastructure**.
 
-The implemented live learning boundary is deliberately small: four scheduled
+The implemented live learning boundary is deliberately small: five scheduled
 batch-64 optimizer updates have run on one deterministic Unity-derived prefix,
-ending at transition 10,012. This is not an extended training run and has not
+ending at transition 10,016. This is not an extended training run and has not
 produced a trained or useful policy.
 
 ## Implemented and verified
@@ -82,19 +85,21 @@ produced a trained or useful policy.
   ML-Agents LLAPI collection and authoritative final masks for truncations.
 - R3E–R3M established deterministic collection, the registered epsilon
   schedule, live action handoffs, and scheduled optimizer updates 1–4.
-- The R3M production path ends at transition 10,012 with four optimizer
-  updates, zero target synchronizations, the target network still equal to its
-  initial snapshot, and no pending decision.
 - R3N implements lossless content-addressed float32 frame storage and columnar
   replay metadata under a fail-closed 4 GiB accounting ceiling while preserving
   the frozen R3M trace and optimizer results exactly.
+- R3O extends the unchanged R3N production path by exactly four transitions
+  and completes scheduled optimizer update 5 at transition 10,016. Each of two
+  independent fresh workers reproduced the accepted 10,012-transition prefix
+  byte-for-byte, and the runner stopped before any post-update action.
 - Detailed evidence: [`docs/evidence/README.md`](docs/evidence/README.md), with
-  one record per R3D–R3N milestone.
+  one record per R3D–R3O milestone.
 
 ## Not implemented or not demonstrated
 
-- Optimizer update 5 or an extended Unity epsilon-decay/training rollout.
+- Optimizer update 6 or an extended Unity epsilon-decay/training rollout.
 - The first scheduled hard target-network synchronization.
+- Any action selected with update-5 weights.
 - Training to convergence across the five registered policy seeds.
 - Checkpoint/resume lifecycle, final checkpoint selection, or ONNX export for
   the learned BDQ policy.
@@ -115,22 +120,21 @@ support.
 
 ## Active constraints and risks
 
-- Do not describe the four bounded optimizer updates as an extended training
+- Do not describe the five bounded optimizer updates as an extended training
   session or a trained-policy result.
 - Do not treat the unchanged target network as a defect: the registered hard
   synchronization boundary has not been reached.
 - Strategic reward-shaping potentials and coefficients remain intentionally
   unregistered until R4; they must be fixed before strategic training rather
   than invented during implementation.
-- R3O is defined as the next bounded SSNT, but its implementation requires a
-  separate explicit go-ahead. Defining it does not open an extended training
-  rollout, update 6, a post-update action, or target synchronization.
+- R3O is implemented and accepted. Its acceptance does not open an extended
+  training rollout, update 6, a post-update action, or target synchronization.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 
 ## Current boundary
 
-R3O is the defined next task: reproduce the accepted R3N/R3M production prefix,
-extend it by exactly four transitions, and stop immediately after scheduled
-optimizer update 5 at transition 10,016. The current request authorizes the
-task definition only, not implementation. See [`TASK.md`](TASK.md).
+R3O is implemented, accepted, and awaiting commit. The live boundary stands at
+10,016 transitions with five optimizer updates, zero target synchronizations,
+and no post-update action. No further work is currently authorized; the next
+SSNT requires an explicit task update. See [`TASK.md`](TASK.md).
