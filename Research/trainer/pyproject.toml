@@ -12,6 +12,7 @@ dependencies = [
   "mlagents-envs==1.1.0",
   "numpy==1.23.5",
   "torch==2.12.0",
+  "jsonschema==4.23.0",
 ]
 
 [tool.setuptools]

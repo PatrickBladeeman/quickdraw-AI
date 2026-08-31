@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import copy
 from dataclasses import dataclass
-from typing import Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -16,6 +18,7 @@ REPLAY_MAX_ACCOUNTED_BYTES = 4 * 1024**3
 REPLAY_FRAME_ACCOUNTING_OVERHEAD_BYTES = 1024
 REPLAY_METADATA_ARRAY_ACCOUNTING_OVERHEAD_BYTES = 256
 REPLAY_FIXED_ACCOUNTING_OVERHEAD_BYTES = 64 * 1024
+REPLAY_CHECKPOINT_STATE_VERSION = "quickdraw.bdq-replay-checkpoint-state.v1"
 
 _FRAME_SHAPE = OBSERVATION_SHAPE[:2]
 _STACK_COUNT = OBSERVATION_SHAPE[2]
@@ -268,6 +271,11 @@ class ReplayBuffer:
         return self._size
 
     @property
+    def cursor(self) -> int:
+        """Return the next ring write position."""
+        return int(self._next_index)
+
+    @property
     def storage_metrics(self) -> ReplayStorageMetrics:
         unique_frame_count = len(self._frame_bytes_by_id)
         accounted = self._accounted_bytes_for_unique_frames(unique_frame_count)
@@ -407,6 +415,347 @@ class ReplayBuffer:
             ),
             indices=np.asarray(indices, dtype=np.int64),
         )
+
+    def export_checkpoint_state(self) -> Dict[str, Any]:
+        """Return an exact raw snapshot of the live buffer state.
+
+        The snapshot holds only live ring rows, live frames, the sampling
+        bit-generator state, and the durable accounting metrics. The unwritten
+        tail of a partially filled buffer is intentionally excluded.
+        """
+
+        rows = self._size
+        return {
+            "state_version": REPLAY_CHECKPOINT_STATE_VERSION,
+            "capacity": self.capacity,
+            "seed": self.seed,
+            "max_accounted_bytes": self.max_accounted_bytes,
+            "next_frame_id": int(self._next_frame_id),
+            "cursor": int(self._next_index),
+            "size": int(self._size),
+            "frame_bytes_by_id": {
+                int(frame_id): bytes(frame_bytes)
+                for frame_id, frame_bytes in self._frame_bytes_by_id.items()
+            },
+            "frame_refcounts": {
+                int(frame_id): int(count)
+                for frame_id, count in self._frame_refcounts.items()
+            },
+            "observation_frame_ids": np.array(
+                self._observation_frame_ids[:rows], copy=True
+            ),
+            "next_observation_frame_ids": np.array(
+                self._next_observation_frame_ids[:rows], copy=True
+            ),
+            "actions": np.array(self._actions[:rows], copy=True),
+            "rewards": np.array(self._rewards[:rows], copy=True),
+            "action_masks": tuple(
+                np.array(mask[:rows], copy=True)
+                for mask in self._action_masks
+            ),
+            "next_action_masks": tuple(
+                np.array(mask[:rows], copy=True)
+                for mask in self._next_action_masks
+            ),
+            "terminated": np.array(self._terminated[:rows], copy=True),
+            "truncated": np.array(self._truncated[:rows], copy=True),
+            "replay_bit_generator_state": copy.deepcopy(
+                self._random.bit_generator.state
+            ),
+            "storage_metrics": self.storage_metrics.as_dict(),
+        }
+
+    def import_checkpoint_state(self, state: Dict[str, Any]) -> None:
+        """Validate a snapshot fully, then replace this buffer's live state.
+
+        Apply this to a freshly constructed buffer whose capacity, seed, and
+        storage budget match the snapshot. Every structural, accounting, and
+        interning invariant is validated before any mutation.
+        """
+
+        if not isinstance(state, dict):
+            raise ValueError("Replay checkpoint state must be a mapping.")
+        required = {
+            "state_version",
+            "capacity",
+            "seed",
+            "max_accounted_bytes",
+            "next_frame_id",
+            "cursor",
+            "size",
+            "frame_bytes_by_id",
+            "frame_refcounts",
+            "observation_frame_ids",
+            "next_observation_frame_ids",
+            "actions",
+            "rewards",
+            "action_masks",
+            "next_action_masks",
+            "terminated",
+            "truncated",
+            "replay_bit_generator_state",
+            "storage_metrics",
+        }
+        missing = sorted(required - set(state))
+        if missing:
+            raise ValueError(f"Replay checkpoint state is incomplete: {missing}.")
+        if state["state_version"] != REPLAY_CHECKPOINT_STATE_VERSION:
+            raise ValueError("Replay checkpoint state version is incompatible.")
+        for key in ("capacity", "seed", "max_accounted_bytes"):
+            if type(state[key]) is not int or state[key] != getattr(self, key):
+                raise ValueError(f"Replay checkpoint {key} is incompatible.")
+
+        size = state["size"]
+        cursor = state["cursor"]
+        next_frame_id = state["next_frame_id"]
+        if type(size) is not int or not 0 <= size <= self.capacity:
+            raise ValueError("Replay checkpoint size is out of range.")
+        if type(cursor) is not int or not 0 <= cursor < self.capacity:
+            raise ValueError("Replay checkpoint cursor is out of range.")
+        if size < self.capacity and cursor != size:
+            raise ValueError("Replay checkpoint cursor disagrees with its size.")
+        if type(next_frame_id) is not int or next_frame_id < 0:
+            raise ValueError("Replay checkpoint frame-id counter is invalid.")
+
+        frame_bytes_by_id = state["frame_bytes_by_id"]
+        frame_refcounts = state["frame_refcounts"]
+        if not isinstance(frame_bytes_by_id, dict) or not isinstance(
+            frame_refcounts, dict
+        ):
+            raise ValueError("Replay checkpoint frame stores must be mappings.")
+        if set(frame_refcounts) != set(frame_bytes_by_id):
+            raise ValueError("Replay checkpoint frame refcounts are incomplete.")
+        bytes_by_frame: Dict[int, bytes] = {}
+        for frame_id, frame_bytes in frame_bytes_by_id.items():
+            if type(frame_id) is not int or not 0 <= frame_id < next_frame_id:
+                raise ValueError("Replay checkpoint frame id is out of range.")
+            if not isinstance(frame_bytes, (bytes, bytearray)):
+                raise ValueError("Replay checkpoint frame payload is not bytes.")
+            if len(frame_bytes) != _FRAME_PAYLOAD_BYTES:
+                raise ValueError("Replay checkpoint frame payload size is wrong.")
+            if frame_id in bytes_by_frame:
+                raise ValueError("Replay checkpoint frame ids are not unique.")
+            bytes_by_frame[frame_id] = bytes(frame_bytes)
+            count = frame_refcounts[frame_id]
+            if type(count) is not int or count < 1:
+                raise ValueError("Replay checkpoint frame refcount is invalid.")
+        if next_frame_id < len(bytes_by_frame):
+            raise ValueError("Replay checkpoint frame-id counter is inconsistent.")
+
+        def _validated_column(
+            value: Any,
+            name: str,
+            dtype: np.dtype,
+            shape: Tuple[int, ...],
+        ) -> np.ndarray:
+            if not isinstance(value, np.ndarray):
+                raise ValueError(f"Replay checkpoint {name} is not an array.")
+            if value.dtype != dtype or tuple(value.shape) != shape:
+                raise ValueError(
+                    f"Replay checkpoint {name} dtype or shape is wrong."
+                )
+            return np.array(value, dtype=dtype, copy=True)
+
+        observation_frame_ids = _validated_column(
+            state["observation_frame_ids"],
+            "observation_frame_ids",
+            np.dtype(np.uint64),
+            (size, _STACK_COUNT),
+        )
+        next_observation_frame_ids = _validated_column(
+            state["next_observation_frame_ids"],
+            "next_observation_frame_ids",
+            np.dtype(np.uint64),
+            (size, _STACK_COUNT),
+        )
+        actions = _validated_column(
+            state["actions"],
+            "actions",
+            np.dtype(np.int64),
+            (size, len(BRANCH_SIZES)),
+        )
+        if size and (
+            (actions < 0).any()
+            or any(
+                (actions[:, branch] >= branch_size).any()
+                for branch, branch_size in enumerate(BRANCH_SIZES)
+            )
+        ):
+            raise ValueError("Replay checkpoint actions are out of range.")
+        rewards = _validated_column(
+            state["rewards"],
+            "rewards",
+            np.dtype(np.float32),
+            (size,),
+        )
+        if size and not np.isfinite(rewards).all():
+            raise ValueError("Replay checkpoint rewards are not finite.")
+
+        def _validated_masks(value: Any, name: str) -> Tuple[np.ndarray, ...]:
+            if not isinstance(value, (tuple, list)) or len(value) != len(
+                BRANCH_SIZES
+            ):
+                raise ValueError(f"Replay checkpoint {name} has wrong branches.")
+            validated = tuple(
+                _validated_column(
+                    mask,
+                    f"{name} branch {branch}",
+                    np.dtype(np.bool_),
+                    (size, branch_size),
+                )
+                for branch, (mask, branch_size) in enumerate(
+                    zip(value, BRANCH_SIZES)
+                )
+            )
+            if size and any(mask.all(axis=1).any() for mask in validated):
+                raise ValueError(f"Replay checkpoint {name} masks every action.")
+            return validated
+
+        action_masks = _validated_masks(state["action_masks"], "action_masks")
+        next_action_masks = _validated_masks(
+            state["next_action_masks"], "next_action_masks"
+        )
+        if size:
+            rows = np.arange(size)
+            for branch in range(len(BRANCH_SIZES)):
+                if action_masks[branch][rows, actions[:, branch]].any():
+                    raise ValueError(
+                        "Replay checkpoint actions are masked by their own row."
+                    )
+        terminated = _validated_column(
+            state["terminated"],
+            "terminated",
+            np.dtype(np.bool_),
+            (size,),
+        )
+        truncated = _validated_column(
+            state["truncated"],
+            "truncated",
+            np.dtype(np.bool_),
+            (size,),
+        )
+        if size and (terminated & truncated).any():
+            raise ValueError(
+                "Replay checkpoint rows are both terminated and truncated."
+            )
+
+        referenced: Dict[int, int] = {}
+        for column in (observation_frame_ids, next_observation_frame_ids):
+            for frame_id in column.reshape(-1):
+                key = int(frame_id)
+                if key not in bytes_by_frame:
+                    raise ValueError(
+                        "Replay checkpoint references a missing frame."
+                    )
+                referenced[key] = referenced.get(key, 0) + 1
+        if referenced != {int(k): int(v) for k, v in frame_refcounts.items()}:
+            raise ValueError(
+                "Replay checkpoint frame refcounts disagree with its rows."
+            )
+
+        interned_bytes: Dict[bytes, int] = {}
+        for frame_id, frame_bytes in bytes_by_frame.items():
+            if frame_bytes in interned_bytes:
+                raise ValueError(
+                    "Replay checkpoint frames are not content-unique."
+                )
+            interned_bytes[frame_bytes] = frame_id
+
+        bit_generator_state = state["replay_bit_generator_state"]
+        if not isinstance(bit_generator_state, dict):
+            raise ValueError("Replay checkpoint RNG state is not a mapping.")
+        if bit_generator_state.get("bit_generator") != type(
+            self._random.bit_generator
+        ).__name__:
+            raise ValueError(
+                "Replay checkpoint RNG bit generator is incompatible."
+            )
+        if set(bit_generator_state) != {
+            "bit_generator",
+            "state",
+            "has_uint32",
+            "uinteger",
+        }:
+            raise ValueError(
+                "Replay checkpoint RNG state fields are wrong."
+            )
+        inner_state = bit_generator_state["state"]
+        if not isinstance(inner_state, dict) or set(inner_state) != {
+            "state",
+            "inc",
+        }:
+            raise ValueError(
+                "Replay checkpoint RNG inner state is malformed."
+            )
+        for key, value in inner_state.items():
+            if type(value) is not int or value < 0:
+                raise ValueError(
+                    "Replay checkpoint RNG inner state is invalid."
+                )
+        for key in ("has_uint32", "uinteger"):
+            value = bit_generator_state[key]
+            if type(value) is not int or value < 0:
+                raise ValueError(
+                    "Replay checkpoint RNG buffering state is invalid."
+                )
+
+        metrics = state["storage_metrics"]
+        if not isinstance(metrics, dict):
+            raise ValueError("Replay checkpoint storage metrics are missing.")
+        unique_frame_count = len(bytes_by_frame)
+        expected_metrics = ReplayStorageMetrics(
+            capacity=self.capacity,
+            size=size,
+            unique_frame_count=unique_frame_count,
+            frame_reference_count=size * _FRAME_REFERENCES_PER_TRANSITION,
+            frame_payload_bytes=unique_frame_count * _FRAME_PAYLOAD_BYTES,
+            metadata_payload_bytes=(
+                self.capacity * _METADATA_PAYLOAD_BYTES_PER_TRANSITION
+            ),
+            accounted_storage_bytes=ReplayBuffer.projected_accounted_bytes(
+                self.capacity, unique_frame_count
+            ),
+            max_accounted_storage_bytes=self.max_accounted_bytes,
+            remaining_accounted_storage_bytes=(
+                self.max_accounted_bytes
+                - ReplayBuffer.projected_accounted_bytes(
+                    self.capacity, unique_frame_count
+                )
+            ),
+            legacy_observation_payload_bytes=(
+                size * _OBSERVATION_PAYLOAD_BYTES * 2
+            ),
+            legacy_capacity_observation_payload_bytes=(
+                self.capacity * _OBSERVATION_PAYLOAD_BYTES * 2
+            ),
+        )
+        if metrics != expected_metrics.as_dict():
+            raise ValueError(
+                "Replay checkpoint storage metrics disagree with its state."
+            )
+
+        self._observation_frame_ids[:size] = observation_frame_ids
+        self._next_observation_frame_ids[:size] = next_observation_frame_ids
+        self._actions[:size] = actions
+        self._rewards[:size] = rewards
+        for branch in range(len(BRANCH_SIZES)):
+            self._action_masks[branch][:size] = action_masks[branch]
+            self._next_action_masks[branch][:size] = next_action_masks[branch]
+        self._terminated[:size] = terminated
+        self._truncated[:size] = truncated
+        self._frame_bytes_by_id = bytes_by_frame
+        self._frame_id_by_bytes = interned_bytes
+        self._frame_refcounts = {
+            int(k): int(v) for k, v in frame_refcounts.items()
+        }
+        self._next_frame_id = next_frame_id
+        self._next_index = cursor
+        self._size = size
+        self._random.bit_generator.state = copy.deepcopy(bit_generator_state)
+        if self.storage_metrics.as_dict() != metrics:
+            raise RuntimeError(
+                "Restored replay accounting failed its post-restore audit."
+            )
 
     def _metadata_arrays(self) -> tuple[np.ndarray, ...]:
         return (

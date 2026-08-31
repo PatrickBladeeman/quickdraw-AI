@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-checkpoint-roundtrip-result.schema.json",
+  "title": "QuickDraw checkpoint round-trip acceptance result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "checkpoint_sha256",
+    "checkpoint_bytes",
+    "fresh_process_count",
+    "clean_boundary_pending_agent_ids",
+    "reference_and_saver_boundaries_identical",
+    "restored_boundary_matches_reference",
+    "same_next_replay_sample",
+    "same_next_optimizer_result",
+    "loaded_without_unity",
+    "at_boundary",
+    "next_update"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-checkpoint-roundtrip-result.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+    "checkpoint_bytes": {"type": "integer", "minimum": 1},
+    "fresh_process_count": {"const": 3},
+    "clean_boundary_pending_agent_ids": {"const": []},
+    "reference_and_saver_boundaries_identical": {"const": true},
+    "restored_boundary_matches_reference": {"const": true},
+    "same_next_replay_sample": {"const": true},
+    "same_next_optimizer_result": {"const": true},
+    "loaded_without_unity": {"const": true},
+    "at_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "controller_seed",
+        "exploration_seed",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_network_sha256",
+        "target_network_sha256",
+        "replay",
+        "pending_agent_ids"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+        "controller_seed": {"const": 51001},
+        "exploration_seed": {"const": 61001},
+        "decision_count": {"const": 36},
+        "optimizer_update_count": {"const": 4},
+        "target_sync_count": {"const": 0},
+        "online_network_sha256": {"$ref": "#/$defs/sha256"},
+        "target_network_sha256": {"$ref": "#/$defs/sha256"},
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capacity",
+            "size",
+            "unique_frame_count",
+            "frame_reference_count",
+            "frame_payload_bytes",
+            "metadata_payload_bytes",
+            "accounted_storage_bytes",
+            "max_accounted_storage_bytes",
+            "remaining_accounted_storage_bytes",
+            "legacy_observation_payload_bytes",
+            "legacy_capacity_observation_payload_bytes",
+            "cursor"
+          ],
+          "properties": {
+            "capacity": {"const": 32},
+            "size": {"const": 32},
+            "unique_frame_count": {"const": 20},
+            "frame_reference_count": {"const": 256},
+            "frame_payload_bytes": {"const": 564480},
+            "metadata_payload_bytes": {"const": 3072},
+            "accounted_storage_bytes": {"const": 656128},
+            "max_accounted_storage_bytes": {"const": 4294967296},
+            "remaining_accounted_storage_bytes": {"const": 4294311168},
+            "legacy_observation_payload_bytes": {"const": 7225344},
+            "legacy_capacity_observation_payload_bytes": {"const": 7225344},
+            "cursor": {"const": 4}
+          }
+        },
+        "pending_agent_ids": {"const": []}
+      }
+    },
+    "next_update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_count",
+        "optimizer_update_count",
+        "replay_size",
+        "target_sync_count",
+        "sampled_indices",
+        "loss",
+        "mean_absolute_td_error",
+        "online_after_sha256",
+        "target_after_sha256",
+        "continuation_actions"
+      ],
+      "properties": {
+        "decision_count": {"const": 40},
+        "optimizer_update_count": {"const": 5},
+        "replay_size": {"const": 32},
+        "target_sync_count": {"const": 0},
+        "sampled_indices": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0, "maximum": 31},
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "loss": {"type": "number", "minimum": 0},
+        "mean_absolute_td_error": {"type": "number", "minimum": 0},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"},
+        "target_after_sha256": {"$ref": "#/$defs/sha256"},
+        "continuation_actions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/action"},
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "action": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "integer", "minimum": 0, "maximum": 2},
+        {"type": "integer", "minimum": 0, "maximum": 1}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

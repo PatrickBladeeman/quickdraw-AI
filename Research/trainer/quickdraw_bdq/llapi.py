@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Dict, Sequence, Tuple
 
 import numpy as np
@@ -30,6 +30,7 @@ DECISION_LIMIT = 300
 SCENARIO_SEED = 31001
 MINIMUM_SLOT = -4
 MAXIMUM_SLOT = 4
+SELECTOR_CHECKPOINT_STATE_VERSION = "quickdraw.bdq-selector-checkpoint-state.v1"
 
 
 class LLAPIContractError(RuntimeError):
@@ -279,6 +280,47 @@ class ScheduledEpsilonGreedyBDQActionSelector:
             epsilon,
             self._generator,
         )
+
+    def export_checkpoint_state(self) -> dict:
+        """Return an exact raw snapshot of the scheduled selector's state."""
+
+        return {
+            "state_version": SELECTOR_CHECKPOINT_STATE_VERSION,
+            "seed": self._seed,
+            "schedule": asdict(self._schedule),
+            "generator_state": self._generator.get_state().clone(),
+        }
+
+    def load_checkpoint_state(self, state: dict) -> None:
+        """Validate a snapshot fully, then restore the selector RNG stream."""
+
+        if not isinstance(state, dict):
+            raise ValueError("Selector checkpoint state must be a mapping.")
+        required = {
+            "state_version",
+            "seed",
+            "schedule",
+            "generator_state",
+        }
+        missing = sorted(required - set(state))
+        if missing:
+            raise ValueError(f"Selector checkpoint state is incomplete: {missing}.")
+        if state["state_version"] != SELECTOR_CHECKPOINT_STATE_VERSION:
+            raise ValueError("Selector checkpoint state version is incompatible.")
+        if type(state["seed"]) is not int or state["seed"] != self._seed:
+            raise ValueError("Selector checkpoint seed is incompatible.")
+        if state["schedule"] != asdict(self._schedule):
+            raise ValueError("Selector checkpoint schedule is incompatible.")
+        generator_state = state["generator_state"]
+        if (
+            not isinstance(generator_state, torch.Tensor)
+            or generator_state.device.type != "cpu"
+            or generator_state.dtype != torch.uint8
+            or generator_state.dim() != 1
+            or generator_state.numel() != self._generator.get_state().numel()
+        ):
+            raise ValueError("Selector checkpoint generator state is incompatible.")
+        self._generator.set_state(generator_state.clone())
 
 
 @dataclass(frozen=True)

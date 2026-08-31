@@ -90,6 +90,9 @@ strategic mechanics belong in a separate future scene.
   branch selector.
 - `llapi.py` owns Unity behavior validation, pending-decision completion,
   truncation-mask transport, and collection records.
+- `checkpoint.py` owns the versioned fail-closed trainer checkpoint: exact
+  state encoding, identity binding, integrity hashing, and clean-boundary
+  save plus fresh-object restore.
 
 The milestone runners in `Research/trainer/` compose those modules into bounded
 acceptance gates. They are not a separate training framework. The retired

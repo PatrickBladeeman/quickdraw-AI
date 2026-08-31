@@ -13,6 +13,12 @@ from .action_space import (
 )
 from .network import DuelingBranchingQNetwork
 from .exploration import LinearEpsilonSchedule
+from .checkpoint import (
+    CHECKPOINT_SCHEMA_VERSION,
+    LoadedCheckpoint,
+    load_controller_checkpoint,
+    save_controller_checkpoint,
+)
 from .llapi import (
     BASIC_BEHAVIOR_NAME,
     BasicTruncationMaskSideChannel,
@@ -53,6 +59,10 @@ __all__ = [
     "BDQOptimizationSettings",
     "BDQOptimizerController",
     "OptimizationStepResult",
+    "CHECKPOINT_SCHEMA_VERSION",
+    "LoadedCheckpoint",
+    "load_controller_checkpoint",
+    "save_controller_checkpoint",
     "ReplayBatch",
     "ReplayBuffer",
     "ReplayStorageMetrics",

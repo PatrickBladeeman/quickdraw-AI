@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-checkpoint.schema.json",
+  "title": "QuickDraw BDQ trainer checkpoint file",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "identity",
+    "state",
+    "state_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "runtime", "settings", "seeds"],
+      "properties": {
+        "package": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["distribution", "version"],
+          "properties": {
+            "distribution": {"const": "quickdraw-bdq-trainer"},
+            "version": {"type": "string", "minLength": 1}
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+          "properties": {
+            "python": {"type": "string", "minLength": 1},
+            "mlagents_envs": {"type": "string", "minLength": 1},
+            "numpy": {"type": "string", "minLength": 1},
+            "torch": {"type": "string", "minLength": 1},
+            "device": {"const": "cpu"}
+          }
+        },
+        "settings": {"$ref": "#/$defs/encoded_object"},
+        "seeds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["controller_seed", "exploration_seed"],
+          "properties": {
+            "controller_seed": {"type": "integer", "minimum": 0},
+            "exploration_seed": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["controller", "selector", "replay", "verification"],
+      "properties": {
+        "controller": {"$ref": "#/$defs/encoded_object"},
+        "selector": {"$ref": "#/$defs/encoded_object"},
+        "replay": {"$ref": "#/$defs/encoded_object"},
+        "verification": {"$ref": "#/$defs/verification_summary"}
+      }
+    },
+    "state_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "base64": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    },
+    "encoded_tensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "dtype", "shape", "data"],
+      "properties": {
+        "kind": {"const": "tensor"},
+        "dtype": {
+          "enum": [
+            "torch.float32",
+            "torch.float64",
+            "torch.int64",
+            "torch.int32",
+            "torch.uint8",
+            "torch.bool"
+          ]
+        },
+        "shape": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0}
+        },
+        "data": {"$ref": "#/$defs/base64"}
+      }
+    },
+    "encoded_ndarray": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "dtype", "shape", "data"],
+      "properties": {
+        "kind": {"const": "ndarray"},
+        "dtype": {
+          "enum": ["float32", "float64", "int64", "int32", "uint64", "uint8", "bool"]
+        },
+        "shape": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0}
+        },
+        "data": {"$ref": "#/$defs/base64"}
+      }
+    },
+    "encoded_bytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "length", "data"],
+      "properties": {
+        "kind": {"const": "bytes"},
+        "length": {"type": "integer", "minimum": 0},
+        "data": {"$ref": "#/$defs/base64"}
+      }
+    },
+    "encoded_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": {"const": "tuple"},
+        "items": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/encoded_value"}
+        }
+      }
+    },
+    "encoded_value": {
+      "anyOf": [
+        {"$ref": "#/$defs/encoded_tensor"},
+        {"$ref": "#/$defs/encoded_ndarray"},
+        {"$ref": "#/$defs/encoded_bytes"},
+        {"$ref": "#/$defs/encoded_tuple"},
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "string"},
+        {
+          "type": "array",
+          "items": {"$ref": "#/$defs/encoded_value"}
+        },
+        {"$ref": "#/$defs/encoded_object"}
+      ]
+    },
+    "encoded_object": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/encoded_value"}
+    },
+    "verification_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "controller_seed",
+        "exploration_seed",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_network_sha256",
+        "target_network_sha256",
+        "replay",
+        "pending_agent_ids"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+        "controller_seed": {"type": "integer", "minimum": 0},
+        "exploration_seed": {"type": "integer", "minimum": 0},
+        "decision_count": {"type": "integer", "minimum": 0},
+        "optimizer_update_count": {"type": "integer", "minimum": 0},
+        "target_sync_count": {"type": "integer", "minimum": 0},
+        "online_network_sha256": {"$ref": "#/$defs/sha256"},
+        "target_network_sha256": {"$ref": "#/$defs/sha256"},
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capacity",
+            "size",
+            "unique_frame_count",
+            "frame_reference_count",
+            "frame_payload_bytes",
+            "metadata_payload_bytes",
+            "accounted_storage_bytes",
+            "max_accounted_storage_bytes",
+            "remaining_accounted_storage_bytes",
+            "legacy_observation_payload_bytes",
+            "legacy_capacity_observation_payload_bytes",
+            "cursor"
+          ],
+          "properties": {
+            "capacity": {"type": "integer", "minimum": 1},
+            "size": {"type": "integer", "minimum": 0},
+            "unique_frame_count": {"type": "integer", "minimum": 0},
+            "frame_reference_count": {"type": "integer", "minimum": 0},
+            "frame_payload_bytes": {"type": "integer", "minimum": 0},
+            "metadata_payload_bytes": {"type": "integer", "minimum": 0},
+            "accounted_storage_bytes": {"type": "integer", "minimum": 0},
+            "max_accounted_storage_bytes": {"type": "integer", "minimum": 1},
+            "remaining_accounted_storage_bytes": {"type": "integer", "minimum": 0},
+            "legacy_observation_payload_bytes": {"type": "integer", "minimum": 0},
+            "legacy_capacity_observation_payload_bytes": {"type": "integer", "minimum": 0},
+            "cursor": {"type": "integer", "minimum": 0}
+          }
+        },
+        "pending_agent_ids": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

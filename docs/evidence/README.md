@@ -50,8 +50,9 @@ study unless its milestone file explicitly says otherwise.
 | R3M | [R3M.md](R3M.md) | Optimizer update 4 and rejected operational attempts |
 | R3N | [R3N.md](R3N.md) | Lossless memory-bounded replay and frozen R3M regression |
 | R3O | [R3O.md](R3O.md) | Bounded scheduled optimizer update 5 |
+| R3P | [R3P.md](R3P.md) | Deterministic Python checkpoint round-trip |
 
-## Shared R3D-R3O runtime and optimizer reference
+## Shared R3D-R3P runtime and optimizer reference
 
 The individual R3D-R3N contracts pin Python `3.11.13`,
 `mlagents_envs==1.1.0`, NumPy `1.23.5`, PyTorch `2.12.0+cpu`, device `cpu`,
@@ -73,7 +74,10 @@ The initial online and frozen target network SHA-256 is:
 `b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb`
 
 Through R3O, the accepted live boundary contains exactly five optimizer
-updates and zero target synchronizations. Update 6, an extended epsilon-decay
-rollout, checkpoint/resume, inference export, ROCm training, held-out learned-
-policy evaluation, strategic combat, the research evade reflex, and the local
-LLM runtime are not demonstrated by this archive.
+updates and zero target synchronizations. R3P demonstrates deterministic
+Python-only checkpoint save/restore on the registered synthetic workload
+without Unity; it does not resume the frozen Unity trajectory. Update 6, an
+extended epsilon-decay rollout, resume of the frozen Unity trajectory,
+inference export, ROCm training, held-out learned-policy evaluation,
+strategic combat, the research evade reflex, and the local LLM runtime are not
+demonstrated by this archive.

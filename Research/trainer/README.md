@@ -95,6 +95,7 @@ pending-decision drift.
 | R3M update 4 | `run_bdq_fourth_update_smoke.py` | [`R3M.md`](../../docs/evidence/R3M.md) |
 | R3N replay regression | `validate_bdq_replay_storage_regression.py` | [`R3N.md`](../../docs/evidence/R3N.md) |
 | R3O update 5 | `run_bdq_fifth_update_smoke.py` | [`R3O.md`](../../docs/evidence/R3O.md) |
+| R3P checkpoint round-trip | `run_bdq_checkpoint_roundtrip_smoke.py` | [`R3P.md`](../../docs/evidence/R3P.md) |
 
 Set the player once, then select the required command:
 
@@ -131,6 +132,9 @@ $player = 'Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.
 & $python Research\trainer\run_bdq_fifth_update_smoke.py `
   --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
   --output Artifacts\Experiments\r3o-fifth-update\acceptance
+
+& $python Research\trainer\run_bdq_checkpoint_roundtrip_smoke.py `
+  --output Artifacts\Experiments\r3p-checkpoint-roundtrip\acceptance
 ```
 
 R3I is a Python-only unit gate:

@@ -65,13 +65,16 @@ Completed boundaries:
 - R3N: lossless, memory-bounded replay representation with frozen-trace
   regression.
 - R3O: bounded scheduled optimizer update 5 at transition 10,016.
+- R3P: deterministic Python-only checkpoint round-trip on the registered
+  synthetic workload.
 
 Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 
 Remaining R3 work, in dependency order:
 
-1. Add durable checkpoint/resume and learned-policy export parity without
-   weakening deterministic replay or schedule contracts.
+1. Extend durable checkpoint/resume beyond the registered synthetic Python
+   boundary toward the live trajectory and add learned-policy export parity
+   without weakening deterministic replay or schedule contracts.
 2. Run the five registered Basic training seeds and retain complete lineage,
    curves, manifests, and hashes.
 3. Evaluate held-out Basic success and random-policy improvement.
@@ -137,6 +140,6 @@ analysis command.
 
 ## Current authorization
 
-R3O is completed and accepted in the working tree; no next SSNT is currently
+R3P is completed and accepted in the working tree; no next SSNT is currently
 authorized. See [`TASK.md`](TASK.md) for the completed boundary and
 [`STATE.md`](STATE.md) for current truth.
