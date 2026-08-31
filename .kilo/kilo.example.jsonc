@@ -1,0 +1,102 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "subagent_depth": 1,
+  "permission": {
+    "task": {
+      "*": "deny",
+      "explore": "allow",
+      "contract-reviewer": "allow"
+    }
+  },
+  "indexing": {
+    "enabled": true
+  },
+  "agent": {
+    "ask": {
+      "permission": {
+        "read": {
+          "*": "allow",
+          "*.env": "deny",
+          "*.env.*": "deny",
+          "*.env.example": "allow"
+        },
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "semantic_search": "allow",
+        "edit": "deny",
+        "write": "deny",
+        "bash": "deny",
+        "task": {
+          "*": "deny",
+          "explore": "allow",
+          "contract-reviewer": "allow"
+        },
+        "agent_manager": "deny",
+        "question": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "skill": "deny",
+        "notebook_edit": "deny",
+        "notebook_execute": "deny",
+        "interactive_terminal": "deny",
+        "background_process": "deny",
+        "repo_clone": "deny",
+        "repo_overview": "deny",
+        "external_directory": "deny",
+        "kilo_memory_recall": "deny",
+        "kilo_memory_save": "deny"
+      }
+    },
+    "explore": {
+      "model": "openrouter/z-ai/glm-5.3-flash",
+      "variant": "max",
+      "steps": 20,
+      "prompt": "You are a read-only repository reconnaissance specialist. Follow AGENTS.md and the repository's context-loading policy. For the caller's question, locate relevant source files, symbols, tests, callers, callees, and important control or data flow. Identify likely modification surfaces and concrete risks or ambiguities for the primary coder. Read relevant ARCH, RESEARCH, decision, or evidence sections only when they bear directly on the question; avoid broad historical-document loading. Prefer semantic search, grep, glob, and targeted reads. Do not edit files, implement the task, refactor, commit, push, delegate, or make final architecture decisions. Return a compact handoff with paths and symbol names.",
+      "permission": {
+        "read": {
+          "*": "allow",
+          "*.env": "deny",
+          "*.env.*": "deny",
+          "*.env.example": "allow"
+        },
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "semantic_search": "allow",
+        "edit": "deny",
+        "write": "deny",
+        "bash": "deny",
+        "task": "deny",
+        "agent_manager": "deny",
+        "question": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "skill": "deny",
+        "notebook_edit": "deny",
+        "notebook_execute": "deny",
+        "interactive_terminal": "deny",
+        "background_process": "deny",
+        "repo_clone": "deny",
+        "repo_overview": "deny",
+        "external_directory": "deny",
+        "kilo_memory_recall": "deny",
+        "kilo_memory_save": "deny"
+      }
+    }
+  },
+  "command": {
+    "codex-explore": {
+      "template": "$ARGUMENTS",
+      "description": "Run project reconnaissance through the read-only explorer.",
+      "agent": "explore",
+      "subtask": true
+    },
+    "codex-contract-review": {
+      "template": "$ARGUMENTS",
+      "description": "Run an independent read-only review of the current diff.",
+      "agent": "contract-reviewer",
+      "subtask": true
+    }
+  }
+}

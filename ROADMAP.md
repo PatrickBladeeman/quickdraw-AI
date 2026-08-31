@@ -47,7 +47,7 @@ implemented and repeatable. It is the control environment for R3.
 
 ## R3 — Branching Double DQN
 
-Status: implementation and acceptance infrastructure complete through R3N;
+Status: implementation and acceptance infrastructure complete through R3P;
 the full R3 learning and evaluation goal is not complete.
 
 Completed boundaries:
@@ -140,6 +140,7 @@ analysis command.
 
 ## Current authorization
 
-R3P is completed and accepted in the working tree; no next SSNT is currently
+R3P is completed, accepted, committed, and pushed at
+`0d78c783897225395ed44304fb6b0124a4620582`; no next SSNT is currently
 authorized. See [`TASK.md`](TASK.md) for the completed boundary and
 [`STATE.md`](STATE.md) for current truth.

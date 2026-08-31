@@ -1,6 +1,7 @@
 # R3P: deterministic Python trainer checkpoint round-trip
 
-Status: completed in the working tree on 2026-08-31; not yet committed.
+Status: completed, verified, committed, and pushed on 2026-08-31 in
+`0d78c783897225395ed44304fb6b0124a4620582`.
 
 ## Frozen contract
 

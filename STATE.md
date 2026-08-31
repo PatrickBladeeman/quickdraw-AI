@@ -15,20 +15,17 @@ or detailed acceptance evidence.
 ## Repository checkpoint
 
 - Branch: `main`.
-- `HEAD`, the configured upstream, and `origin/main` all resolve to
-  `028143fff494c6234fd17832dd41199aee5a6fad`
-  (`feat(trainer): add R3O fifth optimizer update smoke and acceptance`).
+- At the last verification, the local branch, configured upstream, and
+  `origin/main` were aligned with no ahead/behind divergence.
 - The hierarchical documentation migration and its QA cleanup are committed
   and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
   `abd240f9551bfc077e38672f06e7071d5480bc44`.
 - The verified research implementation frontier is
-  `028143fff494c6234fd17832dd41199aee5a6fad` (R3O: bounded scheduled
-  optimizer update 5, including the checkpoint-free live boundary at
-  transition 10,016).
-- R3P (deterministic Python trainer checkpoint round-trip) is implemented and
-  accepted in the working tree as of 2026-08-31; it is not yet committed. It
-  adds the checkpoint module, export/import state methods, the R3P
-  contract/schemas/runner/tests, and synchronized documentation only.
+  `0d78c783897225395ed44304fb6b0124a4620582` (R3P: deterministic
+  Python-only trainer checkpoint round-trip).
+- The verified live Unity frontier remains R3O at
+  `028143fff494c6234fd17832dd41199aee5a6fad`: bounded scheduled optimizer
+  update 5 at transition 10,016. R3P does not extend that live trajectory.
 
 ## Current research phase
 
@@ -135,17 +132,17 @@ support.
 - R3O is implemented, committed, and pushed. Its acceptance does not open an
   extended training rollout, update 6, a post-update action, or target
   synchronization.
-- R3P is implemented and accepted. Its acceptance is Python-only: it does not
-  open a Unity rollout, resume of the frozen Unity trajectory, or any new
-  environment interaction.
+- R3P is implemented, accepted, committed, and pushed. Its acceptance is
+  Python-only: it does not open a Unity rollout, resume of the frozen Unity
+  trajectory, or any new environment interaction.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 
 ## Current boundary
 
-R3P is implemented, accepted, and awaiting commit. The live Unity boundary
-still stands at 10,016 transitions with five optimizer updates, zero target
+R3P is implemented, accepted, committed, and pushed at
+`0d78c783897225395ed44304fb6b0124a4620582`. The live Unity boundary still
+stands at 10,016 transitions with five optimizer updates, zero target
 synchronizations, and no post-update action; the checkpoint boundary covers
 only the registered synthetic Python workload. No further work is currently
-authorized; the next SSNT requires an explicit task update. See
-[`TASK.md`](TASK.md).
+authorized; the next SSNT requires an explicit task update. See [`TASK.md`](TASK.md).

@@ -58,6 +58,21 @@ contracts remain authoritative executable companions for their registered
 fields. Report material disagreement and stop when it could change the result;
 do not silently reconcile it.
 
+## Kilo reconnaissance and review workflow
+
+For a non-trivial authorized implementation task, use the repository's Kilo
+workflow when reconnaissance or an independent final review would materially
+help and current user, system, and tool instructions permit delegation. Before
+the first Kilo invocation in a session, read
+[`docs/reference/KILO_ORCHESTRATION.md`](docs/reference/KILO_ORCHESTRATION.md)
+and verify the local configuration as described there.
+
+Kilo agents are advisory and read-only. The primary Codex agent owns scope,
+implementation, tests, interpretation of findings, and final decisions. Never
+let a Kilo result expand `TASK.md`, bypass a quality gate, edit files, commit,
+push, or substitute for direct inspection of authoritative repository state.
+Keep credentials outside tracked project files.
+
 ## Operating principle
 
 Handle the user's actual goal, not merely the most literal edit. Keep the work

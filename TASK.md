@@ -9,7 +9,8 @@ It excludes completed-task history and speculative later work.
 
 Implement **R3P — deterministic Python trainer checkpoint round-trip**.
 
-Status: **completed in the working tree on 2026-08-31; awaiting commit**.
+Status: **completed, verified, committed, and pushed on 2026-08-31** in
+`0d78c783897225395ed44304fb6b0124a4620582`.
 
 ## Outcome
 

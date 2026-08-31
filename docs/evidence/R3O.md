@@ -1,6 +1,7 @@
 # R3O: scheduled optimizer update 5
 
-Status: completed in the working tree on 2026-08-30; not yet committed.
+Status: completed, verified, committed, and pushed on 2026-08-30 in
+`028143fff494c6234fd17832dd41199aee5a6fad`.
 
 ## Frozen contract
 
