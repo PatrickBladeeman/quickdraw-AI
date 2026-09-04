@@ -235,6 +235,37 @@ def boundary_summary(
     }
 
 
+def _checkpoint_state(
+    controller: BDQOptimizerController,
+    collector: DirectReplayCollector,
+    selector: ScheduledEpsilonGreedyBDQActionSelector,
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    pending = collector.pending_agent_ids
+    if pending:
+        raise LLAPIContractError(
+            "Checkpoint boundary must be clean; pending decisions remain: "
+            f"{list(pending)}."
+        )
+    summary = boundary_summary(controller, selector, collector)
+    return summary, {
+        "controller": controller.export_checkpoint_state(),
+        "selector": selector.export_checkpoint_state(),
+        "replay": controller.replay.export_checkpoint_state(),
+        "verification": summary,
+    }
+
+
+def checkpoint_state_sha256(
+    controller: BDQOptimizerController,
+    collector: DirectReplayCollector,
+    selector: ScheduledEpsilonGreedyBDQActionSelector,
+) -> str:
+    """Hash the exact canonical state that a checkpoint would persist."""
+
+    _, state = _checkpoint_state(controller, collector, selector)
+    return _canonical_state_sha256(_encode_state(state))
+
+
 def _checkpoint_schema() -> Dict[str, Any]:
     schema = json.loads(CHECKPOINT_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
@@ -262,19 +293,7 @@ def save_controller_checkpoint(
     schema-validated and carries a SHA-256 over its canonical encoded state.
     """
 
-    pending = collector.pending_agent_ids
-    if pending:
-        raise LLAPIContractError(
-            "Checkpoint boundary must be clean; pending decisions remain: "
-            f"{list(pending)}."
-        )
-    summary = boundary_summary(controller, selector, collector)
-    state = {
-        "controller": controller.export_checkpoint_state(),
-        "selector": selector.export_checkpoint_state(),
-        "replay": controller.replay.export_checkpoint_state(),
-        "verification": summary,
-    }
+    summary, state = _checkpoint_state(controller, collector, selector)
     encoded_state = _encode_state(state)
     checkpoint = {
         "schema_version": CHECKPOINT_SCHEMA_VERSION,

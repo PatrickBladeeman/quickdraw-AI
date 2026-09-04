@@ -51,10 +51,11 @@ study unless its milestone file explicitly says otherwise.
 | R3N | [R3N.md](R3N.md) | Lossless memory-bounded replay and frozen R3M regression |
 | R3O | [R3O.md](R3O.md) | Bounded scheduled optimizer update 5 |
 | R3P | [R3P.md](R3P.md) | Deterministic Python checkpoint round-trip |
+| R3Q | [R3Q.md](R3Q.md) | Live-derived checkpoint save/restore and replay parity |
 
-## Shared R3D-R3P runtime and optimizer reference
+## Shared R3D-R3Q runtime and optimizer reference
 
-The individual R3D-R3N contracts pin Python `3.11.13`,
+The individual R3D-R3Q contracts pin Python `3.11.13`,
 `mlagents_envs==1.1.0`, NumPy `1.23.5`, PyTorch `2.12.0+cpu`, device `cpu`,
 and `quickdraw-bdq-trainer==0.3.0` with no current
 `mlagents.trainer_type` entry point. The Unity behavior is
@@ -75,9 +76,10 @@ The initial online and frozen target network SHA-256 is:
 
 Through R3O, the accepted live boundary contains exactly five optimizer
 updates and zero target synchronizations. R3P demonstrates deterministic
-Python-only checkpoint save/restore on the registered synthetic workload
-without Unity; it does not resume the frozen Unity trajectory. Update 6, an
-extended epsilon-decay rollout, resume of the frozen Unity trajectory,
-inference export, ROCm training, held-out learned-policy evaluation,
-strategic combat, the research evade reflex, and the local LLM runtime are not
-demonstrated by this archive.
+Python-only checkpoint save/restore on the registered synthetic workload;
+R3Q extends that checkpoint mechanism to the live-derived R3O state and
+reproduces its next replay sample in a fresh Python process without Unity.
+R3Q does not resume the frozen Unity trajectory. Update 6, an extended
+epsilon-decay rollout, Unity resume, inference export, ROCm training,
+held-out learned-policy evaluation, strategic combat, the research evade
+reflex, and the local LLM runtime are not demonstrated by this archive.

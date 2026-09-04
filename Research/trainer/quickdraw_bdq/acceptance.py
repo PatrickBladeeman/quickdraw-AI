@@ -25,7 +25,7 @@ from jsonschema import Draft202012Validator
 from .action_space import joint_indices_from_branches
 from .llapi import LLAPIContractError, observation_sha256
 from .optimizer import BDQOptimizationSettings
-from .replay import ReplayTransition
+from .replay import ReplayBatch, ReplayTransition
 
 
 TRAINER_ROOT = Path(__file__).resolve().parent.parent
@@ -153,6 +153,38 @@ def action_tuple_counts(transitions: Sequence[Dict[str, Any]]) -> list[int]:
     return counts
 
 
+def replay_sample_fingerprint(batch: ReplayBatch) -> Dict[str, Any]:
+    """Return a compact, exact fingerprint of one sampled replay batch."""
+
+    arrays: Dict[str, np.ndarray] = {
+        "indices": batch.indices,
+        "observations": batch.observations,
+        "actions": batch.actions,
+        "rewards": batch.rewards,
+        "next_observations": batch.next_observations,
+        "action_masks_0": batch.action_masks[0],
+        "action_masks_1": batch.action_masks[1],
+        "next_action_masks_0": batch.next_action_masks[0],
+        "next_action_masks_1": batch.next_action_masks[1],
+        "terminated": batch.terminated,
+        "truncated": batch.truncated,
+    }
+
+    fields: Dict[str, Any] = {}
+    for name, value in arrays.items():
+        contiguous = np.ascontiguousarray(value)
+        fields[name] = {
+            "dtype": contiguous.dtype.name,
+            "shape": list(contiguous.shape),
+            "sha256": hashlib.sha256(contiguous.tobytes(order="C")).hexdigest(),
+        }
+    return {
+        "batch_size": int(batch.indices.shape[0]),
+        "indices": [int(value) for value in batch.indices],
+        "fields": fields,
+    }
+
+
 def masked_argmax(
     branch_values: Sequence[float],
     unavailable: Sequence[bool],
@@ -264,30 +296,21 @@ def validate_distinct_trace_paths(
         raise ValueError(f"{task_name} comparison requires two distinct trace files.")
 
 
-def run_fresh_worker_process(
+def run_fresh_python_process(
     *,
     runner_path: Path,
-    executable: Path,
+    arguments: Sequence[str],
     output_directory: Path,
-    worker_index: int,
-    contract: Dict[str, Any] | None,
-    trace_file_name: str,
+    log_name: str,
     task_name: str,
-    announce: bool,
+    contract: Dict[str, Any] | None,
     repo_root: Path = REPO_ROOT,
     timeout_seconds: int = 1800,
-) -> tuple[Dict[str, Any], Path]:
-    worker_output = output_directory / f"run-{worker_index + 1}"
-    if announce:
-        print(f"worker_{worker_index + 1}=starting", flush=True)
-    command = [
-        sys.executable,
-        "-B",
-        str(runner_path.resolve()),
-        f"--env={executable}",
-        f"--worker-output={worker_output}",
-        f"--worker-index={worker_index}",
-    ]
+    failure_label: str | None = None,
+) -> Path:
+    """Run one bounded fresh Python process and retain its combined log."""
+
+    command = [sys.executable, "-B", str(runner_path.resolve()), *arguments]
     process_environment = dict(os.environ)
     process_environment["PYTHONDONTWRITEBYTECODE"] = "1"
     if contract is not None:
@@ -304,13 +327,48 @@ def run_fresh_worker_process(
         timeout=timeout_seconds,
         check=False,
     )
-    log_path = output_directory / f"worker-{worker_index + 1}.log"
+    log_path = output_directory / log_name
     log_path.write_text(completed.stdout, encoding="utf-8")
     if completed.returncode != 0:
+        label = failure_label or f"Fresh {task_name} process"
         raise RuntimeError(
-            f"Fresh {task_name} worker {worker_index + 1} failed with exit code "
-            f"{completed.returncode}; see {log_path}."
+            f"{label} failed with exit code {completed.returncode}; "
+            f"see {log_path}."
         )
+    return log_path
+
+
+def run_fresh_worker_process(
+    *,
+    runner_path: Path,
+    executable: Path,
+    output_directory: Path,
+    worker_index: int,
+    contract: Dict[str, Any] | None,
+    trace_file_name: str,
+    task_name: str,
+    announce: bool,
+    repo_root: Path = REPO_ROOT,
+    timeout_seconds: int = 1800,
+) -> tuple[Dict[str, Any], Path]:
+    worker_output = output_directory / f"run-{worker_index + 1}"
+    if announce:
+        print(f"worker_{worker_index + 1}=starting", flush=True)
+    run_fresh_python_process(
+        runner_path=runner_path,
+        arguments=[
+            f"--env={executable}",
+            f"--worker-output={worker_output}",
+            f"--worker-index={worker_index}",
+        ],
+        output_directory=output_directory,
+        log_name=f"worker-{worker_index + 1}.log",
+        task_name=task_name,
+        contract=contract,
+        repo_root=repo_root,
+        timeout_seconds=timeout_seconds,
+        failure_label=f"Fresh {task_name} worker {worker_index + 1}",
+    )
     trace_path = worker_output / trace_file_name
     if not trace_path.is_file():
         raise RuntimeError(f"Fresh {task_name} worker omitted {trace_path}.")

@@ -47,7 +47,7 @@ implemented and repeatable. It is the control environment for R3.
 
 ## R3 — Branching Double DQN
 
-Status: implementation and acceptance infrastructure complete through R3P;
+Status: implementation and acceptance infrastructure complete through R3Q;
 the full R3 learning and evaluation goal is not complete.
 
 Completed boundaries:
@@ -67,14 +67,17 @@ Completed boundaries:
 - R3O: bounded scheduled optimizer update 5 at transition 10,016.
 - R3P: deterministic Python-only checkpoint round-trip on the registered
   synthetic workload.
+- R3Q: live-derived checkpoint save/restore at the unchanged R3O boundary,
+  with exact state and next replay sample parity in a fresh Python process
+  without Unity.
 
 Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 
 Remaining R3 work, in dependency order:
 
-1. Extend durable checkpoint/resume beyond the registered synthetic Python
-   boundary toward the live trajectory and add learned-policy export parity
-   without weakening deterministic replay or schedule contracts.
+1. Extend durable checkpoint/resume from R3Q's Unity-free live-derived restore
+   toward actual live-trajectory resumption and add learned-policy export
+   parity without weakening deterministic replay or schedule contracts.
 2. Run the five registered Basic training seeds and retain complete lineage,
    curves, manifests, and hashes.
 3. Evaluate held-out Basic success and random-policy improvement.
@@ -142,7 +145,10 @@ analysis command.
 
 R3P is completed, accepted, committed, and pushed at
 `0d78c783897225395ed44304fb6b0124a4620582`. A behavior-preserving
-acceptance-harness consolidation is completed and verified locally but remains
-uncommitted as requested; it does not advance the research roadmap. No next
-research task is authorized. See [`TASK.md`](TASK.md) for the exact outcome
-and [`STATE.md`](STATE.md) for current truth.
+acceptance-harness consolidation is completed, verified, committed, and pushed
+at `4fa825b6c8ca45797abaaf6da85cde9357aa3657`; it does not advance the
+research roadmap. R3Q is implemented and verified in the current working tree
+on 2026-09-04 (uncommitted and unpushed by instruction): it persists and
+exactly restores the live-derived R3O trainer state without advancing Unity or
+starting export work. See [`TASK.md`](TASK.md) for the exact scope and
+[`STATE.md`](STATE.md) for current truth.

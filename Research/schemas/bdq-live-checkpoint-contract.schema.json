@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-live-checkpoint-contract.schema.json",
+  "title": "QuickDraw live-derived BDQ checkpoint contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_fifth_update_contract",
+    "base_checkpoint_contract",
+    "runtime",
+    "package",
+    "accepted_live_boundary",
+    "checkpoint",
+    "determinism",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-live-checkpoint.v1"},
+    "task": {"const": "R3Q"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_fifth_update_contract": {
+      "$ref": "#/$defs/contract_binding",
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-fifth-update-contract-v1.json"},
+        "sha256": {"const": "35dcd10971878bef31d8e2dd9392599cd71607a009ac6cb8d93bff3857eadcb0"},
+        "schema_version": {"const": "quickdraw.bdq-fifth-update.v1"},
+        "pushed_commit": {"const": "028143fff494c6234fd17832dd41199aee5a6fad"}
+      }
+    },
+    "base_checkpoint_contract": {
+      "$ref": "#/$defs/contract_binding",
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-checkpoint-contract-v1.json"},
+        "sha256": {"const": "071fa03eac09f451bf87455951a634943e77ba6873a3457ca6bf00a4d447c755"},
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+        "pushed_commit": {"const": "0d78c783897225395ed44304fb6b0124a4620582"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "device": {"const": "cpu"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "version", "metadata_path", "trainer_entry_points"],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.3.0"},
+        "metadata_path": {"const": "Research/trainer/pyproject.toml"},
+        "trainer_entry_points": {"const": []}
+      }
+    },
+    "accepted_live_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "accepted_result_sha256",
+        "serialized_trace_sha256",
+        "canonical_trace_sha256",
+        "transition_count",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "completed_episode_count",
+        "truncation_event_count",
+        "action_tuple_counts",
+        "policy_seed",
+        "exploration_seed",
+        "selection_count",
+        "last_selection_completed_transition_count",
+        "pending_agent_ids",
+        "post_update_action_selected",
+        "online_network_sha256",
+        "target_network_sha256",
+        "replay",
+        "update_5"
+      ],
+      "properties": {
+        "source": {"const": "docs/evidence/R3O.md"},
+        "accepted_result_sha256": {"$ref": "#/$defs/sha256"},
+        "serialized_trace_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_trace_sha256": {"$ref": "#/$defs/sha256"},
+        "transition_count": {"const": 10016},
+        "decision_count": {"const": 10016},
+        "optimizer_update_count": {"const": 5},
+        "target_sync_count": {"const": 0},
+        "completed_episode_count": {"const": 215},
+        "truncation_event_count": {"const": 3},
+        "action_tuple_counts": {"const": [1859, 1742, 1594, 1606, 1596, 1619]},
+        "policy_seed": {"const": 51001},
+        "exploration_seed": {"const": 61001},
+        "selection_count": {"const": 10016},
+        "last_selection_completed_transition_count": {"const": 10015},
+        "pending_agent_ids": {"const": []},
+        "post_update_action_selected": {"const": false},
+        "online_network_sha256": {"$ref": "#/$defs/sha256"},
+        "target_network_sha256": {"$ref": "#/$defs/sha256"},
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capacity",
+            "size",
+            "cursor",
+            "frame_reference_count_per_transition",
+            "max_accounted_storage_bytes"
+          ],
+          "properties": {
+            "capacity": {"const": 100000},
+            "size": {"const": 10016},
+            "cursor": {"const": 10016},
+            "frame_reference_count_per_transition": {"const": 8},
+            "max_accounted_storage_bytes": {"const": 4294967296}
+          }
+        },
+        "update_5": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision_count",
+            "optimizer_update_count",
+            "target_sync_count",
+            "loss",
+            "mean_absolute_td_error",
+            "online_after_sha256"
+          ],
+          "properties": {
+            "decision_count": {"const": 10016},
+            "optimizer_update_count": {"const": 5},
+            "target_sync_count": {"const": 0},
+            "loss": {"const": 0.00121649622451514},
+            "mean_absolute_td_error": {"const": 0.03924498334527016},
+            "online_after_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_binding_sha256",
+        "clean_boundary_required",
+        "state_integrity",
+        "saved_state",
+        "fresh_restorer_without_unity",
+        "sample_batch_size"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+        "contract_binding_sha256": {"const": "071fa03eac09f451bf87455951a634943e77ba6873a3457ca6bf00a4d447c755"},
+        "clean_boundary_required": {"const": true},
+        "state_integrity": {"const": "SHA-256 over the canonical encoded state subtree"},
+        "saved_state": {
+          "const": [
+            "online network",
+            "target network",
+            "Adam optimizer state",
+            "optimizer update and target synchronization counters",
+            "completed-transition count",
+            "replay contents, ring cursor, accounting metrics, and sampling RNG state",
+            "scheduled-selector RNG stream",
+            "package, runtime, settings, seeds, and contract identity",
+            "boundary verification summary"
+          ]
+        },
+        "fresh_restorer_without_unity": {"const": true},
+        "sample_batch_size": {"const": 64}
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fresh_processes",
+        "live_saver_requires_unity",
+        "restorer_requires_unity",
+        "torch_num_threads",
+        "torch_num_interop_threads",
+        "deterministic_algorithms"
+      ],
+      "properties": {
+        "fresh_processes": {"const": 2},
+        "live_saver_requires_unity": {"const": true},
+        "restorer_requires_unity": {"const": false},
+        "torch_num_threads": {"const": 1},
+        "torch_num_interop_threads": {"const": 1},
+        "deterministic_algorithms": {"const": true}
+      }
+    },
+    "exclusions": {
+      "const": [
+        "transition 10017 or any post-update action",
+        "optimizer update 6 on the R3O trajectory",
+        "target-network synchronization",
+        "Unity resume or extended training",
+        "final checkpoint selection",
+        "ONNX export or exported-inference parity",
+        "ROCm execution or training",
+        "multi-environment collection",
+        "five-seed training or held-out evaluation",
+        "learned-policy effectiveness claims",
+        "changes to the R2A environment or action contract",
+        "changes to the R3O or R3P contracts, schemas, or evidence"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "contract_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version", "pushed_commit"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "schema_version": {"type": "string", "minLength": 1},
+        "pushed_commit": {"$ref": "#/$defs/git_commit"}
+      }
+    },
+    "git_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+  }
+}

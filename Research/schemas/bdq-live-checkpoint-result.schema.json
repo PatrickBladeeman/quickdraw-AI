@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-live-checkpoint-result.schema.json",
+  "title": "QuickDraw live-derived BDQ checkpoint result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "base_r3o_contract_sha256",
+    "checkpoint_contract_sha256",
+    "live_trace_sha256",
+    "live_trace_canonical_sha256",
+    "checkpoint_sha256",
+    "checkpoint_bytes",
+    "saver_checkpoint_state_sha256",
+    "restorer_checkpoint_state_sha256",
+    "fresh_process_count",
+    "clean_boundary_pending_agent_ids",
+    "loaded_without_unity",
+    "same_boundary_state",
+    "same_next_replay_sample",
+    "saver_boundary",
+    "restored_boundary",
+    "saver_next_replay_sample",
+    "restorer_next_replay_sample"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-live-checkpoint-result.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "base_r3o_contract_sha256": {"const": "35dcd10971878bef31d8e2dd9392599cd71607a009ac6cb8d93bff3857eadcb0"},
+    "checkpoint_contract_sha256": {"const": "071fa03eac09f451bf87455951a634943e77ba6873a3457ca6bf00a4d447c755"},
+    "live_trace_sha256": {"const": "798492f929b27dfbef5b4d3e6f9c886fdd34193f958359e4b6b9de49e535fc2f"},
+    "live_trace_canonical_sha256": {"const": "e50182eb2ac6459b835648b3d3eadb7e16f27b33e3c22084de602bfe0c686eca"},
+    "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+    "checkpoint_bytes": {"type": "integer", "minimum": 1},
+    "saver_checkpoint_state_sha256": {"$ref": "#/$defs/sha256"},
+    "restorer_checkpoint_state_sha256": {"$ref": "#/$defs/sha256"},
+    "fresh_process_count": {"const": 2},
+    "clean_boundary_pending_agent_ids": {"const": []},
+    "loaded_without_unity": {"const": true},
+    "same_boundary_state": {"const": true},
+    "same_next_replay_sample": {"const": true},
+    "saver_boundary": {"$ref": "#/$defs/boundary"},
+    "restored_boundary": {"$ref": "#/$defs/boundary"},
+    "saver_next_replay_sample": {"$ref": "#/$defs/sample"},
+    "restorer_next_replay_sample": {"$ref": "#/$defs/sample"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "controller_seed",
+        "exploration_seed",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_network_sha256",
+        "target_network_sha256",
+        "replay",
+        "pending_agent_ids"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+        "controller_seed": {"const": 51001},
+        "exploration_seed": {"const": 61001},
+        "decision_count": {"const": 10016},
+        "optimizer_update_count": {"const": 5},
+        "target_sync_count": {"const": 0},
+        "online_network_sha256": {"$ref": "#/$defs/sha256"},
+        "target_network_sha256": {"$ref": "#/$defs/sha256"},
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capacity",
+            "size",
+            "unique_frame_count",
+            "frame_reference_count",
+            "frame_payload_bytes",
+            "metadata_payload_bytes",
+            "accounted_storage_bytes",
+            "max_accounted_storage_bytes",
+            "remaining_accounted_storage_bytes",
+            "legacy_observation_payload_bytes",
+            "legacy_capacity_observation_payload_bytes",
+            "cursor"
+          ],
+          "properties": {
+            "capacity": {"const": 100000},
+            "size": {"const": 10016},
+            "unique_frame_count": {"type": "integer", "minimum": 1},
+            "frame_reference_count": {"const": 80128},
+            "frame_payload_bytes": {"type": "integer", "minimum": 1},
+            "metadata_payload_bytes": {"type": "integer", "minimum": 1},
+            "accounted_storage_bytes": {"type": "integer", "minimum": 1},
+            "max_accounted_storage_bytes": {"const": 4294967296},
+            "remaining_accounted_storage_bytes": {"type": "integer", "minimum": 0},
+            "legacy_observation_payload_bytes": {"type": "integer", "minimum": 1},
+            "legacy_capacity_observation_payload_bytes": {"type": "integer", "minimum": 1},
+            "cursor": {"const": 10016}
+          }
+        },
+        "pending_agent_ids": {"const": []}
+      }
+    },
+    "field_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dtype", "shape", "sha256"],
+      "properties": {
+        "dtype": {"type": "string", "minLength": 1},
+        "shape": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["batch_size", "indices", "fields"],
+      "properties": {
+        "batch_size": {"const": 64},
+        "indices": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0, "maximum": 10015},
+          "minItems": 64,
+          "maxItems": 64
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "indices",
+            "observations",
+            "actions",
+            "rewards",
+            "next_observations",
+            "action_masks_0",
+            "action_masks_1",
+            "next_action_masks_0",
+            "next_action_masks_1",
+            "terminated",
+            "truncated"
+          ],
+          "properties": {
+            "indices": {"$ref": "#/$defs/field_fingerprint"},
+            "observations": {"$ref": "#/$defs/field_fingerprint"},
+            "actions": {"$ref": "#/$defs/field_fingerprint"},
+            "rewards": {"$ref": "#/$defs/field_fingerprint"},
+            "next_observations": {"$ref": "#/$defs/field_fingerprint"},
+            "action_masks_0": {"$ref": "#/$defs/field_fingerprint"},
+            "action_masks_1": {"$ref": "#/$defs/field_fingerprint"},
+            "next_action_masks_0": {"$ref": "#/$defs/field_fingerprint"},
+            "next_action_masks_1": {"$ref": "#/$defs/field_fingerprint"},
+            "terminated": {"$ref": "#/$defs/field_fingerprint"},
+            "truncated": {"$ref": "#/$defs/field_fingerprint"}
+          }
+        }
+      }
+    }
+  }
+}

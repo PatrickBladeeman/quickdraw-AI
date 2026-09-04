@@ -7,63 +7,49 @@ It excludes completed-task history and speculative later work.
 
 ## Task
 
-Perform a conservative consolidation and maintainability pass on the Python
-research acceptance harness, focused on removing duplicated generic execution
-and validation logic from milestone-named runners.
+### R3Q — Live-derived trainer checkpoint gate
 
-Status: **completed and verified on 2026-09-04; uncommitted by design**.
+Extend the existing R3P Python checkpoint mechanism to the trainer state
+produced by the unchanged R3O live collection path at its clean boundary:
+10,016 completed transitions, optimizer update 5 complete, zero target
+synchronizations, no pending decision, and no post-update action selected.
 
-## Outcome
+Save that live-derived state, restore it in a fresh CPU Python process without
+Unity, and prove exact state and next-replay-sample parity with the saver.
 
-Generic acceptance plumbing and the update-trajectory execution/validation
-engine now have single owners in `quickdraw_bdq.acceptance` and
-`quickdraw_bdq.update_gate`. All eleven historical runner paths remain in
-place as compatibility entry points, while generic source-level runner imports
-fell from 23 to zero; the sole remaining runner import is R3N's intentional
-R3M historical-oracle binding.
-
-The complete 222-test trainer suite, historical R3L/R3M/R3O artifact replay,
-frozen-byte comparison, CLI/syntax/dependency checks, and independent
-read-only contract review passed. No contract, schema, evidence record,
-original production-core module, or Unity/C# file changed.
+Status: **implemented and verified in the working tree on 2026-09-04; not
+committed or pushed by instruction**.
 
 ## Implementation boundary
 
-- Move genuinely shared hashing, serialization, runtime validation, worker
-  orchestration, result writing, and update-gate behavior into reusable
-  `quickdraw_bdq` acceptance modules.
-- Keep each historical `run_bdq_*` path and CLI as a thin compatibility entry
-  point that owns its milestone contract, expectations, and summary.
-- Remove runner-to-runner dependencies when the imported behavior is a generic
-  capability; retain milestone-specific dependencies only when they express a
-  real provenance or validation relationship.
-- Audit the core Python trainer and Unity/C# runtime for maintainability, but do
-  not refactor either without a clear, behavior-preserving justification.
-- Update the acceptance architecture, operating documentation, and direct
-  tests for shared infrastructure.
+- Reuse `quickdraw_bdq.checkpoint`, `quickdraw_bdq.update_gate`, and
+  `quickdraw_bdq.acceptance`; do not clone their generic control flow into an
+  R3Q-specific runner or test.
+- Bind the new claim to the frozen R3O contract and accepted live boundary
+  without modifying R3O, R3P, their schemas, or their evidence.
+- Use one fresh live saver process and one fresh Python-only restorer process.
+- Keep the checkpoint and raw results under `Artifacts/Experiments/`; track
+  only the minimal contract, tests, schema additions if genuinely required,
+  and curated evidence.
 
 ## Acceptance criteria
 
-- Registered research semantics, hyperparameters, schedules, seeds, counts,
-  hashes, losses, thresholds, deterministic behavior, checkpoint behavior,
-  contracts, schemas, and accepted evidence remain unchanged.
-- Existing historical runner paths, arguments, artifact names, result formats,
-  and failure behavior remain compatible.
-- Representative historical boundaries and malformed-contract failures remain
-  exact, and the complete relevant Python test suite passes.
-- Contract, schema, evidence, and original core-module byte hashes match the
-  pre-refactor baseline.
-- An independent read-only contract review finds no unresolved substantive
-  drift, provenance damage, weakened tests, or abstraction overreach.
-- Final documentation and repository status accurately describe the result.
+- The saver exactly reproduces the registered R3O boundary, including network
+  hashes, optimizer/replay state and accounting, counters, seeds, selector RNG
+  state, and an empty pending-decision set.
+- The fresh restorer loads without Unity and matches the saved boundary
+  field-for-field before exposing restored objects.
+- The saver and restorer produce the identical next replay sample without
+  changing the registered sampling algorithm or RNG consumption.
+- Existing checkpoint corruption/incompatibility rejection remains fail-closed
+  without duplicating already-covered impossible-state checks.
+- Focused R3Q tests, the complete trainer suite, and frozen R3O/R3P regressions
+  pass with no weakened assertion, tolerance, or provenance binding.
 
 ## Constraints
 
-Do not change C# runtime behavior, research conclusions, or frozen historical
-artifacts. Do not weaken tests or tolerances. Do not introduce a generalized
-framework larger than the duplicated mechanisms it replaces. Do not commit or
-push.
-
-The verified research frontier remains R3P; this maintainability task does not
-authorize a Unity rollout, transition 10,017, optimizer update 6, target
-synchronization, extended training, export, or a new effectiveness claim.
+Do not select or execute an action after update 5, collect transition 10,017,
+run optimizer update 6, synchronize the target network, resume the Unity
+process, start extended training, export a model, or make an effectiveness
+claim. Do not change C# behavior, registered research values, or frozen
+historical artifacts. Do not commit or push without explicit authorization.

@@ -95,9 +95,10 @@ strategic mechanics belong in a separate future scene.
   save plus fresh-object restore.
 - `acceptance.py` owns reusable, non-scientific acceptance plumbing: canonical
   hashing and serialization, runtime/package checks, execution-mode checks,
-  fresh-worker launch, deterministic worker comparison, and result writing.
+  fresh-process launch, deterministic worker comparison, and result writing.
 - `update_gate.py` owns the shared bounded Unity collection and optimizer-gate
-  mechanism used by the update-trajectory milestones.
+  mechanism used by the update-trajectory milestones, including the optional
+  clean-boundary handoff into `checkpoint.py`.
 
 The milestone runners in `Research/trainer/` are historical compatibility
 entry points. They load milestone-specific contracts, expectations, schemas,

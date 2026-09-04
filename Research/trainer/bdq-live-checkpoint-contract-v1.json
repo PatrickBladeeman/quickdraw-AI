@@ -1,0 +1,107 @@
+{
+  "schema_version": "quickdraw.bdq-live-checkpoint.v1",
+  "task": "R3Q",
+  "purpose": "Save the trainer state produced by the unchanged R3O live collection path at transition 10016, then restore it in one fresh CPU Python process without Unity and reproduce the exact next replay sample.",
+  "base_fifth_update_contract": {
+    "path": "Research/trainer/bdq-fifth-update-contract-v1.json",
+    "sha256": "35dcd10971878bef31d8e2dd9392599cd71607a009ac6cb8d93bff3857eadcb0",
+    "schema_version": "quickdraw.bdq-fifth-update.v1",
+    "pushed_commit": "028143fff494c6234fd17832dd41199aee5a6fad"
+  },
+  "base_checkpoint_contract": {
+    "path": "Research/trainer/bdq-checkpoint-contract-v1.json",
+    "sha256": "071fa03eac09f451bf87455951a634943e77ba6873a3457ca6bf00a4d447c755",
+    "schema_version": "quickdraw.bdq-checkpoint.v1",
+    "pushed_commit": "0d78c783897225395ed44304fb6b0124a4620582"
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "trainer_entry_points": []
+  },
+  "accepted_live_boundary": {
+    "source": "docs/evidence/R3O.md",
+    "accepted_result_sha256": "149b784367d3de736ae86b9b3c9aa31e79a62d485895ba9a6cf5c2c3598e36ff",
+    "serialized_trace_sha256": "798492f929b27dfbef5b4d3e6f9c886fdd34193f958359e4b6b9de49e535fc2f",
+    "canonical_trace_sha256": "e50182eb2ac6459b835648b3d3eadb7e16f27b33e3c22084de602bfe0c686eca",
+    "transition_count": 10016,
+    "decision_count": 10016,
+    "optimizer_update_count": 5,
+    "target_sync_count": 0,
+    "completed_episode_count": 215,
+    "truncation_event_count": 3,
+    "action_tuple_counts": [1859, 1742, 1594, 1606, 1596, 1619],
+    "policy_seed": 51001,
+    "exploration_seed": 61001,
+    "selection_count": 10016,
+    "last_selection_completed_transition_count": 10015,
+    "pending_agent_ids": [],
+    "post_update_action_selected": false,
+    "online_network_sha256": "8275fed953fb594fea0e88c50da15a862e1db6a3e296dd953dd10e048c2c3cbe",
+    "target_network_sha256": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb",
+    "replay": {
+      "capacity": 100000,
+      "size": 10016,
+      "cursor": 10016,
+      "frame_reference_count_per_transition": 8,
+      "max_accounted_storage_bytes": 4294967296
+    },
+    "update_5": {
+      "decision_count": 10016,
+      "optimizer_update_count": 5,
+      "target_sync_count": 0,
+      "loss": 0.00121649622451514,
+      "mean_absolute_td_error": 0.03924498334527016,
+      "online_after_sha256": "8275fed953fb594fea0e88c50da15a862e1db6a3e296dd953dd10e048c2c3cbe"
+    }
+  },
+  "checkpoint": {
+    "schema_version": "quickdraw.bdq-checkpoint.v1",
+    "contract_binding_sha256": "071fa03eac09f451bf87455951a634943e77ba6873a3457ca6bf00a4d447c755",
+    "clean_boundary_required": true,
+    "state_integrity": "SHA-256 over the canonical encoded state subtree",
+    "saved_state": [
+      "online network",
+      "target network",
+      "Adam optimizer state",
+      "optimizer update and target synchronization counters",
+      "completed-transition count",
+      "replay contents, ring cursor, accounting metrics, and sampling RNG state",
+      "scheduled-selector RNG stream",
+      "package, runtime, settings, seeds, and contract identity",
+      "boundary verification summary"
+    ],
+    "fresh_restorer_without_unity": true,
+    "sample_batch_size": 64
+  },
+  "determinism": {
+    "fresh_processes": 2,
+    "live_saver_requires_unity": true,
+    "restorer_requires_unity": false,
+    "torch_num_threads": 1,
+    "torch_num_interop_threads": 1,
+    "deterministic_algorithms": true
+  },
+  "exclusions": [
+    "transition 10017 or any post-update action",
+    "optimizer update 6 on the R3O trajectory",
+    "target-network synchronization",
+    "Unity resume or extended training",
+    "final checkpoint selection",
+    "ONNX export or exported-inference parity",
+    "ROCm execution or training",
+    "multi-environment collection",
+    "five-seed training or held-out evaluation",
+    "learned-policy effectiveness claims",
+    "changes to the R2A environment or action contract",
+    "changes to the R3O or R3P contracts, schemas, or evidence"
+  ]
+}

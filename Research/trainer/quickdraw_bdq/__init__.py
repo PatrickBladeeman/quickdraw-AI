@@ -16,6 +16,7 @@ from .exploration import LinearEpsilonSchedule
 from .checkpoint import (
     CHECKPOINT_SCHEMA_VERSION,
     LoadedCheckpoint,
+    checkpoint_state_sha256,
     load_controller_checkpoint,
     save_controller_checkpoint,
 )
@@ -61,6 +62,7 @@ __all__ = [
     "OptimizationStepResult",
     "CHECKPOINT_SCHEMA_VERSION",
     "LoadedCheckpoint",
+    "checkpoint_state_sha256",
     "load_controller_checkpoint",
     "save_controller_checkpoint",
     "ReplayBatch",

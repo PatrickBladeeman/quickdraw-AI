@@ -28,8 +28,8 @@ records. All output paths below are generated and ignored.
 - `llapi.py` — behavior validation, pending decisions, transition completion,
   action selection, and truncation-mask side-channel ingestion;
 - `checkpoint.py` — versioned, integrity-bound trainer state save and restore;
-- `acceptance.py` — shared hashing, serialization, runtime checks, worker
-  execution, deterministic comparison, and result writing; and
+- `acceptance.py` — shared hashing, serialization, runtime checks, fresh
+  process execution, deterministic comparison, and result writing; and
 - `update_gate.py` — shared bounded Unity collection and optimizer-gate
   execution for the update-trajectory milestones.
 
@@ -93,7 +93,8 @@ contain sensitive command-line context; retain only necessary excerpts.
 Each acceptance runner requires a fresh `--output` directory. It starts two
 fresh workers unless its contract says otherwise, validates the complete trace,
 and fails closed on contract, prefix, behavior, shape, mask, schedule, hash, or
-pending-decision drift.
+pending-decision drift. R3Q starts one Unity-backed saver and one fresh
+Unity-free Python restorer, as registered by its contract.
 
 | Gate | Runner | Canonical evidence |
 | --- | --- | --- |
@@ -110,6 +111,7 @@ pending-decision drift.
 | R3N replay regression | `validate_bdq_replay_storage_regression.py` | [`R3N.md`](../../docs/evidence/R3N.md) |
 | R3O update 5 | `run_bdq_fifth_update_smoke.py` | [`R3O.md`](../../docs/evidence/R3O.md) |
 | R3P checkpoint round-trip | `run_bdq_checkpoint_roundtrip_smoke.py` | [`R3P.md`](../../docs/evidence/R3P.md) |
+| R3Q live-derived checkpoint | `run_bdq_live_checkpoint_smoke.py` | [`R3Q.md`](../../docs/evidence/R3Q.md) |
 
 Set the player once, then select the required command:
 
@@ -149,6 +151,10 @@ $player = 'Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.
 
 & $python Research\trainer\run_bdq_checkpoint_roundtrip_smoke.py `
   --output Artifacts\Experiments\r3p-checkpoint-roundtrip\acceptance
+
+& $python Research\trainer\run_bdq_live_checkpoint_smoke.py `
+  --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3q-live-checkpoint\acceptance
 ```
 
 R3I is a Python-only unit gate:

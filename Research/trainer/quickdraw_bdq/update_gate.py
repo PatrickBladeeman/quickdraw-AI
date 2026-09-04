@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Callable, Dict, Sequence
 
 import numpy as np
 import torch
@@ -16,8 +16,8 @@ from mlagents_envs.side_channel.engine_configuration_channel import (
     EngineConfigurationChannel,
 )
 
-
 from .action_space import greedy_actions
+from .checkpoint import save_controller_checkpoint
 from .exploration import LinearEpsilonSchedule
 from .llapi import (
     BASIC_BEHAVIOR_NAME,
@@ -419,6 +419,43 @@ def _emit_watch_progress(
     )
 
 
+def _checkpoint_handoff(
+    *,
+    checkpoint_path: Path | None,
+    checkpoint_callback: Callable[
+        [
+            BDQOptimizerController,
+            DirectReplayCollector,
+            ScheduledEpsilonGreedyBDQActionSelector,
+        ],
+        None,
+    ]
+    | None,
+    controller: BDQOptimizerController,
+    collector: DirectReplayCollector,
+    scheduled_selector: ScheduledEpsilonGreedyBDQActionSelector | None,
+    task_name: str,
+) -> None:
+    if checkpoint_path is not None:
+        if scheduled_selector is None:
+            raise LLAPIContractError(
+                f"{task_name} checkpoint handoff requires a scheduled selector."
+            )
+        save_controller_checkpoint(
+            checkpoint_path,
+            controller,
+            collector,
+            scheduled_selector,
+        )
+    if checkpoint_callback is not None:
+        if checkpoint_path is None or scheduled_selector is None:
+            raise LLAPIContractError(
+                f"{task_name} checkpoint callback requires a saved "
+                "scheduled-selector boundary."
+            )
+        checkpoint_callback(controller, collector, scheduled_selector)
+
+
 def _environment_side_channels(
     truncation_side_channel: BasicTruncationMaskSideChannel,
     *,
@@ -450,6 +487,16 @@ def execute_update_gate_worker(
     timeout_wait: int = 120,
     watch: bool = False,
     progress_interval: int = 0,
+    checkpoint_path: Path | None = None,
+    checkpoint_callback: Callable[
+        [
+            BDQOptimizerController,
+            DirectReplayCollector,
+            ScheduledEpsilonGreedyBDQActionSelector,
+        ],
+        None,
+    ]
+    | None = None,
 ) -> Dict[str, Any]:
     worker_output.mkdir(parents=True, exist_ok=False)
     collection = contract["collection"]
@@ -1114,6 +1161,14 @@ def execute_update_gate_worker(
         trace_path.write_text(
             json.dumps(trace, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
+        )
+        _checkpoint_handoff(
+            checkpoint_path=checkpoint_path,
+            checkpoint_callback=checkpoint_callback,
+            controller=controller,
+            collector=collector,
+            scheduled_selector=scheduled_selector,
+            task_name=task_name,
         )
         return trace
     finally:

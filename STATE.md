@@ -14,17 +14,20 @@ or detailed acceptance evidence.
 
 ## Repository checkpoint
 
-- Branch: `main`.
-- At the last verification, the local branch, configured upstream, and
-  `origin/main` were aligned with no ahead/behind divergence.
+- Branch: `main`, with the R3Q implementation and evidence changes currently
+  uncommitted and unpushed by instruction.
+- The last pushed research boundary remains the R3P boundary below; the
+  working-tree changes are intentionally not represented by a commit hash.
 - The hierarchical documentation migration and its QA cleanup are committed
   and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
   `abd240f9551bfc077e38672f06e7071d5480bc44`.
 - The persistent read-only Kilo reconnaissance/review workflow is documented
   and pushed in `75bfb6427a1f17518e0b8487d7cdf8c31399f7d8`.
-- The verified research implementation frontier is
-  `0d78c783897225395ed44304fb6b0124a4620582` (R3P: deterministic
-  Python-only trainer checkpoint round-trip).
+- The acceptance-harness consolidation and repository-wide bloat-control rule
+  are committed and pushed in `4fa825b6c8ca45797abaaf6da85cde9357aa3657`.
+- The verified research implementation frontier is R3Q in the current working
+  tree (uncommitted and unpushed by instruction), extending the committed R3P
+  deterministic Python-only trainer checkpoint round-trip.
 - The verified live Unity frontier remains R3O at
   `028143fff494c6234fd17832dd41199aee5a6fad`: bounded scheduled optimizer
   update 5 at transition 10,016. R3P does not extend that live trajectory.
@@ -73,7 +76,7 @@ produced a trained or useful policy.
   is a separately versioned future variant.
 - Detailed evidence: [`docs/evidence/DETERMINISTIC-R0-R2.md`](docs/evidence/DETERMINISTIC-R0-R2.md).
 
-### R3 — BDQ boundary through R3P
+### R3 — BDQ boundary through R3Q
 
 - R3A/R3B implement and test replay semantics, the registered visual dueling
   branch network, legal masking, Double-DQN targets, averaged branch Huber
@@ -95,8 +98,13 @@ produced a trained or useful policy.
   agreed exactly on the registered synthetic boundary at decision count 36
   and on the same next replay sample and bounded next optimizer result at
   decision count 40, loaded without Unity.
+- R3Q extends the same checkpoint mechanism to the unchanged R3O live-derived
+  state at transition 10,016. One fresh Unity-backed saver and one fresh CPU
+  Python restorer agreed field-for-field on the checkpoint state and on the
+  same next replay sample without Unity; the run stopped before any post-update
+  action.
 - Detailed evidence: [`docs/evidence/README.md`](docs/evidence/README.md), with
-  one record per R3D–R3P milestone.
+  one record per R3D–R3Q milestone.
 
 ## Not implemented or not demonstrated
 
@@ -104,9 +112,9 @@ produced a trained or useful policy.
 - The first scheduled hard target-network synchronization.
 - Any action selected with update-5 weights.
 - Training to convergence across the five registered policy seeds.
-- Checkpoint/resume of the frozen Unity trajectory, final checkpoint
-  selection, or ONNX export for the learned BDQ policy. The implemented
-  R3P boundary covers only the registered synthetic Python workload.
+- Resume of the frozen Unity trajectory or final checkpoint selection. R3Q
+  saves and restores a live-derived state in a fresh Python process without
+  resuming Unity; ONNX export for the learned BDQ policy remains unproven.
 - Held-out learned-policy evaluation, the Basic BDQ acceptance result, or the
   joint-action Double DQN comparison.
 - The separately versioned gradual-motion Basic variant.
@@ -137,13 +145,18 @@ support.
 - R3P is implemented, accepted, committed, and pushed. Its acceptance is
   Python-only: it does not open a Unity rollout, resume of the frozen Unity
   trajectory, or any new environment interaction.
+- R3Q is implemented and verified in the current working tree, but remains
+  uncommitted and unpushed by instruction. It does not open transition 10,017,
+  select an action after update 5, synchronize the target, resume Unity, or
+  authorize extended training/export.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 
 ## Completed maintainability work
 
 A conservative consolidation of the Python research acceptance harness is
-implemented and verified locally, and remains uncommitted as requested.
+implemented, verified, committed, and pushed at
+`4fa825b6c8ca45797abaaf6da85cde9357aa3657`.
 Generic acceptance utilities and the shared update-gate implementation now
 live in capability-oriented `quickdraw_bdq` modules while all historical
 runner paths remain compatibility entry points.
@@ -158,9 +171,10 @@ collection. [`TASK.md`](TASK.md) owns its exact scope and outcome.
 ## Current boundary
 
 R3P is implemented, accepted, committed, and pushed at
-`0d78c783897225395ed44304fb6b0124a4620582`. The live Unity boundary still
-stands at 10,016 transitions with five optimizer updates, zero target
-synchronizations, and no post-update action; the checkpoint boundary covers
-only the registered synthetic Python workload. The completed, uncommitted
-acceptance-harness maintainability task in [`TASK.md`](TASK.md) does not
-advance either research boundary. No next research task is authorized.
+`0d78c783897225395ed44304fb6b0124a4620582`. The live Unity boundary remains
+R3O at 10,016 transitions with five optimizer updates, zero target
+synchronizations, and no post-update action. R3Q is implemented and verified
+in the current working tree (uncommitted and unpushed by instruction): the
+live-derived state was saved and restored in a fresh Python process without
+Unity with exact next-sample parity. R3Q does not resume Unity or extend that
+live boundary.
