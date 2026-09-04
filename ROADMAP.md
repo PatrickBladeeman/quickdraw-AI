@@ -141,6 +141,8 @@ analysis command.
 ## Current authorization
 
 R3P is completed, accepted, committed, and pushed at
-`0d78c783897225395ed44304fb6b0124a4620582`; no next SSNT is currently
-authorized. See [`TASK.md`](TASK.md) for the completed boundary and
-[`STATE.md`](STATE.md) for current truth.
+`0d78c783897225395ed44304fb6b0124a4620582`. A behavior-preserving
+acceptance-harness consolidation is completed and verified locally but remains
+uncommitted as requested; it does not advance the research roadmap. No next
+research task is authorized. See [`TASK.md`](TASK.md) for the exact outcome
+and [`STATE.md`](STATE.md) for current truth.

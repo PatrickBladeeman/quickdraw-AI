@@ -1,6 +1,6 @@
 # quickdraw-AI — Current State
 
-Last verified: 2026-08-31
+Last verified: 2026-09-04
 
 This file is the canonical answer to **what is true right now**. It records
 implementation and verification status, not the registered experiment design
@@ -20,6 +20,8 @@ or detailed acceptance evidence.
 - The hierarchical documentation migration and its QA cleanup are committed
   and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
   `abd240f9551bfc077e38672f06e7071d5480bc44`.
+- The persistent read-only Kilo reconnaissance/review workflow is documented
+  and pushed in `75bfb6427a1f17518e0b8487d7cdf8c31399f7d8`.
 - The verified research implementation frontier is
   `0d78c783897225395ed44304fb6b0124a4620582` (R3P: deterministic
   Python-only trainer checkpoint round-trip).
@@ -138,11 +140,27 @@ support.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 
+## Completed maintainability work
+
+A conservative consolidation of the Python research acceptance harness is
+implemented and verified locally, and remains uncommitted as requested.
+Generic acceptance utilities and the shared update-gate implementation now
+live in capability-oriented `quickdraw_bdq` modules while all historical
+runner paths remain compatibility entry points.
+
+The complete trainer suite and representative historical artifacts pass, the
+independent read-only contract review found no blocking drift, and all frozen
+contracts, schemas, evidence, and original production-core files remain
+byte-identical. This work does not advance the R3 research frontier, change any
+registered research value or accepted result, or authorize new Unity
+collection. [`TASK.md`](TASK.md) owns its exact scope and outcome.
+
 ## Current boundary
 
 R3P is implemented, accepted, committed, and pushed at
 `0d78c783897225395ed44304fb6b0124a4620582`. The live Unity boundary still
 stands at 10,016 transitions with five optimizer updates, zero target
 synchronizations, and no post-update action; the checkpoint boundary covers
-only the registered synthetic Python workload. No further work is currently
-authorized; the next SSNT requires an explicit task update. See [`TASK.md`](TASK.md).
+only the registered synthetic Python workload. The completed, uncommitted
+acceptance-harness maintainability task in [`TASK.md`](TASK.md) does not
+advance either research boundary. No next research task is authorized.

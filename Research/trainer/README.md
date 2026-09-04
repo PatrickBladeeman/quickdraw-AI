@@ -24,9 +24,23 @@ records. All output paths below are generated and ignored.
   storage, seeded sampling, reclamation, and fail-closed accounting;
 - `optimizer.py` — online/target networks, Adam, update and target-sync
   counters;
-- `exploration.py` — the stateless epsilon schedule and seeded selector; and
+- `exploration.py` — the stateless epsilon schedule and seeded selector;
 - `llapi.py` — behavior validation, pending decisions, transition completion,
-  action selection, and truncation-mask side-channel ingestion.
+  action selection, and truncation-mask side-channel ingestion;
+- `checkpoint.py` — versioned, integrity-bound trainer state save and restore;
+- `acceptance.py` — shared hashing, serialization, runtime checks, worker
+  execution, deterministic comparison, and result writing; and
+- `update_gate.py` — shared bounded Unity collection and optimizer-gate
+  execution for the update-trajectory milestones.
+
+The `run_bdq_*` files preserve historical commands and milestone-specific
+contracts, expectations, validation, and summaries. Generic behavior used by
+multiple milestones belongs in `quickdraw_bdq`, not in a milestone runner.
+Future milestones must state a genuinely new acceptance or research claim and
+extend a shared execution mechanism through contract/configuration data. A new
+bespoke runner/test/schema stack is appropriate only when that claim requires a
+substantially different contract or execution boundary; a new label, cutoff,
+or expected value alone is not enough.
 
 The former high-level ML-Agents trainer, policy, trajectory, settings, YAML,
 plugin registration, and next-mask registry were superseded and removed.

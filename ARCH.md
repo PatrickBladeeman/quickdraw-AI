@@ -93,9 +93,17 @@ strategic mechanics belong in a separate future scene.
 - `checkpoint.py` owns the versioned fail-closed trainer checkpoint: exact
   state encoding, identity binding, integrity hashing, and clean-boundary
   save plus fresh-object restore.
+- `acceptance.py` owns reusable, non-scientific acceptance plumbing: canonical
+  hashing and serialization, runtime/package checks, execution-mode checks,
+  fresh-worker launch, deterministic worker comparison, and result writing.
+- `update_gate.py` owns the shared bounded Unity collection and optimizer-gate
+  mechanism used by the update-trajectory milestones.
 
-The milestone runners in `Research/trainer/` compose those modules into bounded
-acceptance gates. They are not a separate training framework. The retired
+The milestone runners in `Research/trainer/` are historical compatibility
+entry points. They load milestone-specific contracts, expectations, schemas,
+and summaries, then compose the shared package modules into bounded acceptance
+gates. They are not a separate training framework and must not become the
+canonical owner of generic behavior needed by another milestone. The retired
 high-level ML-Agents `Trainer`/`Policy`/`Trajectory` experiment is historical,
 not an available runtime path.
 
@@ -126,6 +134,12 @@ not be hidden behind placeholder descriptions that imply implementation.
   terminal/truncation truth.
 - Python owns collection, replay, action selection, targets, and optimization;
   it never infers Unity legality from privileged scene state.
+- Every research milestone states a genuinely new acceptance or research
+  claim. It extends an existing execution boundary through shared acceptance
+  mechanisms plus contract/configuration data unless the claim also requires a
+  substantially different contract or execution boundary; only then is a
+  bespoke runner/test/schema stack justified. A new label, cutoff, or expected
+  value alone is not a new boundary.
 - Policies emit typed intent; they do not emulate keyboard or mouse input.
 - The shared actuator is the exclusive intent-to-mechanics path.
 - A strategic director may publish only a validated categorical goal. It may

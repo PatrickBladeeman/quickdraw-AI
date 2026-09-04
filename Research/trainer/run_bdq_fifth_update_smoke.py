@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import os
-import subprocess
 import sys
-import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Dict, Sequence
-
-from jsonschema import Draft202012Validator
 
 
 HERE = Path(__file__).resolve().parent
@@ -23,14 +16,20 @@ from quickdraw_bdq import (  # noqa: E402
     LLAPIContractError,
     LinearEpsilonSchedule,
 )
-from run_bdq_epsilon_collection_smoke import sha256_file  # noqa: E402
-from run_bdq_post_update_handoff_smoke import (  # noqa: E402
-    canonical_json_sha256,
-)
-from run_bdq_warmup_update_smoke import (  # noqa: E402
+from quickdraw_bdq.acceptance import (  # noqa: E402
     ARTIFACT_ROOT,
     PYPROJECT_PATH,
-    _registered_settings,
+    canonical_json_sha256,
+    comparison_execution_mode as _execution_mode,
+    registered_settings as _registered_settings,
+    run_fresh_worker_process,
+    sha256_file,
+    validate_distinct_trace_paths as _validate_distinct_trace_paths_common,
+    validate_runtime_and_package,
+    validate_schema_pair,
+    write_two_process_result,
+)
+from quickdraw_bdq.update_gate import (  # noqa: E402
     execute_update_gate_worker,
     validate_update_gate_trace,
 )
@@ -54,22 +53,10 @@ TRACE_SCHEMA_VERSION = "quickdraw.bdq-fifth-update-trace.v1"
 RESULT_SCHEMA_VERSION = "quickdraw.bdq-fifth-update-smoke-result.v1"
 
 
-def _runtime_contract() -> Dict[str, str]:
-    return {
-        "python": ".".join(str(value) for value in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
-
-
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
-    contract_schema = json.loads(CONTRACT_SCHEMA_PATH.read_text(encoding="utf-8"))
-    result_schema = json.loads(RESULT_SCHEMA_PATH.read_text(encoding="utf-8"))
-    Draft202012Validator.check_schema(contract_schema)
-    Draft202012Validator.check_schema(result_schema)
-    Draft202012Validator(contract_schema).validate(contract)
+    result_schema = validate_schema_pair(
+        contract, CONTRACT_SCHEMA_PATH, RESULT_SCHEMA_PATH
+    )
 
     binding = contract["base_fourth_update_contract"]
     base_contract_path = REPO_ROOT / binding["path"]
@@ -95,15 +82,7 @@ def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     ):
         raise LLAPIContractError("R3N does not bind R3O's active R3M contract.")
 
-    if contract["runtime"] != _runtime_contract():
-        raise LLAPIContractError("The active runtime differs from R3O.")
-    pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
-    if pyproject["project"]["name"] != contract["package"]["distribution"]:
-        raise LLAPIContractError("The R3O package name has drifted.")
-    if pyproject["project"]["version"] != contract["package"]["version"]:
-        raise LLAPIContractError("The R3O package version has drifted.")
-    if "entry-points" in pyproject["project"]:
-        raise LLAPIContractError("The retired trainer entry point returned.")
+    validate_runtime_and_package(contract, "R3O", pyproject_path=PYPROJECT_PATH)
     for key in ("runtime", "package", "transport"):
         if contract[key] != base_contract[key]:
             raise LLAPIContractError(f"R3O {key} differs from R3M.")
@@ -430,52 +409,26 @@ def run_fresh_worker(
     worker_index: int,
     contract: Dict[str, Any],
 ) -> tuple[Dict[str, Any], Path]:
-    worker_output = output_directory / f"run-{worker_index + 1}"
-    print(f"worker_{worker_index + 1}=starting", flush=True)
-    command = [
-        sys.executable,
-        "-B",
-        str(Path(__file__).resolve()),
-        f"--env={executable}",
-        f"--worker-output={worker_output}",
-        f"--worker-index={worker_index}",
-    ]
-    process_environment = dict(os.environ)
-    process_environment["PYTHONDONTWRITEBYTECODE"] = "1"
-    thread_count = str(contract["determinism"]["torch_num_threads"])
-    process_environment["OMP_NUM_THREADS"] = thread_count
-    process_environment["MKL_NUM_THREADS"] = thread_count
-    completed = subprocess.run(
-        command,
-        cwd=REPO_ROOT,
-        env=process_environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        timeout=1800,
-        check=False,
+    return run_fresh_worker_process(
+        runner_path=Path(__file__),
+        executable=executable,
+        output_directory=output_directory,
+        worker_index=worker_index,
+        contract=contract,
+        trace_file_name=TRACE_FILE_NAME,
+        task_name="R3O",
+        announce=True,
+        repo_root=REPO_ROOT,
+        timeout_seconds=1800,
     )
-    log_path = output_directory / f"worker-{worker_index + 1}.log"
-    log_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"Fresh R3O worker {worker_index + 1} failed with exit code "
-            f"{completed.returncode}; see {log_path}."
-        )
-    trace_path = worker_output / TRACE_FILE_NAME
-    if not trace_path.is_file():
-        raise RuntimeError(f"Fresh R3O worker omitted {trace_path}.")
-    print(f"worker_{worker_index + 1}=complete", flush=True)
-    return json.loads(trace_path.read_text(encoding="utf-8")), trace_path
 
 
 def _validate_distinct_trace_paths(first_path: Path, second_path: Path) -> None:
-    if not first_path.is_file():
-        raise FileNotFoundError(first_path)
-    if not second_path.is_file():
-        raise FileNotFoundError(second_path)
-    if first_path == second_path or first_path.samefile(second_path):
-        raise ValueError("R3O comparison requires two distinct trace files.")
+    _validate_distinct_trace_paths_common(
+        first_path,
+        second_path,
+        task_name="R3O",
+    )
 
 
 def _write_acceptance_result(
@@ -486,32 +439,17 @@ def _write_acceptance_result(
     output_directory: Path,
     result_schema: Dict[str, Any],
 ) -> tuple[Path, Dict[str, Any]]:
-    validate_trace(first, result_schema)
-    validate_trace(second, result_schema)
-    if first != second or first_path.read_bytes() != second_path.read_bytes():
-        raise LLAPIContractError(
-            f"Fresh R3O traces differ: {first_path} versus {second_path}."
-        )
-
-    canonical_bytes = json.dumps(
-        first,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    result = {
-        "schema_version": RESULT_SCHEMA_VERSION,
-        "contract_sha256": sha256_file(CONTRACT_PATH),
-        "fresh_process_count": 2,
-        "exact_trace_equality": True,
-        "canonical_trace_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
-        "canonical_trace": first,
-    }
-    Draft202012Validator(result_schema).validate(result)
-    output_directory.mkdir(parents=True, exist_ok=True)
-    result_path = output_directory / "result.json"
-    result_path.write_text(
-        json.dumps(result, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    result_path = write_two_process_result(
+        first=first,
+        first_path=first_path,
+        second=second,
+        second_path=second_path,
+        output_directory=output_directory,
+        result_schema=result_schema,
+        result_schema_version=RESULT_SCHEMA_VERSION,
+        contract_path=CONTRACT_PATH,
+        task_name="R3O",
+        validate_trace=validate_trace,
     )
     return result_path, first
 
@@ -548,42 +486,6 @@ def parse_arguments(
     return parser.parse_args(arguments)
 
 
-def _execution_mode(arguments: argparse.Namespace) -> str:
-    trace_paths_supplied = (
-        arguments.first_trace is not None or arguments.second_trace is not None
-    )
-    if trace_paths_supplied:
-        if (
-            arguments.first_trace is None
-            or arguments.second_trace is None
-            or arguments.output is None
-            or arguments.env is not None
-            or arguments.worker_output is not None
-            or arguments.worker_index is not None
-        ):
-            raise ValueError(
-                "Trace-comparison mode requires only --output, --first-trace, "
-                "and --second-trace."
-            )
-        return "compare"
-    if arguments.worker_output is not None:
-        if (
-            arguments.env is None
-            or arguments.worker_index is None
-            or arguments.output is not None
-        ):
-            raise ValueError(
-                "Worker mode requires only --env, --worker-output, and "
-                "--worker-index."
-            )
-        return "worker"
-    if (
-        arguments.env is None
-        or arguments.output is None
-        or arguments.worker_index is not None
-    ):
-        raise ValueError("Parent mode requires --output and no worker index.")
-    return "parent"
 
 
 def main() -> int:

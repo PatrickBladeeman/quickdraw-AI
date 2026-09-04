@@ -1,19 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
-import os
-import subprocess
 import sys
-import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
 import numpy as np
-import torch
 from jsonschema import Draft202012Validator
 from mlagents_envs.base_env import ActionTuple
 from mlagents_envs.environment import UnityEnvironment
@@ -30,14 +24,22 @@ from quickdraw_bdq import (  # noqa: E402
     BasicTruncationMaskSideChannel,
     DirectReplayCollector,
     LLAPIContractError,
-    ReplayTransition,
     SeededEpsilonGreedyBDQActionSelector,
-    joint_indices_from_branches,
     network_sha256,
-    observation_sha256,
     read_action_masks,
     validate_basic_behavior_spec,
     validate_observation,
+)
+from quickdraw_bdq.acceptance import (  # noqa: E402
+    action_tuple_counts as _action_tuple_counts,
+    episode_record as _episode_record,
+    masks_to_json as _masks_to_json,
+    run_fresh_worker_process,
+    sha256_file,
+    transition_to_json as _transition_to_json,
+    validate_runtime_and_package,
+    validate_schema_pair,
+    write_two_process_result,
 )
 
 
@@ -59,42 +61,6 @@ PYPROJECT_PATH = HERE / "pyproject.toml"
 TRACE_FILE_NAME = "r3e-epsilon-collection-trace.json"
 TRACE_SCHEMA_VERSION = "quickdraw.bdq-epsilon-collection-trace.v1"
 RESULT_SCHEMA_VERSION = "quickdraw.bdq-epsilon-collection-smoke-result.v1"
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _masks_to_json(masks: Sequence[np.ndarray]) -> list[list[bool]]:
-    return [[bool(value) for value in branch] for branch in masks]
-
-
-def _transition_to_json(
-    transition: ReplayTransition,
-    index: int,
-    episode_index: int,
-    episode_decision_index: int,
-) -> Dict[str, Any]:
-    return {
-        "index": index,
-        "episode_index": episode_index,
-        "episode_decision_index": episode_decision_index,
-        "observation_sha256": observation_sha256(transition.observation),
-        "next_observation_sha256": observation_sha256(
-            transition.next_observation
-        ),
-        "observation_shape": list(transition.observation.shape),
-        "action": [int(value) for value in transition.action],
-        "reward": float(transition.reward),
-        "action_masks": _masks_to_json(transition.action_masks),
-        "next_action_masks": _masks_to_json(transition.next_action_masks),
-        "terminated": transition.terminated,
-        "truncated": transition.truncated,
-    }
 
 
 def _record_transition(
@@ -130,53 +96,6 @@ def _record_transition(
             episode_decision_index,
         )
     )
-
-
-def _episode_record(
-    *,
-    episode_index: int,
-    transition_start_index: int,
-    transition_count: int,
-    episode_return: float,
-    end_kind: str,
-) -> Dict[str, Any]:
-    if end_kind == "terminal":
-        reason = "target_hit"
-        interrupted = False
-        unity_episode_ended = True
-    elif end_kind == "truncated":
-        reason = "decision_limit"
-        interrupted = True
-        unity_episode_ended = True
-    elif end_kind == "collection_cutoff":
-        reason = "collection_limit"
-        interrupted = False
-        unity_episode_ended = False
-    else:
-        raise LLAPIContractError(f"Unexpected R3E episode end kind {end_kind}.")
-    return {
-        "episode_index": episode_index,
-        "transition_start_index": transition_start_index,
-        "transition_count": transition_count,
-        "return": float(episode_return),
-        "end_kind": end_kind,
-        "reason": reason,
-        "interrupted": interrupted,
-        "unity_episode_ended": unity_episode_ended,
-    }
-
-
-def _action_tuple_counts(transitions: Sequence[Dict[str, Any]]) -> list[int]:
-    counts = [0] * 6
-    for transition in transitions:
-        action = np.asarray(transition["action"], dtype=np.int64)
-        joint = int(
-            joint_indices_from_branches(
-                torch.as_tensor(action[None, ...], dtype=torch.int64)
-            )[0].item()
-        )
-        counts[joint] += 1
-    return counts
 
 
 def execute_worker(
@@ -609,30 +528,13 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
 
 
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
-    contract_schema = json.loads(CONTRACT_SCHEMA_PATH.read_text(encoding="utf-8"))
-    result_schema = json.loads(RESULT_SCHEMA_PATH.read_text(encoding="utf-8"))
-    Draft202012Validator.check_schema(contract_schema)
-    Draft202012Validator.check_schema(result_schema)
-    Draft202012Validator(contract_schema).validate(contract)
+    result_schema = validate_schema_pair(
+        contract, CONTRACT_SCHEMA_PATH, RESULT_SCHEMA_PATH
+    )
     binding = contract["base_llapi_contract"]
     if sha256_file(REPO_ROOT / binding["path"]) != binding["sha256"]:
         raise LLAPIContractError(f"Contract binding drifted: {binding['path']}.")
-    runtime = contract["runtime"]
-    if runtime != {
-        "python": ".".join(str(value) for value in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }:
-        raise LLAPIContractError("The active runtime differs from R3E.")
-    pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
-    if pyproject["project"]["name"] != contract["package"]["distribution"]:
-        raise LLAPIContractError("The R3E package name has drifted.")
-    if pyproject["project"]["version"] != contract["package"]["version"]:
-        raise LLAPIContractError("The R3E package version has drifted.")
-    if "entry-points" in pyproject["project"]:
-        raise LLAPIContractError("The retired trainer entry point returned.")
+    validate_runtime_and_package(contract, "R3E", pyproject_path=PYPROJECT_PATH)
     settings = BDQOptimizationSettings()
     collection = contract["collection"]
     if settings.replay_warmup_decisions != collection["replay_warmup_decisions"]:
@@ -647,38 +549,18 @@ def run_fresh_worker(
     output_directory: Path,
     worker_index: int,
 ) -> tuple[Dict[str, Any], Path]:
-    worker_output = output_directory / f"run-{worker_index + 1}"
-    command = [
-        sys.executable,
-        "-B",
-        str(Path(__file__).resolve()),
-        f"--env={executable}",
-        f"--worker-output={worker_output}",
-        f"--worker-index={worker_index}",
-    ]
-    process_environment = dict(os.environ)
-    process_environment["PYTHONDONTWRITEBYTECODE"] = "1"
-    completed = subprocess.run(
-        command,
-        cwd=REPO_ROOT,
-        env=process_environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        timeout=600,
-        check=False,
+    return run_fresh_worker_process(
+        runner_path=Path(__file__),
+        executable=executable,
+        output_directory=output_directory,
+        worker_index=worker_index,
+        contract=None,
+        trace_file_name=TRACE_FILE_NAME,
+        task_name="R3E",
+        announce=False,
+        repo_root=REPO_ROOT,
+        timeout_seconds=600,
     )
-    log_path = output_directory / f"worker-{worker_index + 1}.log"
-    log_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"Fresh R3E worker {worker_index + 1} failed with exit code "
-            f"{completed.returncode}; see {log_path}."
-        )
-    trace_path = worker_output / TRACE_FILE_NAME
-    if not trace_path.is_file():
-        raise RuntimeError(f"Fresh R3E worker omitted {trace_path}.")
-    return json.loads(trace_path.read_text(encoding="utf-8")), trace_path
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -724,31 +606,17 @@ def main() -> int:
 
     first, first_path = run_fresh_worker(executable, output_directory, 0)
     second, second_path = run_fresh_worker(executable, output_directory, 1)
-    validate_trace(first, result_schema)
-    validate_trace(second, result_schema)
-    if first != second or first_path.read_bytes() != second_path.read_bytes():
-        raise LLAPIContractError(
-            f"Fresh R3E traces differ: {first_path} versus {second_path}."
-        )
-
-    canonical_bytes = json.dumps(
-        first,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    result = {
-        "schema_version": RESULT_SCHEMA_VERSION,
-        "contract_sha256": sha256_file(CONTRACT_PATH),
-        "fresh_process_count": 2,
-        "exact_trace_equality": True,
-        "canonical_trace_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
-        "canonical_trace": first,
-    }
-    Draft202012Validator(result_schema).validate(result)
-    result_path = output_directory / "result.json"
-    result_path.write_text(
-        json.dumps(result, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    result_path = write_two_process_result(
+        first=first,
+        first_path=first_path,
+        second=second,
+        second_path=second_path,
+        output_directory=output_directory,
+        result_schema=result_schema,
+        result_schema_version=RESULT_SCHEMA_VERSION,
+        contract_path=CONTRACT_PATH,
+        task_name="R3E",
+        validate_trace=validate_trace,
     )
     print(f"result={result_path}")
     print("fresh_processes=2")

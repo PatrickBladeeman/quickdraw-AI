@@ -22,14 +22,16 @@ from quickdraw_bdq import (  # noqa: E402
     LLAPIContractError,
     LinearEpsilonSchedule,
 )
+from quickdraw_bdq.acceptance import (  # noqa: E402
+    registered_settings as _registered_settings,
+    sha256_file,
+)
 from run_bdq_third_update_smoke import (  # noqa: E402
     _execution_mode,
     parse_arguments,
-    sha256_file,
     validate_contract,
     validate_trace,
 )
-from run_bdq_warmup_update_smoke import _registered_settings  # noqa: E402
 
 
 CONTRACT_PATH = HERE / "bdq-third-update-contract-v1.json"

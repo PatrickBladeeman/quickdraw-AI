@@ -27,19 +27,19 @@ from quickdraw_bdq import (  # noqa: E402
     ScheduledEpsilonGreedyBDQActionSelector,
     network_sha256,
 )
-from run_bdq_post_update_handoff_smoke import (  # noqa: E402
+from quickdraw_bdq.acceptance import (  # noqa: E402
     canonical_json_sha256,
+    registered_settings as _registered_settings,
+    sha256_file,
+)
+from quickdraw_bdq.update_gate import (  # noqa: E402
+    _complete_gate_transition,
+    _select_scheduled_epsilon_handoff_action,
 )
 from run_bdq_scheduled_epsilon_handoff_smoke import (  # noqa: E402
     _execution_mode,
     parse_arguments,
-    sha256_file,
     validate_contract,
-)
-from run_bdq_warmup_update_smoke import (  # noqa: E402
-    _complete_gate_transition,
-    _registered_settings,
-    _select_scheduled_epsilon_handoff_action,
 )
 
 

@@ -26,15 +26,19 @@ from quickdraw_bdq import (  # noqa: E402
     OptimizationStepResult,
     network_sha256,
 )
-from run_bdq_warmup_update_smoke import (  # noqa: E402
-    _complete_transition,
+from quickdraw_bdq.acceptance import (  # noqa: E402
+    registered_settings as _registered_settings,
+    sha256_file,
+)
+from quickdraw_bdq.update_gate import (  # noqa: E402
+    _complete_gate_transition,
     _emit_watch_progress,
     _environment_side_channels,
-    _execution_mode,
     _optimization_event,
-    _registered_settings,
+)
+from run_bdq_warmup_update_smoke import (  # noqa: E402
+    _execution_mode,
     parse_arguments,
-    sha256_file,
     validate_contract,
 )
 
@@ -130,7 +134,7 @@ def test_collection_helper_opens_one_update_only_at_warmup() -> None:
             np.asarray([index % 3, index % 2], dtype=np.int64),
             masks(),
         )
-        _complete_transition(
+        _complete_gate_transition(
             collector,
             0,
             float(index - 1),
@@ -142,7 +146,8 @@ def test_collection_helper_opens_one_update_only_at_warmup() -> None:
             optimization_events=events,
             episode_index=0,
             episode_decision_index=index,
-            expected_first_update_decision=4,
+            expected_update_decisions=(4,),
+            task_name="R3F",
         )
         if index < 3:
             assert controller.optimizer_update_count == 0
@@ -207,7 +212,7 @@ def test_watch_engine_configuration_is_separate_from_acceptance(
             calls.append(parameters)
 
     monkeypatch.setattr(
-        "run_bdq_warmup_update_smoke.EngineConfigurationChannel",
+        "quickdraw_bdq.update_gate.EngineConfigurationChannel",
         FakeEngineConfigurationChannel,
     )
     truncation_channel = object()
@@ -289,7 +294,7 @@ def test_collection_helper_rejects_an_update_at_the_wrong_decision() -> None:
             np.asarray([0, 0], dtype=np.int64),
             masks(),
         )
-        _complete_transition(
+        _complete_gate_transition(
             collector,
             0,
             0.0,
@@ -301,11 +306,12 @@ def test_collection_helper_rejects_an_update_at_the_wrong_decision() -> None:
             optimization_events=events,
             episode_index=0,
             episode_decision_index=index,
-            expected_first_update_decision=6,
+            expected_update_decisions=(6,),
+            task_name="R3F",
         )
     collector.begin(0, observation(0.3), np.asarray([0, 0]), masks())
     with pytest.raises(LLAPIContractError, match="wrong decision"):
-        _complete_transition(
+        _complete_gate_transition(
             collector,
             0,
             0.0,
@@ -317,7 +323,8 @@ def test_collection_helper_rejects_an_update_at_the_wrong_decision() -> None:
             optimization_events=events,
             episode_index=0,
             episode_decision_index=3,
-            expected_first_update_decision=6,
+            expected_update_decisions=(6,),
+            task_name="R3F",
         )
 
 

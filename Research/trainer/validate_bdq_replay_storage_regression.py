@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
@@ -20,9 +18,10 @@ from quickdraw_bdq import (  # noqa: E402
     LLAPIContractError,
     ReplayBuffer,
 )
-from run_bdq_epsilon_collection_smoke import sha256_file  # noqa: E402
-from run_bdq_post_update_handoff_smoke import (  # noqa: E402
+from quickdraw_bdq.acceptance import (  # noqa: E402
     canonical_json_sha256,
+    runtime_contract,
+    sha256_file,
 )
 from run_bdq_fourth_update_smoke import (  # noqa: E402
     CONTRACT_PATH as R3M_CONTRACT_PATH,
@@ -40,16 +39,6 @@ CONTRACT_SCHEMA_PATH = (
 )
 
 
-def _runtime_contract() -> Dict[str, str]:
-    return {
-        "python": ".".join(str(value) for value in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
-
-
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     schema = json.loads(CONTRACT_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
@@ -64,7 +53,7 @@ def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     base_contract = json.loads(bound_path.read_text(encoding="utf-8"))
     if base_contract["schema_version"] != binding["schema_version"]:
         raise LLAPIContractError("R3N's R3M schema binding has drifted.")
-    if contract["runtime"] != _runtime_contract():
+    if contract["runtime"] != runtime_contract():
         raise LLAPIContractError("The active runtime differs from R3N.")
     if contract["runtime"] != base_contract["runtime"]:
         raise LLAPIContractError("R3N runtime differs from R3M.")

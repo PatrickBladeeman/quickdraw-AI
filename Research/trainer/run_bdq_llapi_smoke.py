@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
-import os
-import subprocess
 import sys
 import tomllib
 from importlib.metadata import version
@@ -30,12 +27,17 @@ from quickdraw_bdq import (  # noqa: E402
     DirectReplayCollector,
     GreedyBDQActionSelector,
     LLAPIContractError,
-    ReplayTransition,
     network_sha256,
-    observation_sha256,
     read_action_masks,
     validate_basic_behavior_spec,
     validate_observation,
+)
+from quickdraw_bdq.acceptance import (  # noqa: E402
+    masks_to_json as _masks_to_json,
+    run_fresh_worker_process,
+    sha256_file,
+    transition_to_json as _transition_to_json,
+    write_two_process_result,
 )
 
 
@@ -51,42 +53,6 @@ PYPROJECT_PATH = HERE / "pyproject.toml"
 TRACE_FILE_NAME = "r3d-llapi-trace.json"
 TRACE_SCHEMA_VERSION = "quickdraw.bdq-llapi-trace.v1"
 RESULT_SCHEMA_VERSION = "quickdraw.bdq-llapi-smoke-result.v1"
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _masks_to_json(masks: Sequence[np.ndarray]) -> list[list[bool]]:
-    return [[bool(value) for value in branch] for branch in masks]
-
-
-def _transition_to_json(
-    transition: ReplayTransition,
-    index: int,
-    episode_index: int,
-    episode_decision_index: int,
-) -> Dict[str, Any]:
-    return {
-        "index": index,
-        "episode_index": episode_index,
-        "episode_decision_index": episode_decision_index,
-        "observation_sha256": observation_sha256(transition.observation),
-        "next_observation_sha256": observation_sha256(
-            transition.next_observation
-        ),
-        "observation_shape": list(transition.observation.shape),
-        "action": [int(value) for value in transition.action],
-        "reward": float(transition.reward),
-        "action_masks": _masks_to_json(transition.action_masks),
-        "next_action_masks": _masks_to_json(transition.next_action_masks),
-        "terminated": transition.terminated,
-        "truncated": transition.truncated,
-    }
 
 
 def _record_transition(
@@ -538,38 +504,18 @@ def run_fresh_worker(
     output_directory: Path,
     worker_index: int,
 ) -> tuple[Dict[str, Any], Path]:
-    worker_output = output_directory / f"run-{worker_index + 1}"
-    command = [
-        sys.executable,
-        "-B",
-        str(Path(__file__).resolve()),
-        f"--env={executable}",
-        f"--worker-output={worker_output}",
-        f"--worker-index={worker_index}",
-    ]
-    process_environment = dict(os.environ)
-    process_environment["PYTHONDONTWRITEBYTECODE"] = "1"
-    completed = subprocess.run(
-        command,
-        cwd=REPO_ROOT,
-        env=process_environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        timeout=360,
-        check=False,
+    return run_fresh_worker_process(
+        runner_path=Path(__file__),
+        executable=executable,
+        output_directory=output_directory,
+        worker_index=worker_index,
+        contract=None,
+        trace_file_name=TRACE_FILE_NAME,
+        task_name="LLAPI",
+        announce=False,
+        repo_root=REPO_ROOT,
+        timeout_seconds=360,
     )
-    log_path = output_directory / f"worker-{worker_index + 1}.log"
-    log_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"Fresh LLAPI worker {worker_index + 1} failed with exit code "
-            f"{completed.returncode}; see {log_path}."
-        )
-    trace_path = worker_output / TRACE_FILE_NAME
-    if not trace_path.is_file():
-        raise RuntimeError(f"Fresh LLAPI worker omitted {trace_path}.")
-    return json.loads(trace_path.read_text(encoding="utf-8")), trace_path
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -615,31 +561,17 @@ def main() -> int:
 
     first, first_path = run_fresh_worker(executable, output_directory, 0)
     second, second_path = run_fresh_worker(executable, output_directory, 1)
-    validate_trace(first, result_schema)
-    validate_trace(second, result_schema)
-    if first != second or first_path.read_bytes() != second_path.read_bytes():
-        raise LLAPIContractError(
-            f"Fresh LLAPI traces differ: {first_path} versus {second_path}."
-        )
-
-    canonical_bytes = json.dumps(
-        first,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    result = {
-        "schema_version": RESULT_SCHEMA_VERSION,
-        "contract_sha256": sha256_file(CONTRACT_PATH),
-        "fresh_process_count": 2,
-        "exact_trace_equality": True,
-        "canonical_trace_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
-        "canonical_trace": first,
-    }
-    Draft202012Validator(result_schema).validate(result)
-    result_path = output_directory / "result.json"
-    result_path.write_text(
-        json.dumps(result, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    result_path = write_two_process_result(
+        first=first,
+        first_path=first_path,
+        second=second,
+        second_path=second_path,
+        output_directory=output_directory,
+        result_schema=result_schema,
+        result_schema_version=RESULT_SCHEMA_VERSION,
+        contract_path=CONTRACT_PATH,
+        task_name="LLAPI",
+        validate_trace=validate_trace,
     )
     print(f"result={result_path}")
     print("fresh_processes=2")

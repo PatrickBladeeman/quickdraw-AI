@@ -161,6 +161,19 @@ Apply this gate to every coding or repository-editing task.
 - Write the minimum code and documentation required for the task.
 - Avoid speculative features, one-use abstraction layers, unnecessary
   configurability, premature optimization, and handling for impossible cases.
+- Keep one clear execution path. Do not add repeated internal validation or
+  fallback chains for states already excluded by an enforced invariant. Retain
+  defensive handling at untrusted, persistence, process, network, and research
+  contract boundaries where the failure is plausible and the response is
+  defined.
+- Import capabilities from their canonical owner. Do not copy, forward, or
+  re-export helpers through milestone-specific modules merely for convenience.
+- For milestone-driven work, state the genuinely new acceptance or research
+  claim first and extend existing shared execution, test, and schema mechanisms
+  through contract or configuration data. A bespoke runner/test/schema stack
+  is justified only when that new claim also requires a substantially different
+  contract or execution boundary; a new milestone label, cutoff, or expected
+  value is not sufficient.
 - Reconsider any design that is substantially harder to explain or verify than
   the requirement itself.
 
@@ -173,6 +186,9 @@ Apply this gate to every coding or repository-editing task.
 - Remove imports, variables, helpers, files, or documentation made obsolete by
   the current change. Do not remove unrelated legacy material without separate
   approval.
+- Simplify the affected path when the task exposes safe opportunities: collapse
+  duplicate checks, redundant fallback handling, and repeated imports without
+  expanding into unrelated cleanup or weakening real boundary validation.
 - Preserve public behavior and compatibility unless the request explicitly
   changes them.
 
