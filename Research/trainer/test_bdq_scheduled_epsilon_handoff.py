@@ -4,7 +4,6 @@ import copy
 import json
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -17,30 +16,22 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from bdq_test_support import handoff_controller  # noqa: E402
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
-    BDQOptimizerController,
-    DirectReplayCollector,
     DuelingBranchingQNetwork,
     LLAPIContractError,
     LinearEpsilonSchedule,
     ScheduledEpsilonGreedyBDQActionSelector,
-    network_sha256,
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
-    canonical_json_sha256,
     registered_settings as _registered_settings,
-    sha256_file,
 )
 from quickdraw_bdq.update_gate import (  # noqa: E402
-    _complete_gate_transition,
     _select_scheduled_epsilon_handoff_action,
 )
-from run_bdq_scheduled_epsilon_handoff_smoke import (  # noqa: E402
-    _execution_mode,
-    parse_arguments,
-    validate_contract,
-)
+from run_bdq_scheduled_epsilon_handoff_smoke import validate_contract
 
 
 CONTRACT_PATH = HERE / "bdq-scheduled-epsilon-handoff-contract-v1.json"
@@ -68,57 +59,6 @@ def masks() -> tuple[np.ndarray, np.ndarray]:
         np.zeros(3, dtype=np.bool_),
         np.zeros(2, dtype=np.bool_),
     )
-
-
-def controller_after_two_updates() -> tuple[
-    BDQOptimizerController,
-    list[dict[str, object]],
-    str,
-]:
-    settings = BDQOptimizationSettings(
-        replay_capacity=8,
-        replay_warmup_decisions=2,
-        batch_size=2,
-        optimizer_update_interval_decisions=2,
-        hard_target_sync_interval_optimizer_updates=10_000,
-    )
-    controller = BDQOptimizerController(seed=51001, settings=settings)
-    collector = DirectReplayCollector(controller)
-    transitions: list[dict[str, object]] = []
-    events: list[dict[str, object]] = []
-    target_before = network_sha256(controller.target_network)
-
-    for index in range(4):
-        collector.begin(
-            0,
-            observation(index / 10.0),
-            np.asarray([index % 3, index % 2], dtype=np.int64),
-            masks(),
-        )
-        result = _complete_gate_transition(
-            collector,
-            0,
-            float(index - 1),
-            observation((index + 1) / 10.0),
-            masks(),
-            terminated=False,
-            truncated=False,
-            transitions=transitions,
-            optimization_events=events,
-            episode_index=0,
-            episode_decision_index=index,
-            expected_update_decisions=(2, 4),
-            task_name="R3J",
-        )
-        if result.updated:
-            events[-1]["online_after_sha256"] = network_sha256(
-                controller.online_network
-            )
-
-    assert controller.decision_count == 4
-    assert controller.optimizer_update_count == 2
-    assert controller.target_sync_count == 0
-    return controller, events, target_before
 
 
 class RecordingScheduledSelector:
@@ -153,13 +93,7 @@ def test_r3j_contract_schema_bindings_runtime_and_schedule_are_exact() -> None:
     ):
         binding = contract[binding_name]
         assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]
@@ -217,7 +151,9 @@ def test_r3j_contract_rejects_counter_or_epsilon_drift() -> None:
 
 
 def test_scheduled_handoff_passes_the_controller_count_and_preserves_masks() -> None:
-    controller, events, target_before = controller_after_two_updates()
+    controller, events, target_before = handoff_controller(
+        (2, 4), (-1, 0, 1, 2), task_name="R3J"
+    )
     schedule = LinearEpsilonSchedule(
         replay_warmup_decisions=2,
         decay_decisions=100,
@@ -265,7 +201,9 @@ def test_scheduled_handoff_passes_the_controller_count_and_preserves_masks() -> 
 
 
 def test_scheduled_handoff_uses_controller_count_without_copy_state() -> None:
-    controller, events, target_before = controller_after_two_updates()
+    controller, events, target_before = handoff_controller(
+        (2, 4), (-1, 0, 1, 2), task_name="R3J"
+    )
     schedule = LinearEpsilonSchedule(
         replay_warmup_decisions=2,
         decay_decisions=100,
@@ -298,7 +236,9 @@ def test_scheduled_handoff_uses_controller_count_without_copy_state() -> None:
 
 
 def test_scheduled_handoff_rejects_wrong_epsilon_or_changed_target() -> None:
-    controller, events, target_before = controller_after_two_updates()
+    controller, events, target_before = handoff_controller(
+        (2, 4), (-1, 0, 1, 2), task_name="R3J"
+    )
     selector = ScheduledEpsilonGreedyBDQActionSelector(
         controller.online_network,
         schedule=LinearEpsilonSchedule(
@@ -418,29 +358,3 @@ def test_r3j_handoff_schema_requires_schedule_evidence() -> None:
     handoff.pop("completed_transition_count_source")
     with pytest.raises(ValidationError):
         Draft202012Validator(handoff_schema).validate(handoff)
-
-
-def test_canonical_json_sha256_ignores_object_key_order() -> None:
-    first = [{"index": 0, "action": [0, 0]}]
-    second = [{"action": [0, 0], "index": 0}]
-
-    assert canonical_json_sha256(first) == canonical_json_sha256(second)
-
-
-def test_r3j_cli_separates_parent_and_worker_modes() -> None:
-    parent = parse_arguments(
-        ["--env", "player.exe", "--output", "r3j-acceptance"]
-    )
-    worker = parse_arguments(
-        [
-            "--env",
-            "player.exe",
-            "--worker-output",
-            "run-1",
-            "--worker-index",
-            "0",
-        ]
-    )
-
-    assert _execution_mode(parent) == "parent"
-    assert _execution_mode(worker) == "worker"

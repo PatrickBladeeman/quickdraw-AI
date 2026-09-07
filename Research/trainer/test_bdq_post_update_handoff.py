@@ -4,7 +4,6 @@ import copy
 import json
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -17,28 +16,15 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
-from quickdraw_bdq import (  # noqa: E402
-    BDQOptimizationSettings,
-    BDQOptimizerController,
-    DirectReplayCollector,
-    LLAPIContractError,
-    network_sha256,
-)
+from bdq_test_support import handoff_controller  # noqa: E402
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
+from quickdraw_bdq import BDQOptimizationSettings, LLAPIContractError  # noqa: E402
 from quickdraw_bdq.acceptance import (  # noqa: E402
-    canonical_json_sha256,
     masked_argmax as _masked_argmax,
     registered_settings as _registered_settings,
-    sha256_file,
 )
-from quickdraw_bdq.update_gate import (  # noqa: E402
-    _complete_gate_transition,
-    _select_post_update_greedy_action,
-)
-from run_bdq_post_update_handoff_smoke import (  # noqa: E402
-    _execution_mode,
-    parse_arguments,
-    validate_contract,
-)
+from quickdraw_bdq.update_gate import _select_post_update_greedy_action  # noqa: E402
+from run_bdq_post_update_handoff_smoke import validate_contract
 
 
 CONTRACT_PATH = HERE / "bdq-post-update-handoff-contract-v1.json"
@@ -68,59 +54,6 @@ def masks() -> tuple[np.ndarray, np.ndarray]:
     )
 
 
-def controller_after_two_updates() -> tuple[
-    BDQOptimizerController,
-    list[dict[str, object]],
-    str,
-]:
-    settings = BDQOptimizationSettings(
-        replay_capacity=8,
-        replay_warmup_decisions=2,
-        batch_size=2,
-        optimizer_update_interval_decisions=2,
-        hard_target_sync_interval_optimizer_updates=10_000,
-    )
-    controller = BDQOptimizerController(seed=51001, settings=settings)
-    collector = DirectReplayCollector(controller)
-    transitions: list[dict[str, object]] = []
-    events: list[dict[str, object]] = []
-    target_before = network_sha256(controller.target_network)
-
-    for index in range(4):
-        collector.begin(
-            0,
-            observation(index / 10.0),
-            np.asarray([index % 3, index % 2], dtype=np.int64),
-            masks(),
-        )
-        result = _complete_gate_transition(
-            collector,
-            0,
-            float(index - 1),
-            observation((index + 1) / 10.0),
-            masks(),
-            terminated=False,
-            truncated=False,
-            transitions=transitions,
-            optimization_events=events,
-            episode_index=0,
-            episode_decision_index=index,
-            expected_update_decisions=(2, 4),
-            task_name="R3H",
-        )
-        if result.updated:
-            events[-1]["online_after_sha256"] = network_sha256(
-                controller.online_network
-            )
-
-    assert controller.decision_count == 4
-    assert controller.optimizer_update_count == 2
-    assert controller.target_sync_count == 0
-    assert len(events) == 2
-    assert collector.pending_agent_ids == ()
-    return controller, events, target_before
-
-
 def test_r3h_contract_schema_binding_runtime_and_handoff_are_exact() -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     contract_schema = json.loads(CONTRACT_SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -132,13 +65,7 @@ def test_r3h_contract_schema_binding_runtime_and_handoff_are_exact() -> None:
     Draft202012Validator(contract_schema).validate(contract)
     binding = contract["base_two_update_contract"]
     assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]
@@ -178,7 +105,9 @@ def test_r3h_contract_rejects_a_drifted_r3g_binding() -> None:
 
 
 def test_post_update_handoff_uses_latest_online_network_and_legal_argmax() -> None:
-    controller, events, target_before = controller_after_two_updates()
+    controller, events, target_before = handoff_controller(
+        (2, 4), (-1, 0, 1, 2), task_name="R3H"
+    )
     decision_observation = observation(0.45)
     action_masks = (
         np.asarray([False, True, False], dtype=np.bool_),
@@ -222,7 +151,7 @@ def test_post_update_handoff_uses_latest_online_network_and_legal_argmax() -> No
 
 
 def test_post_update_handoff_rejects_a_changed_comparison_target() -> None:
-    controller, events, _ = controller_after_two_updates()
+    controller, events, _ = handoff_controller((2, 4), (-1, 0, 1, 2), task_name="R3H")
 
     with pytest.raises(LLAPIContractError, match="comparison target changed"):
         _select_post_update_greedy_action(
@@ -246,13 +175,6 @@ def test_masked_argmax_skips_unavailable_actions_and_rejects_empty_branch() -> N
 
     with pytest.raises(LLAPIContractError, match="removes every"):
         _masked_argmax([0.1, 0.2], [True, True])
-
-
-def test_canonical_json_sha256_ignores_object_key_order() -> None:
-    first = [{"index": 0, "action": [1, 0]}]
-    second = [{"action": [1, 0], "index": 0}]
-
-    assert canonical_json_sha256(first) == canonical_json_sha256(second)
 
 
 def test_r3h_handoff_schema_requires_q_value_evidence() -> None:
@@ -285,22 +207,3 @@ def test_r3h_handoff_schema_requires_q_value_evidence() -> None:
     handoff.pop("online_q_values")
     with pytest.raises(ValidationError):
         Draft202012Validator(handoff_schema).validate(handoff)
-
-
-def test_r3h_cli_separates_parent_and_worker_modes() -> None:
-    parent = parse_arguments(
-        ["--env", "player.exe", "--output", "r3h-acceptance"]
-    )
-    worker = parse_arguments(
-        [
-            "--env",
-            "player.exe",
-            "--worker-output",
-            "run-1",
-            "--worker-index",
-            "0",
-        ]
-    )
-
-    assert _execution_mode(parent) == "parent"
-    assert _execution_mode(worker) == "worker"

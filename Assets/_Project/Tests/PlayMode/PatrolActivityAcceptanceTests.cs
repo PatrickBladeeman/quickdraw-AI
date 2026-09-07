@@ -6,6 +6,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
+using static QuickDraw.Tests.PlayMode.TestReflection;
+
 namespace QuickDraw.Tests.PlayMode
 {
     public sealed class PatrolActivityAcceptanceTests
@@ -196,11 +198,5 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(_npc.transform.position.z, Is.EqualTo(expected.z).Within(0.001f));
         }
 
-        private static GameObject RequireObject(string objectName)
-        {
-            GameObject result = GameObject.Find(objectName);
-            Assert.That(result, Is.Not.Null, $"Missing {objectName}.");
-            return result;
-        }
     }
 }

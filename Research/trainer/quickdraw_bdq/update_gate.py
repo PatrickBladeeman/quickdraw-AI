@@ -16,6 +16,7 @@ from mlagents_envs.side_channel.engine_configuration_channel import (
     EngineConfigurationChannel,
 )
 
+from .provenance import sha256_file
 from .action_space import greedy_actions
 from .checkpoint import save_controller_checkpoint
 from .exploration import LinearEpsilonSchedule
@@ -43,7 +44,6 @@ from .acceptance import (
     episode_record as _episode_record,
     masks_to_json as _masks_to_json,
     registered_settings as _registered_settings,
-    sha256_file,
     transition_to_json as _transition_to_json,
 )
 

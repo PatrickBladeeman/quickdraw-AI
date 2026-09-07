@@ -5,7 +5,6 @@ import json
 import math
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     BDQOptimizerController,
@@ -28,7 +28,6 @@ from quickdraw_bdq import (  # noqa: E402
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
     registered_settings as _registered_settings,
-    sha256_file,
 )
 from quickdraw_bdq.update_gate import (  # noqa: E402
     _complete_gate_transition,
@@ -36,9 +35,12 @@ from quickdraw_bdq.update_gate import (  # noqa: E402
     _environment_side_channels,
     _optimization_event,
 )
-from run_bdq_warmup_update_smoke import (  # noqa: E402
-    _execution_mode,
-    parse_arguments,
+from quickdraw_bdq.trajectory_runner import (  # noqa: E402
+    parse_trajectory_arguments,
+    trajectory_execution_mode,
+)
+from run_bdq_warmup_update_smoke import (
+    GATE,  # noqa: E402
     validate_contract,
 )
 
@@ -78,13 +80,7 @@ def test_r3f_contract_schema_binding_runtime_and_boundary_are_exact() -> None:
     Draft202012Validator(contract_schema).validate(contract)
     binding = contract["base_epsilon_collection_contract"]
     assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]
@@ -228,14 +224,14 @@ def test_watch_engine_configuration_is_separate_from_acceptance(
 
 
 def test_watch_mode_accepts_editor_or_standalone_sources() -> None:
-    editor = parse_arguments(["--watch", "--output", "editor-watch"])
-    standalone = parse_arguments(
-        ["--watch", "--env", "player.exe", "--output", "player-watch"]
+    editor = parse_trajectory_arguments(GATE, ["--watch", "--output", "editor-watch"])
+    standalone = parse_trajectory_arguments(
+        GATE, ["--watch", "--env", "player.exe", "--output", "player-watch"]
     )
 
-    assert _execution_mode(editor) == "watch"
+    assert trajectory_execution_mode(GATE, editor) == "watch"
     assert editor.env is None
-    assert _execution_mode(standalone) == "watch"
+    assert trajectory_execution_mode(GATE, standalone) == "watch"
     assert standalone.env == Path("player.exe")
 
 
@@ -271,7 +267,7 @@ def test_invalid_watch_and_acceptance_argument_combinations_are_rejected(
     message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):
-        _execution_mode(parse_arguments(arguments))
+        trajectory_execution_mode(GATE, parse_trajectory_arguments(GATE, arguments))
 
 
 def test_collection_helper_rejects_an_update_at_the_wrong_decision() -> None:

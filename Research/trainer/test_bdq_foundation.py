@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -15,6 +14,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BRANCH_SIZES,
     COMBAT_NAMES,
@@ -34,14 +34,6 @@ from quickdraw_bdq import (  # noqa: E402
 CONTRACT_PATH = HERE / "bdq-foundation-contract-v1.json"
 SCHEMA_PATH = ROOT / "Research" / "schemas" / "bdq-foundation-contract.schema.json"
 BASIC_CONTRACT_PATH = ROOT / "Research" / "basic" / "basic-contract-v1.json"
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def observation(value: float) -> np.ndarray:

@@ -1,7 +1,7 @@
 """Shared, non-scientific plumbing for the BDQ acceptance runners.
 
 Milestone runners own their registered assertions and summaries. This module owns
-only stable serialization, runtime metadata, and fresh-process orchestration so
+only stable serialization, contract checks, and fresh-process orchestration so
 later milestones do not import implementation details from earlier runner files.
 """
 
@@ -14,7 +14,6 @@ import os
 import subprocess
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Callable, Dict, Sequence
 
@@ -22,6 +21,7 @@ import numpy as np
 import torch
 from jsonschema import Draft202012Validator
 
+from .provenance import runtime_contract, sha256_file
 from .action_space import joint_indices_from_branches
 from .llapi import LLAPIContractError, observation_sha256
 from .optimizer import BDQOptimizationSettings
@@ -34,14 +34,6 @@ ARTIFACT_ROOT = (REPO_ROOT / "Artifacts" / "Experiments").resolve()
 PYPROJECT_PATH = TRAINER_ROOT / "pyproject.toml"
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def canonical_json_sha256(value: Any) -> str:
     payload = json.dumps(
         value,
@@ -49,16 +41,6 @@ def canonical_json_sha256(value: Any) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
-
-
-def runtime_contract() -> Dict[str, str]:
-    return {
-        "python": ".".join(str(value) for value in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
 
 
 def registered_settings(settings: BDQOptimizationSettings) -> Dict[str, Any]:
@@ -229,6 +211,21 @@ def validate_runtime_and_package(
         raise LLAPIContractError(f"The {task_name} package version has drifted.")
     if "entry-points" in pyproject["project"]:
         raise LLAPIContractError("The retired trainer entry point returned.")
+
+
+def load_bound_contract(
+    binding: Dict[str, Any],
+    *,
+    schema_error: str,
+    repo_root: Path = REPO_ROOT,
+) -> Dict[str, Any]:
+    path = repo_root / binding["path"]
+    if sha256_file(path) != binding["sha256"]:
+        raise LLAPIContractError(f"Contract binding drifted: {binding['path']}.")
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    if contract["schema_version"] != binding["schema_version"]:
+        raise LLAPIContractError(schema_error)
+    return contract
 
 
 def standard_execution_mode(arguments: argparse.Namespace) -> str:

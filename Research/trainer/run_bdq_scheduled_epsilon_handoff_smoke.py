@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 
 HERE = Path(__file__).resolve().parent
@@ -17,19 +16,21 @@ from quickdraw_bdq import (  # noqa: E402
     LinearEpsilonSchedule,
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
-    ARTIFACT_ROOT,
     PYPROJECT_PATH,
-    canonical_json_sha256,
     registered_settings as _registered_settings,
-    run_fresh_worker_process,
-    sha256_file,
-    standard_execution_mode as _execution_mode,
+    load_bound_contract,
     validate_runtime_and_package,
     validate_schema_pair,
-    write_two_process_result,
 )
+from quickdraw_bdq.trajectory_validation import (  # noqa: E402
+    prefix_update_values,
+    validate_frozen_target,
+    validate_prefix_updates,
+    validate_transition_prefix,
+    validate_scheduled_selector,
+)
+from quickdraw_bdq.trajectory_runner import TrajectoryGate, run_trajectory  # noqa: E402
 from quickdraw_bdq.update_gate import (  # noqa: E402
-    execute_update_gate_worker,
     validate_update_gate_trace,
 )
 
@@ -54,34 +55,35 @@ RESULT_SCHEMA_VERSION = (
 )
 
 
+GATE = TrajectoryGate(
+    runner_path=Path(__file__),
+    contract_path=CONTRACT_PATH,
+    trace_file_name=TRACE_FILE_NAME,
+    trace_schema_version=TRACE_SCHEMA_VERSION,
+    result_schema_version=RESULT_SCHEMA_VERSION,
+    task_name="R3J",
+    description="Run two fresh continuous scheduled-epsilon collections through one live action after the second optimizer update.",
+)
+
+
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     result_schema = validate_schema_pair(
         contract, CONTRACT_SCHEMA_PATH, RESULT_SCHEMA_PATH
     )
 
     schedule_binding = contract["base_epsilon_schedule_contract"]
-    schedule_contract_path = REPO_ROOT / schedule_binding["path"]
-    if sha256_file(schedule_contract_path) != schedule_binding["sha256"]:
-        raise LLAPIContractError(
-            f"Contract binding drifted: {schedule_binding['path']}."
-        )
-    base_schedule_contract = json.loads(
-        schedule_contract_path.read_text(encoding="utf-8")
+    base_schedule_contract = load_bound_contract(
+        schedule_binding,
+        schema_error="R3J's R3I schema binding drifted.",
+        repo_root=REPO_ROOT,
     )
-    if base_schedule_contract["schema_version"] != schedule_binding[
-        "schema_version"
-    ]:
-        raise LLAPIContractError("R3J's R3I schema binding drifted.")
 
     prefix_binding = contract["live_prefix_source_contract"]
-    prefix_contract_path = REPO_ROOT / prefix_binding["path"]
-    if sha256_file(prefix_contract_path) != prefix_binding["sha256"]:
-        raise LLAPIContractError(
-            f"Contract binding drifted: {prefix_binding['path']}."
-        )
-    prefix_contract = json.loads(prefix_contract_path.read_text(encoding="utf-8"))
-    if prefix_contract["schema_version"] != prefix_binding["schema_version"]:
-        raise LLAPIContractError("R3J's R3H schema binding drifted.")
+    prefix_contract = load_bound_contract(
+        prefix_binding,
+        schema_error="R3J's R3H schema binding drifted.",
+        repo_root=REPO_ROOT,
+    )
     inherited_section = prefix_binding["inherited_section"]
     if prefix_contract[inherited_section] != contract["r3g_prefix"]:
         raise LLAPIContractError("R3J's registered R3G prefix drifted from R3H.")
@@ -180,64 +182,37 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
     )
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     prefix = contract["r3g_prefix"]
-    prefix_count = int(prefix["transition_count"])
-    if canonical_json_sha256(trace["transitions"][:prefix_count]) != prefix[
-        "canonical_transitions_sha256"
-    ]:
-        raise LLAPIContractError("R3J did not preserve the canonical R3G prefix.")
+    validate_transition_prefix(
+        trace["transitions"],
+        prefix,
+        task_name="R3J",
+        base_name="R3G",
+    )
 
     optimization = trace["optimization"]
     events = optimization["update_events"]
-    expected_events = (
-        (
-            prefix["online_after_first_update_sha256"],
-            prefix["first_update_loss"],
-            prefix["first_update_mean_absolute_td_error"],
-        ),
-        (
-            prefix["online_after_second_update_sha256"],
-            prefix["second_update_loss"],
-            prefix["second_update_mean_absolute_td_error"],
-        ),
+    validate_prefix_updates(
+        events,
+        prefix_update_values(prefix, 2),
+        task_name="R3J",
+        base_name="R3G",
     )
-    for event, (online_hash, loss, td_error) in zip(events, expected_events):
-        if event["online_after_sha256"] != online_hash:
-            raise LLAPIContractError("R3J changed an R3G post-update online hash.")
-        if event["loss"] != loss or event["mean_absolute_td_error"] != td_error:
-            raise LLAPIContractError("R3J changed an R3G optimizer metric.")
     if optimization["online_after_sha256"] != prefix[
         "online_after_second_update_sha256"
     ]:
         raise LLAPIContractError("R3J final online hash differs from R3G update 2.")
-    if optimization["target_before_sha256"] != prefix[
-        "frozen_target_sha256"
-    ] or optimization["target_after_sha256"] != prefix["frozen_target_sha256"]:
-        raise LLAPIContractError("R3J changed the frozen R3G target network.")
+    validate_frozen_target(
+        optimization,
+        prefix,
+        task_name="R3J",
+        base_name="R3G",
+    )
 
-    schedule_contract = contract["epsilon_schedule"]
-    selector = trace["selector"]
-    expected_samples = [
-        {"completed_transition_count": count, "epsilon": epsilon}
-        for count, epsilon in zip(
-            schedule_contract["trace_sample_completed_transition_counts"],
-            schedule_contract["trace_sample_epsilons"],
-        )
-    ]
-    if selector["epsilon_samples"] != expected_samples:
-        raise LLAPIContractError("R3J trace epsilon samples drifted.")
-    for key in (
-        "selection_count",
-        "full_exploration_selection_count",
-        "decay_selection_count",
-        "first_decay_completed_transition_count",
-        "last_selection_completed_transition_count",
-    ):
-        if selector[key] != schedule_contract[key]:
-            raise LLAPIContractError(f"R3J selector {key} drifted.")
-    if selector["completed_transition_count_source"] != schedule_contract[
-        "completed_transition_count_source"
-    ]:
-        raise LLAPIContractError("R3J selector counter source drifted.")
+    validate_scheduled_selector(
+        trace["selector"],
+        contract["epsilon_schedule"],
+        task_name="R3J",
+    )
 
     handoff_contract = contract["scheduled_epsilon_handoff"]
     handoff = trace["scheduled_epsilon_handoff"]
@@ -279,119 +254,8 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
         raise LLAPIContractError("R3J handoff selected an unavailable action.")
 
 
-def execute_worker(
-    executable: Path,
-    worker_output: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> Dict[str, Any]:
-    return execute_update_gate_worker(
-        executable,
-        worker_output,
-        worker_index,
-        contract,
-        contract_path=CONTRACT_PATH,
-        trace_file_name=TRACE_FILE_NAME,
-        trace_schema_version=TRACE_SCHEMA_VERSION,
-        task_name="R3J",
-        record_update_hashes=True,
-    )
-
-
-def run_fresh_worker(
-    executable: Path,
-    output_directory: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> tuple[Dict[str, Any], Path]:
-    return run_fresh_worker_process(
-        runner_path=Path(__file__),
-        executable=executable,
-        output_directory=output_directory,
-        worker_index=worker_index,
-        contract=contract,
-        trace_file_name=TRACE_FILE_NAME,
-        task_name="R3J",
-        announce=True,
-        repo_root=REPO_ROOT,
-        timeout_seconds=1800,
-    )
-
-
-def parse_arguments(
-    arguments: Sequence[str] | None = None,
-) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Run two fresh continuous scheduled-epsilon collections through "
-            "one live action after the second optimizer update."
-        )
-    )
-    parser.add_argument("--env", required=True, type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--worker-output", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-index", type=int, help=argparse.SUPPRESS)
-    return parser.parse_args(arguments)
-
-
-
-
-def main() -> int:
-    arguments = parse_arguments()
-    mode = _execution_mode(arguments)
-    executable = arguments.env.resolve()
-    if not executable.is_file():
-        raise FileNotFoundError(executable)
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    result_schema = validate_contract(contract)
-
-    if mode == "worker":
-        assert arguments.worker_output is not None
-        assert arguments.worker_index is not None
-        trace = execute_worker(
-            executable,
-            arguments.worker_output.resolve(),
-            arguments.worker_index,
-            contract,
-        )
-        validate_trace(trace, result_schema)
-        print(f"trace={arguments.worker_output.resolve() / TRACE_FILE_NAME}")
-        return 0
-
-    assert arguments.output is not None
-    output_directory = arguments.output.resolve()
-    if ARTIFACT_ROOT not in output_directory.parents:
-        raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
-    if output_directory.exists():
-        raise FileExistsError(f"R3J output must be fresh: {output_directory}.")
-    output_directory.mkdir(parents=True)
-
-    first, first_path = run_fresh_worker(
-        executable,
-        output_directory,
-        0,
-        contract,
-    )
-    second, second_path = run_fresh_worker(
-        executable,
-        output_directory,
-        1,
-        contract,
-    )
-    result_path = write_two_process_result(
-        first=first,
-        first_path=first_path,
-        second=second,
-        second_path=second_path,
-        output_directory=output_directory,
-        result_schema=result_schema,
-        result_schema_version=RESULT_SCHEMA_VERSION,
-        contract_path=CONTRACT_PATH,
-        task_name="R3J",
-        validate_trace=validate_trace,
-    )
-    handoff = first["scheduled_epsilon_handoff"]
-    print(f"result={result_path}")
+def print_summary(trace: Dict[str, Any]) -> None:
+    handoff = trace["scheduled_epsilon_handoff"]
     print("fresh_processes=2")
     print("transitions=10005")
     print("scheduled_actions=10005")
@@ -405,7 +269,15 @@ def main() -> int:
     print("continuous_scheduled_selector=pass")
     print("scheduled_handoff_legal=pass")
     print("exact_trace_equality=pass")
-    return 0
+
+
+def main() -> int:
+    return run_trajectory(
+        GATE,
+        validate_contract=validate_contract,
+        validate_trace=validate_trace,
+        summarize=print_summary,
+    )
 
 
 if __name__ == "__main__":

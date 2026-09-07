@@ -4,7 +4,6 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 import pytest
@@ -15,6 +14,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     REPLAY_MAX_ACCOUNTED_BYTES,
     LLAPIContractError,
@@ -35,14 +35,6 @@ SCHEMA_PATH = (
 R3M_CONTRACT_PATH = HERE / "bdq-fourth-update-contract-v1.json"
 BASIC_CONTRACT_PATH = ROOT / "Research" / "basic" / "basic-contract-v1.json"
 OBSERVATION_SHAPE = (84, 84, 4)
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def canonical_json_sha256(value: object) -> str:

@@ -14,6 +14,7 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     DirectReplayCollector,
@@ -29,7 +30,6 @@ from quickdraw_bdq.acceptance import (  # noqa: E402
     replay_sample_fingerprint,
     run_fresh_python_process,
     run_fresh_worker_process,
-    sha256_file,
     validate_runtime_and_package,
     validate_schema_pair,
 )

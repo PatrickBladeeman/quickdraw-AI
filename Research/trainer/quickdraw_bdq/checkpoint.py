@@ -7,7 +7,6 @@ import binascii
 import dataclasses
 import hashlib
 import json
-import sys
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -18,6 +17,7 @@ import torch
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from .provenance import runtime_contract, sha256_file
 from .exploration import LinearEpsilonSchedule
 from .llapi import (
     DirectReplayCollector,
@@ -76,16 +76,6 @@ def _active_package_version() -> str:
         raise LLAPIContractError(
             f"The {PACKAGE_DISTRIBUTION} distribution is not installed."
         ) from error
-
-
-def _runtime_contract() -> Dict[str, str]:
-    return {
-        "python": ".".join(str(value) for value in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
 
 
 def _encode_bytes_payload(data: bytes, length: int) -> str:
@@ -205,14 +195,6 @@ def _canonical_state_sha256(encoded_state: Any) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def boundary_summary(
     controller: BDQOptimizerController,
     selector: ScheduledEpsilonGreedyBDQActionSelector,
@@ -297,13 +279,13 @@ def save_controller_checkpoint(
     encoded_state = _encode_state(state)
     checkpoint = {
         "schema_version": CHECKPOINT_SCHEMA_VERSION,
-        "contract_sha256": _sha256_file(CHECKPOINT_CONTRACT_PATH),
+        "contract_sha256": sha256_file(CHECKPOINT_CONTRACT_PATH),
         "identity": {
             "package": {
                 "distribution": PACKAGE_DISTRIBUTION,
                 "version": _active_package_version(),
             },
-            "runtime": _runtime_contract(),
+            "runtime": runtime_contract(),
             "settings": dataclasses.asdict(controller.settings),
             "seeds": {
                 "controller_seed": controller.seed,
@@ -351,7 +333,7 @@ def load_controller_checkpoint(
 
     if checkpoint["schema_version"] != CHECKPOINT_SCHEMA_VERSION:
         raise LLAPIContractError("Checkpoint schema version is incompatible.")
-    if checkpoint["contract_sha256"] != _sha256_file(CHECKPOINT_CONTRACT_PATH):
+    if checkpoint["contract_sha256"] != sha256_file(CHECKPOINT_CONTRACT_PATH):
         raise LLAPIContractError("Checkpoint contract binding has drifted.")
     identity = checkpoint["identity"]
     if identity["package"] != {
@@ -359,7 +341,7 @@ def load_controller_checkpoint(
         "version": _active_package_version(),
     }:
         raise LLAPIContractError("Checkpoint package identity is incompatible.")
-    if identity["runtime"] != _runtime_contract():
+    if identity["runtime"] != runtime_contract():
         raise LLAPIContractError("Checkpoint runtime is incompatible.")
     if identity["settings"] != dataclasses.asdict(settings):
         raise LLAPIContractError("Checkpoint settings are incompatible.")

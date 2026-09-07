@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import base64
-import copy
 import hashlib
 import json
+import subprocess
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Callable
 
@@ -20,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     BDQOptimizerController,
@@ -42,6 +42,7 @@ from run_bdq_checkpoint_roundtrip_smoke import (  # noqa: E402
     parse_arguments,
     validate_contract,
 )
+import run_bdq_checkpoint_roundtrip_smoke as runner  # noqa: E402
 
 
 CONTRACT_PATH = HERE / "bdq-checkpoint-contract-v1.json"
@@ -72,14 +73,6 @@ def _settings() -> BDQOptimizationSettings:
         batch_size=8,
         optimizer_update_interval_decisions=4,
     )
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _build_to_boundary() -> tuple[
@@ -149,14 +142,8 @@ def test_r3p_contract_schema_binding_and_registration_are_exact() -> None:
     Draft202012Validator.check_schema(result_schema)
     Draft202012Validator(contract_schema).validate(contract)
     binding = contract["base_fifth_update_contract"]
-    assert _sha256_file(ROOT / binding["path"]) == binding["sha256"]
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]
@@ -306,7 +293,7 @@ def test_r3p_checkpoint_file_bytes_are_deterministic(
     )
 
     assert first_path.read_bytes() == second_path.read_bytes()
-    assert _sha256_file(first_path) == _sha256_file(second_path)
+    assert sha256_file(first_path) == sha256_file(second_path)
 
 
 def test_r3p_checkpoint_schema_validates_the_saved_file(
@@ -573,3 +560,54 @@ def test_r3p_cli_separates_parent_and_worker_modes() -> None:
         )
     with pytest.raises(ValueError, match="Parent mode"):
         _execution_mode(parse_arguments(["--checkpoint", "checkpoint.json"]))
+
+
+@pytest.mark.parametrize("failing_role", ["saver", "reference", "restored"])
+def test_r3p_process_roles_keep_launch_order_arguments_and_failure_context(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failing_role: str,
+) -> None:
+    output = tmp_path / "roundtrip"
+    calls = []
+
+    def complete(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        role = command[command.index("--mode") + 1]
+        calls.append(role)
+        expected = [
+            sys.executable,
+            "-B",
+            str(Path(runner.__file__).resolve()),
+            "--mode",
+            role,
+        ]
+        if role != "reference":
+            expected.extend(["--checkpoint", str(output / "checkpoint.json")])
+        expected.extend(["--summary", str(output / f"{role}.json")])
+        assert command == expected
+        assert kwargs["cwd"] == ROOT
+        assert kwargs["timeout"] == 600
+        assert kwargs["env"]["OMP_NUM_THREADS"] == "1"
+        assert kwargs["env"]["MKL_NUM_THREADS"] == "1"
+        return subprocess.CompletedProcess(
+            command,
+            7 if role == failing_role else 0,
+            stdout=f"{role} output\n",
+        )
+
+    monkeypatch.setattr(runner, "ARTIFACT_ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", [runner.__file__, "--output", str(output)])
+    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.run", complete)
+    with pytest.raises(RuntimeError) as error:
+        runner.main()
+    roles = ["saver", "reference", "restored"]
+    assert calls == roles[: roles.index(failing_role) + 1]
+    assert str(error.value) == (
+        f"R3P worker {failing_role}.log failed with exit code 7; "
+        f"see {output / (failing_role + '.log')}."
+    )
+    for role in calls:
+        assert (output / f"{role}.log").read_text(
+            encoding="utf-8"
+        ) == f"{role} output\n"
+    assert not (output / "result.json").exists()

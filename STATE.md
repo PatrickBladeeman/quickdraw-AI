@@ -1,6 +1,6 @@
 # quickdraw-AI — Current State
 
-Last verified: 2026-09-04
+Last verified: 2026-09-07
 
 This file is the canonical answer to **what is true right now**. It records
 implementation and verification status, not the registered experiment design
@@ -14,10 +14,9 @@ or detailed acceptance evidence.
 
 ## Repository checkpoint
 
-- Branch: `main`, with the R3Q implementation and evidence changes currently
-  uncommitted and unpushed by instruction.
-- The last pushed research boundary remains the R3P boundary below; the
-  working-tree changes are intentionally not represented by a commit hash.
+- Task-start branch: `main`; HEAD and local `origin/main` both pointed to
+  `549617b08b0d88199c0a97531350d9c61a2428ae`, the R3Q checkpoint implementation.
+  The second implementation-consolidation changes are currently uncommitted.
 - The hierarchical documentation migration and its QA cleanup are committed
   and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
   `abd240f9551bfc077e38672f06e7071d5480bc44`.
@@ -25,9 +24,10 @@ or detailed acceptance evidence.
   and pushed in `75bfb6427a1f17518e0b8487d7cdf8c31399f7d8`.
 - The acceptance-harness consolidation and repository-wide bloat-control rule
   are committed and pushed in `4fa825b6c8ca45797abaaf6da85cde9357aa3657`.
-- The verified research implementation frontier is R3Q in the current working
-  tree (uncommitted and unpushed by instruction), extending the committed R3P
-  deterministic Python-only trainer checkpoint round-trip.
+- The verified research implementation frontier is committed R3Q, extending
+  the R3P deterministic Python-only trainer checkpoint round-trip. The R3Q
+  evidence record's uncommitted status describes its original verification
+  date; this repository checkpoint supersedes that historical status.
 - The verified live Unity frontier remains R3O at
   `028143fff494c6234fd17832dd41199aee5a6fad`: bounded scheduled optimizer
   update 5 at transition 10,016. R3P does not extend that live trajectory.
@@ -145,8 +145,7 @@ support.
 - R3P is implemented, accepted, committed, and pushed. Its acceptance is
   Python-only: it does not open a Unity rollout, resume of the frozen Unity
   trajectory, or any new environment interaction.
-- R3Q is implemented and verified in the current working tree, but remains
-  uncommitted and unpushed by instruction. It does not open transition 10,017,
+- R3Q is implemented, verified, and committed. It does not open transition 10,017,
   select an action after update 5, synchronize the target, resume Unity, or
   authorize extended training/export.
 - Local context and handoff archives are intentionally ignored. Their absence
@@ -157,7 +156,7 @@ support.
 A conservative consolidation of the Python research acceptance harness is
 implemented, verified, committed, and pushed at
 `4fa825b6c8ca45797abaaf6da85cde9357aa3657`.
-Generic acceptance utilities and the shared update-gate implementation now
+Generic acceptance utilities and the shared update-gate implementation
 live in capability-oriented `quickdraw_bdq` modules while all historical
 runner paths remain compatibility entry points.
 
@@ -166,7 +165,30 @@ independent read-only contract review found no blocking drift, and all frozen
 contracts, schemas, evidence, and original production-core files remain
 byte-identical. This work does not advance the R3 research frontier, change any
 registered research value or accepted result, or authorize new Unity
-collection. [`TASK.md`](TASK.md) owns its exact scope and outcome.
+collection.
+
+The second implementation consolidation is complete and remains uncommitted.
+It shares the eight trajectory entry flows, repeated contract/prefix validation,
+scheduled-update test fixtures,
+PlayMode reflection helpers, raw-file/runtime provenance, R3P process launch,
+and Unity build/report handling. Historical commands and frozen research
+formats remain intact; [`ARCH.md`](ARCH.md) owns the new module boundaries.
+The three collection loops remain distinct because sharing their substantial
+body would require new event-order tests and more control machinery.
+
+The complete trainer suite passes 277 cases and the unchanged 41 PlayMode
+cases pass. Both historical Unity build entry methods produced fresh players
+from existing scenes. R3O traces/results and R3P/R3Q checkpoints/results match
+the accepted raw bytes. All 21 explicit path/SHA contract
+bindings pass. Of 273 task-start manifest entries, 272 match and one records
+ML-Agents rewriting the historical player's unbound `Research_Basic_timers.json`
+timing log. Its original hash and the failed strict audit are retained. On
+2026-09-07 the user authorized completion without restoring that log; the
+exception remains explicit in the complete manifest comparison. Two read-only
+Kilo reviews covered the change; the first review's render-asset line-ending
+finding was resolved, and the second found no substantive new issue.
+Verification passes within the updated authorized scope.
+[`TASK.md`](TASK.md) owns the authorized maintenance boundary.
 
 ## Current boundary
 
@@ -174,7 +196,7 @@ R3P is implemented, accepted, committed, and pushed at
 `0d78c783897225395ed44304fb6b0124a4620582`. The live Unity boundary remains
 R3O at 10,016 transitions with five optimizer updates, zero target
 synchronizations, and no post-update action. R3Q is implemented and verified
-in the current working tree (uncommitted and unpushed by instruction): the
+at the committed repository checkpoint above: the
 live-derived state was saved and restored in a fresh Python process without
 Unity with exact next-sample parity. R3Q does not resume Unity or extend that
 live boundary.

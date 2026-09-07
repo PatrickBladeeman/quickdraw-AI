@@ -9,6 +9,8 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
+using static QuickDraw.Tests.PlayMode.TestReflection;
+
 namespace QuickDraw.Tests.PlayMode
 {
     public sealed class AimThreatEmitterAcceptanceTests : InputTestFixture
@@ -199,25 +201,11 @@ namespace QuickDraw.Tests.PlayMode
             _lastEndStimulus = stimulus;
         }
 
-        private static Type RequireType(string qualifiedName)
-        {
-            Type type = Type.GetType(qualifiedName);
-            Assert.That(type, Is.Not.Null, $"Could not find {qualifiedName}.");
-            return type;
-        }
-
         private static void AssertFieldContract(Type type, string fieldName, Type fieldType)
         {
             FieldInfo field = type.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
             Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
             Assert.That(field.FieldType, Is.EqualTo(fieldType));
-        }
-
-        private static T ReadPrivateField<T>(object instance, string fieldName)
-        {
-            FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
-            return (T)field.GetValue(instance);
         }
 
         private static T ReadPublicField<T>(object instance, string fieldName)
@@ -242,11 +230,5 @@ namespace QuickDraw.Tests.PlayMode
             setter.Invoke(controller, new object[] { isAiming });
         }
 
-        private static void InvokePrivate(object instance, string methodName, params object[] arguments)
-        {
-            MethodInfo method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
-            method.Invoke(instance, arguments);
-        }
     }
 }

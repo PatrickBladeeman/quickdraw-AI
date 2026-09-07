@@ -75,6 +75,14 @@ strategic mechanics belong in a separate future scene.
 - `QuickDraw.Research.Basic` owns the Basic scene contract, visual sensor,
   episode state, target, actuator, and ML-Agents agent lifecycle.
 
+Within the existing PlayMode test assembly, `TestReflection` owns matching
+type/object lookup and reflection helpers; fixture lifetimes and assertions
+remain with each test. Its private-only invocation is distinct from general
+invocation. Structured telemetry keeps its overload resolver locally.
+`ResearchPlayerBuild` shares command-line lookup and Windows player build/report
+handling. Basic keeps its synchronous asset refresh; Smoke alone rebuilds a
+missing scene. Their public build entry methods and output options remain intact.
+
 ### Implemented Python package
 
 `Research/trainer/quickdraw_bdq` is split by responsibility:
@@ -93,9 +101,18 @@ strategic mechanics belong in a separate future scene.
 - `checkpoint.py` owns the versioned fail-closed trainer checkpoint: exact
   state encoding, identity binding, integrity hashing, and clean-boundary
   save plus fresh-object restore.
+- `provenance.py` owns raw-file SHA-256 and registered CPU runtime identity,
+  using only the standard library. Checkpoint persistence imports it directly;
+  structured hashing protocols retain their existing serialization owners.
 - `acceptance.py` owns reusable, non-scientific acceptance plumbing: canonical
   hashing and serialization, runtime/package checks, execution-mode checks,
   fresh-process launch, deterministic worker comparison, and result writing.
+- `trajectory_runner.py` owns the ordinary two-worker trajectory entry flow,
+  configured explicitly for the eight historical update/handoff commands.
+  Only R3F supports watch; only R3L/R3M/R3O support completed-trace comparison.
+- `trajectory_validation.py` owns repeated contract relationships, explicit
+  ordinal prefix comparisons, scheduled-selector checks, and frozen-target
+  checks. Entry points retain schema validation and distinct research assertions.
 - `update_gate.py` owns the shared bounded Unity collection and optimizer-gate
   mechanism used by the update-trajectory milestones, including the optional
   clean-boundary handoff into `checkpoint.py`.
@@ -107,6 +124,11 @@ gates. They are not a separate training framework and must not become the
 canonical owner of generic behavior needed by another milestone. The retired
 high-level ML-Agents `Trainer`/`Policy`/`Trajectory` experiment is historical,
 not an available runtime path.
+
+R3P retains its ordered saver/reference/restorer protocol and R3Q its live-saver
+and Python-restorer protocol; both use the common process launcher. Neither is
+adapted to the two-identical-worker trajectory flow. Direct LLAPI, pre-warmup
+epsilon collection, and optimizer-gate loops retain their distinct event order.
 
 ### Planned research modules
 

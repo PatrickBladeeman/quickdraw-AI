@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 
 HERE = Path(__file__).resolve().parent
@@ -18,21 +17,21 @@ from quickdraw_bdq import (  # noqa: E402
     LinearEpsilonSchedule,
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
-    ARTIFACT_ROOT,
     PYPROJECT_PATH,
-    canonical_json_sha256,
-    comparison_execution_mode as _execution_mode,
     masked_argmax as _masked_argmax,
     registered_settings as _registered_settings,
-    run_fresh_worker_process,
-    sha256_file,
-    validate_distinct_trace_paths as _validate_distinct_trace_paths_common,
+    load_bound_contract,
     validate_runtime_and_package,
     validate_schema_pair,
-    write_two_process_result,
 )
+from quickdraw_bdq.trajectory_validation import (  # noqa: E402
+    prefix_update_values,
+    validate_frozen_target,
+    validate_prefix_updates,
+    validate_transition_prefix,
+)
+from quickdraw_bdq.trajectory_runner import TrajectoryGate, run_trajectory  # noqa: E402
 from quickdraw_bdq.update_gate import (  # noqa: E402
-    execute_update_gate_worker,
     validate_update_gate_trace,
 )
 
@@ -57,18 +56,29 @@ RESULT_SCHEMA_VERSION = (
 )
 
 
+GATE = TrajectoryGate(
+    runner_path=Path(__file__),
+    contract_path=CONTRACT_PATH,
+    trace_file_name=TRACE_FILE_NAME,
+    trace_schema_version=TRACE_SCHEMA_VERSION,
+    result_schema_version=RESULT_SCHEMA_VERSION,
+    task_name="R3L",
+    description="Run two fresh R3K-prefix collections followed by one update-3 diagnostic masked-greedy Unity transition.",
+    cli="comparison",
+)
+
+
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     result_schema = validate_schema_pair(
         contract, CONTRACT_SCHEMA_PATH, RESULT_SCHEMA_PATH
     )
 
     binding = contract["base_third_update_contract"]
-    base_contract_path = REPO_ROOT / binding["path"]
-    if sha256_file(base_contract_path) != binding["sha256"]:
-        raise LLAPIContractError(f"Contract binding drifted: {binding['path']}.")
-    base_contract = json.loads(base_contract_path.read_text(encoding="utf-8"))
-    if base_contract["schema_version"] != binding["schema_version"]:
-        raise LLAPIContractError("R3L's R3K schema binding drifted.")
+    base_contract = load_bound_contract(
+        binding,
+        schema_error="R3L's R3K schema binding drifted.",
+        repo_root=REPO_ROOT,
+    )
 
     validate_runtime_and_package(contract, "R3L", pyproject_path=PYPROJECT_PATH)
     for key in ("runtime", "package", "transport", "optimization"):
@@ -174,44 +184,31 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
     )
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     prefix = contract["r3k_prefix"]
-    prefix_count = int(prefix["transition_count"])
-    if canonical_json_sha256(trace["transitions"][:prefix_count]) != prefix[
-        "canonical_transitions_sha256"
-    ]:
-        raise LLAPIContractError("R3L did not preserve the canonical R3K prefix.")
+    validate_transition_prefix(
+        trace["transitions"],
+        prefix,
+        task_name="R3L",
+        base_name="R3K",
+    )
 
     optimization = trace["optimization"]
     events = optimization["update_events"]
-    expected_events = (
-        (
-            prefix["online_after_first_update_sha256"],
-            prefix["first_update_loss"],
-            prefix["first_update_mean_absolute_td_error"],
-        ),
-        (
-            prefix["online_after_second_update_sha256"],
-            prefix["second_update_loss"],
-            prefix["second_update_mean_absolute_td_error"],
-        ),
-        (
-            prefix["online_after_third_update_sha256"],
-            prefix["third_update_loss"],
-            prefix["third_update_mean_absolute_td_error"],
-        ),
+    validate_prefix_updates(
+        events,
+        prefix_update_values(prefix, 3),
+        task_name="R3L",
+        base_name="R3K",
     )
-    for event, (online_hash, loss, td_error) in zip(events, expected_events):
-        if event["online_after_sha256"] != online_hash:
-            raise LLAPIContractError("R3L changed an R3K post-update online hash.")
-        if event["loss"] != loss or event["mean_absolute_td_error"] != td_error:
-            raise LLAPIContractError("R3L changed an R3K optimizer metric.")
     if optimization["online_after_sha256"] != prefix[
         "online_after_third_update_sha256"
     ]:
         raise LLAPIContractError("R3L final online hash differs from R3K update 3.")
-    if optimization["target_before_sha256"] != prefix[
-        "frozen_target_sha256"
-    ] or optimization["target_after_sha256"] != prefix["frozen_target_sha256"]:
-        raise LLAPIContractError("R3L changed the frozen R3K target network.")
+    validate_frozen_target(
+        optimization,
+        prefix,
+        task_name="R3L",
+        base_name="R3K",
+    )
 
     collection = contract["collection"]
     schedule_contract = contract["epsilon_schedule"]
@@ -317,180 +314,8 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
         raise LLAPIContractError("R3L greedy handoff action is unavailable.")
 
 
-def execute_worker(
-    executable: Path,
-    worker_output: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> Dict[str, Any]:
-    return execute_update_gate_worker(
-        executable,
-        worker_output,
-        worker_index,
-        contract,
-        contract_path=CONTRACT_PATH,
-        trace_file_name=TRACE_FILE_NAME,
-        trace_schema_version=TRACE_SCHEMA_VERSION,
-        task_name="R3L",
-        record_update_hashes=True,
-    )
-
-
-def run_fresh_worker(
-    executable: Path,
-    output_directory: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> tuple[Dict[str, Any], Path]:
-    return run_fresh_worker_process(
-        runner_path=Path(__file__),
-        executable=executable,
-        output_directory=output_directory,
-        worker_index=worker_index,
-        contract=contract,
-        trace_file_name=TRACE_FILE_NAME,
-        task_name="R3L",
-        announce=True,
-        repo_root=REPO_ROOT,
-        timeout_seconds=1800,
-    )
-
-
-def _validate_distinct_trace_paths(first_path: Path, second_path: Path) -> None:
-    _validate_distinct_trace_paths_common(
-        first_path,
-        second_path,
-        task_name="R3L",
-    )
-
-
-def _write_acceptance_result(
-    first: Dict[str, Any],
-    first_path: Path,
-    second: Dict[str, Any],
-    second_path: Path,
-    output_directory: Path,
-    result_schema: Dict[str, Any],
-) -> tuple[Path, Dict[str, Any]]:
-    result_path = write_two_process_result(
-        first=first,
-        first_path=first_path,
-        second=second,
-        second_path=second_path,
-        output_directory=output_directory,
-        result_schema=result_schema,
-        result_schema_version=RESULT_SCHEMA_VERSION,
-        contract_path=CONTRACT_PATH,
-        task_name="R3L",
-        validate_trace=validate_trace,
-    )
-    return result_path, first
-
-
-def parse_arguments(
-    arguments: Sequence[str] | None = None,
-) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Run two fresh R3K-prefix collections followed by one update-3 "
-            "diagnostic masked-greedy Unity transition."
-        )
-    )
-    parser.add_argument("--env", type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument(
-        "--first-trace",
-        type=Path,
-        help=(
-            "Validate an already completed fresh-process trace together with "
-            "--second-trace instead of launching new workers."
-        ),
-    )
-    parser.add_argument(
-        "--second-trace",
-        type=Path,
-        help=(
-            "Second independently collected fresh-process trace for recovery "
-            "validation."
-        ),
-    )
-    parser.add_argument("--worker-output", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-index", type=int, help=argparse.SUPPRESS)
-    return parser.parse_args(arguments)
-
-
-
-
-def main() -> int:
-    arguments = parse_arguments()
-    mode = _execution_mode(arguments)
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    result_schema = validate_contract(contract)
-
-    if mode == "worker":
-        assert arguments.env is not None
-        assert arguments.worker_output is not None
-        assert arguments.worker_index is not None
-        executable = arguments.env.resolve()
-        if not executable.is_file():
-            raise FileNotFoundError(executable)
-        trace = execute_worker(
-            executable,
-            arguments.worker_output.resolve(),
-            arguments.worker_index,
-            contract,
-        )
-        validate_trace(trace, result_schema)
-        print(f"trace={arguments.worker_output.resolve() / TRACE_FILE_NAME}")
-        return 0
-
-    assert arguments.output is not None
-    output_directory = arguments.output.resolve()
-    if ARTIFACT_ROOT not in output_directory.parents:
-        raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
-    if output_directory.exists():
-        raise FileExistsError(f"R3L output must be fresh: {output_directory}.")
-
-    if mode == "compare":
-        assert arguments.first_trace is not None
-        assert arguments.second_trace is not None
-        first_path = arguments.first_trace.resolve()
-        second_path = arguments.second_trace.resolve()
-        _validate_distinct_trace_paths(first_path, second_path)
-        first = json.loads(first_path.read_text(encoding="utf-8"))
-        second = json.loads(second_path.read_text(encoding="utf-8"))
-    else:
-        assert arguments.env is not None
-        executable = arguments.env.resolve()
-        if not executable.is_file():
-            raise FileNotFoundError(executable)
-        output_directory.mkdir(parents=True)
-        first, first_path = run_fresh_worker(
-            executable,
-            output_directory,
-            0,
-            contract,
-        )
-        second, second_path = run_fresh_worker(
-            executable,
-            output_directory,
-            1,
-            contract,
-        )
-
-    result_path, accepted_trace = _write_acceptance_result(
-        first,
-        first_path,
-        second,
-        second_path,
-        output_directory,
-        result_schema,
-    )
-
-    handoff = accepted_trace["post_update_greedy_handoff"]
-    print(f"result={result_path}")
-    print(f"first_trace={first_path}")
-    print(f"second_trace={second_path}")
+def print_summary(trace: Dict[str, Any]) -> None:
+    handoff = trace["post_update_greedy_handoff"]
     print("fresh_processes=2")
     print("transitions=10009")
     print("r3k_prefix_transitions=10008")
@@ -500,8 +325,8 @@ def main() -> int:
     print(f"max_absolute_q_delta={handoff['max_absolute_q_delta']}")
     print(f"online_sha256={handoff['online_sha256']}")
     print(f"target_sha256={handoff['target_sha256']}")
-    print(f"completed_episodes={accepted_trace['completed_episode_count']}")
-    print(f"truncation_events={len(accepted_trace['truncation_events'])}")
+    print(f"completed_episodes={trace['completed_episode_count']}")
+    print(f"truncation_events={len(trace['truncation_events'])}")
     print("pending_decisions=0")
     print("optimizer_updates=3")
     print("target_synchronizations=0")
@@ -510,7 +335,15 @@ def main() -> int:
     print("masked_greedy_handoff=pass")
     print("no_fourth_update=pass")
     print("exact_trace_equality=pass")
-    return 0
+
+
+def main() -> int:
+    return run_trajectory(
+        GATE,
+        validate_contract=validate_contract,
+        validate_trace=validate_trace,
+        summarize=print_summary,
+    )
 
 
 if __name__ == "__main__":

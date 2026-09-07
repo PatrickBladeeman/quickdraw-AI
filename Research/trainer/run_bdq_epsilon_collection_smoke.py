@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BASIC_BEHAVIOR_NAME,
     BDQOptimizationSettings,
@@ -35,7 +36,6 @@ from quickdraw_bdq.acceptance import (  # noqa: E402
     episode_record as _episode_record,
     masks_to_json as _masks_to_json,
     run_fresh_worker_process,
-    sha256_file,
     transition_to_json as _transition_to_json,
     validate_runtime_and_package,
     validate_schema_pair,

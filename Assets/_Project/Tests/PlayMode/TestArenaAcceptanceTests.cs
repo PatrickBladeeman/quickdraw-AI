@@ -6,6 +6,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
+using static QuickDraw.Tests.PlayMode.TestReflection;
+
 namespace QuickDraw.Tests.PlayMode
 {
     public sealed class TestArenaAcceptanceTests
@@ -129,13 +131,6 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(divider.bounds.min.y, Is.LessThanOrEqualTo(0.01f));
             Assert.That(divider.bounds.max.y, Is.GreaterThanOrEqualTo(2.79f));
             Assert.That(lowBlock.bounds.max.y, Is.EqualTo(1f).Within(0.01f));
-        }
-
-        private static GameObject RequireObject(string objectName)
-        {
-            GameObject result = GameObject.Find(objectName);
-            Assert.That(result, Is.Not.Null, $"Missing {objectName}.");
-            return result;
         }
 
         private static void AssertWallHit(Vector3 start, Vector3 direction, string expectedWall, int geometryMask)

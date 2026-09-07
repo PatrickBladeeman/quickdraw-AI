@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 import math
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +18,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     LinearEpsilonSchedule,
@@ -33,14 +32,6 @@ CONTRACT_SCHEMA_PATH = (
 )
 BASE_CONTRACT_PATH = HERE / "bdq-post-update-handoff-contract-v1.json"
 PYPROJECT_PATH = HERE / "pyproject.toml"
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def observation(value: float = 0.25) -> np.ndarray:
@@ -83,13 +74,7 @@ def test_r3i_contract_schema_hash_runtime_and_defaults_are_exact() -> None:
         "sha256": sha256_file(BASE_CONTRACT_PATH),
         "schema_version": base_contract["schema_version"],
     }
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]

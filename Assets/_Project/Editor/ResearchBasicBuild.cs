@@ -1,11 +1,9 @@
 using System;
-using System.IO;
 using QuickDraw.Research.Basic;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Policies;
 using UnityEditor;
-using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -212,34 +210,9 @@ namespace QuickDraw.Editor
         public static void BuildWindows()
         {
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            string outputPath = GetCommandLineValue(OutputArgument) ?? DefaultOutput;
-            string absoluteOutput = Path.GetFullPath(outputPath);
-            string outputDirectory = Path.GetDirectoryName(absoluteOutput);
-            if (string.IsNullOrEmpty(outputDirectory))
-            {
-                throw new InvalidOperationException("Basic build output has no directory.");
-            }
-
-            Directory.CreateDirectory(outputDirectory);
-            BuildReport report = BuildPipeline.BuildPlayer(
-                new BuildPlayerOptions
-                {
-                    scenes = new[] { ScenePath },
-                    locationPathName = absoluteOutput,
-                    target = BuildTarget.StandaloneWindows64,
-                    options = BuildOptions.None
-                });
-
-            if (report.summary.result != BuildResult.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    $"Research Basic build failed: {report.summary.result} " +
-                    $"({report.summary.totalErrors} errors)." );
-            }
-
-            Debug.Log(
-                $"Research Basic build succeeded at {absoluteOutput} " +
-                $"({report.summary.totalSize} bytes)." );
+            string outputPath =
+                ResearchPlayerBuild.GetCommandLineValue(OutputArgument) ?? DefaultOutput;
+            ResearchPlayerBuild.BuildWindows(ScenePath, outputPath, "Basic", "Basic");
         }
 
         private static GameObject CreatePrimitive(
@@ -366,23 +339,6 @@ namespace QuickDraw.Editor
             }
 
             return property;
-        }
-
-        private static string GetCommandLineValue(string argumentName)
-        {
-            string[] arguments = Environment.GetCommandLineArgs();
-            for (int index = 0; index < arguments.Length - 1; index++)
-            {
-                if (string.Equals(
-                        arguments[index],
-                        argumentName,
-                        StringComparison.Ordinal))
-                {
-                    return arguments[index + 1];
-                }
-            }
-
-            return null;
         }
     }
 }

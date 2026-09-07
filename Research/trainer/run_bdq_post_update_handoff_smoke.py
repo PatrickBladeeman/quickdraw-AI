@@ -1,36 +1,36 @@
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     LLAPIContractError,
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
-    ARTIFACT_ROOT,
     PYPROJECT_PATH,
-    canonical_json_sha256,
     masked_argmax as _masked_argmax,
     registered_settings as _registered_settings,
-    run_fresh_worker_process,
-    sha256_file,
-    standard_execution_mode as _execution_mode,
     validate_runtime_and_package,
     validate_schema_pair,
-    write_two_process_result,
 )
+from quickdraw_bdq.trajectory_validation import (  # noqa: E402
+    prefix_update_values,
+    validate_frozen_target,
+    validate_prefix_updates,
+    validate_transition_prefix,
+)
+from quickdraw_bdq.trajectory_runner import TrajectoryGate, run_trajectory  # noqa: E402
 from quickdraw_bdq.update_gate import (  # noqa: E402
-    execute_update_gate_worker,
     validate_update_gate_trace,
 )
 
@@ -51,6 +51,17 @@ RESULT_SCHEMA_PATH = (
 TRACE_FILE_NAME = "r3h-post-update-handoff-trace.json"
 TRACE_SCHEMA_VERSION = "quickdraw.bdq-post-update-handoff-trace.v1"
 RESULT_SCHEMA_VERSION = "quickdraw.bdq-post-update-handoff-smoke-result.v1"
+
+
+GATE = TrajectoryGate(
+    runner_path=Path(__file__),
+    contract_path=CONTRACT_PATH,
+    trace_file_name=TRACE_FILE_NAME,
+    trace_schema_version=TRACE_SCHEMA_VERSION,
+    result_schema_version=RESULT_SCHEMA_VERSION,
+    task_name="R3H",
+    description="Run two fresh R3G-prefix collections followed by one post-update masked-greedy Unity transition.",
+)
 
 
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
@@ -123,43 +134,31 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
     )
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     prefix_contract = contract["r3g_prefix"]
-    prefix_count = int(prefix_contract["transition_count"])
-    prefix_hash = canonical_json_sha256(trace["transitions"][:prefix_count])
-    if prefix_hash != prefix_contract["canonical_transitions_sha256"]:
-        raise LLAPIContractError("R3H did not preserve the canonical R3G prefix.")
+    prefix_count = validate_transition_prefix(
+        trace["transitions"],
+        prefix_contract,
+        task_name="R3H",
+        base_name="R3G",
+    )
 
     optimization = trace["optimization"]
     events = optimization["update_events"]
-    expected_event_values = (
-        (
-            prefix_contract["online_after_first_update_sha256"],
-            prefix_contract["first_update_loss"],
-            prefix_contract["first_update_mean_absolute_td_error"],
-        ),
-        (
-            prefix_contract["online_after_second_update_sha256"],
-            prefix_contract["second_update_loss"],
-            prefix_contract["second_update_mean_absolute_td_error"],
-        ),
-    )
-    for event, (online_hash, loss, td_error) in zip(
+    validate_prefix_updates(
         events,
-        expected_event_values,
-    ):
-        if event["online_after_sha256"] != online_hash:
-            raise LLAPIContractError("R3H changed an R3G post-update online hash.")
-        if event["loss"] != loss or event["mean_absolute_td_error"] != td_error:
-            raise LLAPIContractError("R3H changed an R3G optimizer metric.")
+        prefix_update_values(prefix_contract, 2),
+        task_name="R3H",
+        base_name="R3G",
+    )
     if optimization["online_after_sha256"] != prefix_contract[
         "online_after_second_update_sha256"
     ]:
         raise LLAPIContractError("R3H final online hash differs from R3G update 2.")
-    if optimization["target_before_sha256"] != prefix_contract[
-        "frozen_target_sha256"
-    ] or optimization["target_after_sha256"] != prefix_contract[
-        "frozen_target_sha256"
-    ]:
-        raise LLAPIContractError("R3H changed the frozen R3G target network.")
+    validate_frozen_target(
+        optimization,
+        prefix_contract,
+        task_name="R3H",
+        base_name="R3G",
+    )
 
     selector = trace["selector"]
     if selector["seeded_random_selection_count"] != prefix_count:
@@ -226,117 +225,8 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
         raise LLAPIContractError("R3H greedy handoff action is unavailable.")
 
 
-def execute_worker(
-    executable: Path,
-    worker_output: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> Dict[str, Any]:
-    return execute_update_gate_worker(
-        executable,
-        worker_output,
-        worker_index,
-        contract,
-        contract_path=CONTRACT_PATH,
-        trace_file_name=TRACE_FILE_NAME,
-        trace_schema_version=TRACE_SCHEMA_VERSION,
-        task_name="R3H",
-        record_update_hashes=True,
-    )
-
-
-def run_fresh_worker(
-    executable: Path,
-    output_directory: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> tuple[Dict[str, Any], Path]:
-    return run_fresh_worker_process(
-        runner_path=Path(__file__),
-        executable=executable,
-        output_directory=output_directory,
-        worker_index=worker_index,
-        contract=contract,
-        trace_file_name=TRACE_FILE_NAME,
-        task_name="R3H",
-        announce=True,
-        repo_root=REPO_ROOT,
-        timeout_seconds=1800,
-    )
-
-
-def parse_arguments(
-    arguments: Sequence[str] | None = None,
-) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Run two fresh R3G-prefix collections followed by one post-update "
-            "masked-greedy Unity transition."
-        )
-    )
-    parser.add_argument("--env", required=True, type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--worker-output", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-index", type=int, help=argparse.SUPPRESS)
-    return parser.parse_args(arguments)
-
-
-def main() -> int:
-    arguments = parse_arguments()
-    mode = _execution_mode(arguments)
-    executable = arguments.env.resolve()
-    if not executable.is_file():
-        raise FileNotFoundError(executable)
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    result_schema = validate_contract(contract)
-
-    if mode == "worker":
-        assert arguments.worker_output is not None
-        assert arguments.worker_index is not None
-        trace = execute_worker(
-            executable,
-            arguments.worker_output.resolve(),
-            arguments.worker_index,
-            contract,
-        )
-        validate_trace(trace, result_schema)
-        print(f"trace={arguments.worker_output.resolve() / TRACE_FILE_NAME}")
-        return 0
-
-    assert arguments.output is not None
-    output_directory = arguments.output.resolve()
-    if ARTIFACT_ROOT not in output_directory.parents:
-        raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
-    if output_directory.exists():
-        raise FileExistsError(f"R3H output must be fresh: {output_directory}.")
-    output_directory.mkdir(parents=True)
-
-    first, first_path = run_fresh_worker(
-        executable,
-        output_directory,
-        0,
-        contract,
-    )
-    second, second_path = run_fresh_worker(
-        executable,
-        output_directory,
-        1,
-        contract,
-    )
-    result_path = write_two_process_result(
-        first=first,
-        first_path=first_path,
-        second=second,
-        second_path=second_path,
-        output_directory=output_directory,
-        result_schema=result_schema,
-        result_schema_version=RESULT_SCHEMA_VERSION,
-        contract_path=CONTRACT_PATH,
-        task_name="R3H",
-        validate_trace=validate_trace,
-    )
-    handoff = first["post_update_greedy_handoff"]
-    print(f"result={result_path}")
+def print_summary(trace: Dict[str, Any]) -> None:
+    handoff = trace["post_update_greedy_handoff"]
     print("fresh_processes=2")
     print("transitions=10005")
     print("r3g_prefix_transitions=10004")
@@ -353,7 +243,15 @@ def main() -> int:
     print("masked_greedy_handoff=pass")
     print("online_target_q_divergence=pass")
     print("exact_trace_equality=pass")
-    return 0
+
+
+def main() -> int:
+    return run_trajectory(
+        GATE,
+        validate_contract=validate_contract,
+        validate_trace=validate_trace,
+        summarize=print_summary,
+    )
 
 
 if __name__ == "__main__":

@@ -8,6 +8,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
+using static QuickDraw.Tests.PlayMode.TestReflection;
+
 namespace QuickDraw.Tests.PlayMode
 {
     public sealed class SoftFOVPerceptionAcceptanceTests
@@ -136,7 +138,7 @@ namespace QuickDraw.Tests.PlayMode
             Transform eye = _npc.transform.Find("PerceptionEye");
             Physics.SyncTransforms();
 
-            Vector3 stateGizmoPosition = InvokeWithResult<Vector3>(
+            Vector3 stateGizmoPosition = InvokeResult<Vector3>(
                 _perception,
                 "GetStateGizmoPosition",
                 eye);
@@ -588,34 +590,6 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(property.GetSetMethod(false), Is.Null);
         }
 
-        private static Type RequireType(string qualifiedName)
-        {
-            Type type = Type.GetType(qualifiedName);
-            Assert.That(type, Is.Not.Null, $"Could not find {qualifiedName}.");
-            return type;
-        }
-
-        private static GameObject RequireObject(string objectName)
-        {
-            GameObject result = GameObject.Find(objectName);
-            Assert.That(result, Is.Not.Null, $"Missing {objectName}.");
-            return result;
-        }
-
-        private static T ReadPrivateField<T>(object instance, string fieldName)
-        {
-            FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
-            return (T)field.GetValue(instance);
-        }
-
-        private static T ReadProperty<T>(object instance, string propertyName)
-        {
-            PropertyInfo property = instance.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
-            Assert.That(property, Is.Not.Null, $"Missing property {propertyName}.");
-            return (T)property.GetValue(instance);
-        }
-
         private static void AssertRendererColor(Renderer renderer, Color expected)
         {
             MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
@@ -625,27 +599,6 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(actual.g, Is.EqualTo(expected.g).Within(0.001f));
             Assert.That(actual.b, Is.EqualTo(expected.b).Within(0.001f));
             Assert.That(actual.a, Is.EqualTo(expected.a).Within(0.001f));
-        }
-
-        private static void Invoke(object instance, string methodName, params object[] arguments)
-        {
-            MethodInfo method = instance.GetType().GetMethod(
-                methodName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
-            method.Invoke(instance, arguments);
-        }
-
-        private static T InvokeWithResult<T>(
-            object instance,
-            string methodName,
-            params object[] arguments)
-        {
-            MethodInfo method = instance.GetType().GetMethod(
-                methodName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
-            return (T)method.Invoke(instance, arguments);
         }
 
         private sealed class EventSubscription : IDisposable

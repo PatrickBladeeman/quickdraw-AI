@@ -13,16 +13,13 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     REPLAY_MAX_ACCOUNTED_BYTES,
     LLAPIContractError,
     ReplayBuffer,
 )
-from quickdraw_bdq.acceptance import (  # noqa: E402
-    canonical_json_sha256,
-    runtime_contract,
-    sha256_file,
-)
+from quickdraw_bdq.acceptance import canonical_json_sha256  # noqa: E402
 from run_bdq_fourth_update_smoke import (  # noqa: E402
     CONTRACT_PATH as R3M_CONTRACT_PATH,
     validate_contract as validate_r3m_contract,

@@ -1,33 +1,27 @@
 from __future__ import annotations
 
-import argparse
-import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     LLAPIContractError,
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
-    ARTIFACT_ROOT,
     PYPROJECT_PATH,
     registered_settings as _registered_settings,
-    run_fresh_worker_process,
-    sha256_file,
-    standard_execution_mode as _execution_mode,
     validate_runtime_and_package,
     validate_schema_pair,
-    write_two_process_result,
 )
+from quickdraw_bdq.trajectory_runner import TrajectoryGate, run_trajectory  # noqa: E402
 from quickdraw_bdq.update_gate import (  # noqa: E402
-    execute_update_gate_worker,
     validate_update_gate_trace,
 )
 
@@ -45,6 +39,17 @@ RESULT_SCHEMA_PATH = (
 TRACE_FILE_NAME = "r3g-two-update-trace.json"
 TRACE_SCHEMA_VERSION = "quickdraw.bdq-two-update-trace.v1"
 RESULT_SCHEMA_VERSION = "quickdraw.bdq-two-update-smoke-result.v1"
+
+
+GATE = TrajectoryGate(
+    runner_path=Path(__file__),
+    contract_path=CONTRACT_PATH,
+    trace_file_name=TRACE_FILE_NAME,
+    trace_schema_version=TRACE_SCHEMA_VERSION,
+    result_schema_version=RESULT_SCHEMA_VERSION,
+    task_name="R3G",
+    description="Run two fresh fixed-epsilon Unity collections through the second production optimizer update.",
+)
 
 
 def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
@@ -93,124 +98,13 @@ def validate_trace(trace: Dict[str, Any], result_schema: Dict[str, Any]) -> None
     )
 
 
-def execute_worker(
-    executable: Path,
-    worker_output: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> Dict[str, Any]:
-    return execute_update_gate_worker(
-        executable,
-        worker_output,
-        worker_index,
-        contract,
-        contract_path=CONTRACT_PATH,
-        trace_file_name=TRACE_FILE_NAME,
-        trace_schema_version=TRACE_SCHEMA_VERSION,
-        task_name="R3G",
-        record_update_hashes=True,
-    )
-
-
-def run_fresh_worker(
-    executable: Path,
-    output_directory: Path,
-    worker_index: int,
-    contract: Dict[str, Any],
-) -> tuple[Dict[str, Any], Path]:
-    return run_fresh_worker_process(
-        runner_path=Path(__file__),
-        executable=executable,
-        output_directory=output_directory,
-        worker_index=worker_index,
-        contract=contract,
-        trace_file_name=TRACE_FILE_NAME,
-        task_name="R3G",
-        announce=True,
-        repo_root=REPO_ROOT,
-        timeout_seconds=1800,
-    )
-
-
-def parse_arguments(
-    arguments: Sequence[str] | None = None,
-) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Run two fresh fixed-epsilon Unity collections through the second "
-            "production optimizer update."
-        )
-    )
-    parser.add_argument("--env", required=True, type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--worker-output", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-index", type=int, help=argparse.SUPPRESS)
-    return parser.parse_args(arguments)
-
-
-
-
-def main() -> int:
-    arguments = parse_arguments()
-    mode = _execution_mode(arguments)
-    executable = arguments.env.resolve()
-    if not executable.is_file():
-        raise FileNotFoundError(executable)
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    result_schema = validate_contract(contract)
-
-    if mode == "worker":
-        assert arguments.worker_output is not None
-        assert arguments.worker_index is not None
-        trace = execute_worker(
-            executable,
-            arguments.worker_output.resolve(),
-            arguments.worker_index,
-            contract,
-        )
-        validate_trace(trace, result_schema)
-        print(f"trace={arguments.worker_output.resolve() / TRACE_FILE_NAME}")
-        return 0
-
-    assert arguments.output is not None
-    output_directory = arguments.output.resolve()
-    if ARTIFACT_ROOT not in output_directory.parents:
-        raise ValueError(f"Output must be below {ARTIFACT_ROOT}.")
-    if output_directory.exists():
-        raise FileExistsError(f"R3G output must be fresh: {output_directory}.")
-    output_directory.mkdir(parents=True)
-
-    first, first_path = run_fresh_worker(
-        executable,
-        output_directory,
-        0,
-        contract,
-    )
-    second, second_path = run_fresh_worker(
-        executable,
-        output_directory,
-        1,
-        contract,
-    )
-    result_path = write_two_process_result(
-        first=first,
-        first_path=first_path,
-        second=second,
-        second_path=second_path,
-        output_directory=output_directory,
-        result_schema=result_schema,
-        result_schema_version=RESULT_SCHEMA_VERSION,
-        contract_path=CONTRACT_PATH,
-        task_name="R3G",
-        validate_trace=validate_trace,
-    )
-    updates = first["optimization"]["update_events"]
-    print(f"result={result_path}")
+def print_summary(trace: Dict[str, Any]) -> None:
+    updates = trace["optimization"]["update_events"]
     print("fresh_processes=2")
     print("transitions=10004")
-    print(f"completed_episodes={first['completed_episode_count']}")
-    print(f"episode_resets={first['episode_reset_count']}")
-    print(f"unique_action_tuples={first['selector']['unique_action_tuple_count']}")
+    print(f"completed_episodes={trace['completed_episode_count']}")
+    print(f"episode_resets={trace['episode_reset_count']}")
+    print(f"unique_action_tuples={trace['selector']['unique_action_tuple_count']}")
     print("pending_decisions=0")
     print("optimizer_updates=2")
     print("update_decisions=10000,10004")
@@ -225,7 +119,15 @@ def main() -> int:
     print("online_weights_changed_after_each_update=pass")
     print("target_weights_unchanged=pass")
     print("exact_trace_equality=pass")
-    return 0
+
+
+def main() -> int:
+    return run_trajectory(
+        GATE,
+        validate_contract=validate_contract,
+        validate_trace=validate_trace,
+        summarize=print_summary,
+    )
 
 
 if __name__ == "__main__":

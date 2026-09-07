@@ -28,8 +28,13 @@ records. All output paths below are generated and ignored.
 - `llapi.py` — behavior validation, pending decisions, transition completion,
   action selection, and truncation-mask side-channel ingestion;
 - `checkpoint.py` — versioned, integrity-bound trainer state save and restore;
-- `acceptance.py` — shared hashing, serialization, runtime checks, fresh
-  process execution, deterministic comparison, and result writing; and
+- `provenance.py` — dependency-light raw-file hashing and CPU runtime identity;
+- `acceptance.py` — canonical JSON hashing, serialization, runtime checks,
+  fresh process execution, deterministic comparison, and result writing;
+- `trajectory_runner.py` — shared CLI dispatch and orchestration for the eight
+  update/handoff entry points, preserving their existing modes;
+- `trajectory_validation.py` — repeated contract/prefix and scheduled-selector
+  relationships with explicit historical field mappings; and
 - `update_gate.py` — shared bounded Unity collection and optimizer-gate
   execution for the update-trajectory milestones.
 
@@ -63,6 +68,15 @@ $python = 'Artifacts\Experiments\.venvs\r1f-cpu-py311\Scripts\python.exe'
 & $python -B -m pip install --no-deps -e Research\trainer
 & $python -B -m pytest -p no:cacheprovider Research\trainer
 ```
+
+Shared orchestration tests live in `test_bdq_trajectory_runner.py`; parameterized
+R3K/R3M/R3O relationship cases live in `test_bdq_scheduled_updates.py`.
+`bdq_test_support.py` provides small synthetic fixtures with independent
+accepted update values. Unit cases that stub the generic validator test only
+milestone relationships. Real composed validation requires a full accepted
+trace and its unchanged schema; it does not establish live collection parity.
+Historical per-milestone test paths retain registration and distinct research
+claims. R3P/R3Q keep their separate checkpoint protocols and tests.
 
 The package expects the pinned versions recorded in `pyproject.toml` and the
 environment contracts. Do not upgrade them as part of running a gate.

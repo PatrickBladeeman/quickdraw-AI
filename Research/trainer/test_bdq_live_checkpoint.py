@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     BDQOptimizerController,
@@ -45,14 +46,6 @@ from run_bdq_live_checkpoint_smoke import (  # noqa: E402
 
 def _contract() -> dict[str, Any]:
     return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _valid_boundary() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -101,7 +94,7 @@ def test_r3q_contract_schema_bindings_and_boundary_are_exact() -> None:
     Draft202012Validator(contract_schema).validate(contract)
     for binding_name in ("base_fifth_update_contract", "base_checkpoint_contract"):
         binding = contract[binding_name]
-        assert _sha256_file(ROOT / binding["path"]) == binding["sha256"]
+        assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
 
     accepted = contract["accepted_live_boundary"]
     assert accepted["transition_count"] == 10_016

@@ -4,7 +4,6 @@ import copy
 import json
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +16,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     BDQOptimizerController,
@@ -26,14 +26,9 @@ from quickdraw_bdq import (  # noqa: E402
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
     registered_settings as _registered_settings,
-    sha256_file,
 )
 from quickdraw_bdq.update_gate import _complete_gate_transition  # noqa: E402
-from run_bdq_two_update_smoke import (  # noqa: E402
-    _execution_mode,
-    parse_arguments,
-    validate_contract,
-)
+from run_bdq_two_update_smoke import validate_contract
 
 
 CONTRACT_PATH = HERE / "bdq-two-update-contract-v1.json"
@@ -68,13 +63,7 @@ def test_r3g_contract_schema_binding_runtime_and_schedule_are_exact() -> None:
     Draft202012Validator(contract_schema).validate(contract)
     binding = contract["base_warmup_update_contract"]
     assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]
@@ -275,22 +264,3 @@ def test_r3g_event_schema_requires_a_per_update_online_hash() -> None:
     event.pop("online_after_sha256")
     with pytest.raises(ValidationError):
         Draft202012Validator(event_schema).validate(event)
-
-
-def test_r3g_cli_separates_parent_and_worker_modes() -> None:
-    parent = parse_arguments(
-        ["--env", "player.exe", "--output", "r3g-acceptance"]
-    )
-    worker = parse_arguments(
-        [
-            "--env",
-            "player.exe",
-            "--worker-output",
-            "run-1",
-            "--worker-index",
-            "0",
-        ]
-    )
-
-    assert _execution_mode(parent) == "parent"
-    assert _execution_mode(worker) == "worker"

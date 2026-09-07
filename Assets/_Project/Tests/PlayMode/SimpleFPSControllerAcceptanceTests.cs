@@ -7,6 +7,8 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
+using static QuickDraw.Tests.PlayMode.TestReflection;
+
 namespace QuickDraw.Tests.PlayMode
 {
     public sealed class SimpleFPSControllerAcceptanceTests : InputTestFixture
@@ -59,8 +61,8 @@ namespace QuickDraw.Tests.PlayMode
             Assert.That(playerCamera.CompareTag("MainCamera"), Is.True);
             Assert.That(playerCamera.fieldOfView, Is.EqualTo(70f));
 
-            Assert.That(ReadField<Transform>(controller, "cameraPivot"), Is.SameAs(pivot));
-            Assert.That(ReadField<Camera>(controller, "playerCamera"), Is.SameAs(playerCamera));
+            Assert.That(ReadPrivateField<Transform>(controller, "cameraPivot"), Is.SameAs(pivot));
+            Assert.That(ReadPrivateField<Camera>(controller, "playerCamera"), Is.SameAs(playerCamera));
         }
 
         [Test]
@@ -94,13 +96,13 @@ namespace QuickDraw.Tests.PlayMode
             yield return new WaitForSeconds(0.75f);
 
             ((Behaviour)controller).enabled = false;
-            Invoke(controller, "SetCursorLocked", true);
+            InvokePrivate(controller, "SetCursorLocked", true);
 
             Vector3 normalStart = player.transform.position;
             Press(_keyboard.wKey);
             InputSystem.Update();
             Assert.That(_keyboard.wKey.isPressed, Is.True, "The simulated W press was not observed by the Input System.");
-            Assert.That(ReadField<CharacterController>(controller, "_characterController"), Is.Not.Null, "Awake must cache the CharacterController.");
+            Assert.That(ReadPrivateField<CharacterController>(controller, "_characterController"), Is.Not.Null, "Awake must cache the CharacterController.");
             TickController(controller, 12);
             Release(_keyboard.wKey);
             InputSystem.Update();
@@ -161,14 +163,14 @@ namespace QuickDraw.Tests.PlayMode
             TickController(controller, 1);
             Release(_keyboard.escapeKey);
             InputSystem.Update();
-            Assert.That(ReadField<bool>(controller, "_cursorLocked"), Is.False, "Escape must release the cursor.");
+            Assert.That(ReadPrivateField<bool>(controller, "_cursorLocked"), Is.False, "Escape must release the cursor.");
 
             Press(_keyboard.escapeKey);
             InputSystem.Update();
             TickController(controller, 1);
             Release(_keyboard.escapeKey);
             InputSystem.Update();
-            Assert.That(ReadField<bool>(controller, "_cursorLocked"), Is.True, "A second Escape press must relock the cursor.");
+            Assert.That(ReadPrivateField<bool>(controller, "_cursorLocked"), Is.True, "A second Escape press must relock the cursor.");
 
             yield return null;
         }
@@ -186,7 +188,7 @@ namespace QuickDraw.Tests.PlayMode
             yield return new WaitForSeconds(0.75f);
 
             ((Behaviour)controller).enabled = false;
-            Invoke(controller, "SetCursorLocked", true);
+            InvokePrivate(controller, "SetCursorLocked", true);
 
             for (int i = 0; i < 180 && !characterController.isGrounded; i++)
             {
@@ -237,7 +239,7 @@ namespace QuickDraw.Tests.PlayMode
             for (int i = 0; i < 12; i++)
             {
                 TickController(controller, 1);
-                if (ReadField<float>(controller, "_verticalVelocity") <= 0f)
+                if (ReadPrivateField<float>(controller, "_verticalVelocity") <= 0f)
                 {
                     upwardVelocityCleared = true;
                     break;
@@ -260,31 +262,17 @@ namespace QuickDraw.Tests.PlayMode
             return type;
         }
 
-        private static T ReadField<T>(object instance, string fieldName)
-        {
-            FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
-            return (T)field.GetValue(instance);
-        }
-
         private static bool ReadAiming(object controller)
         {
             PropertyInfo property = controller.GetType().GetProperty("IsAiming", BindingFlags.Instance | BindingFlags.Public);
             return (bool)property.GetValue(controller);
         }
 
-        private static void Invoke(object instance, string methodName, params object[] arguments)
-        {
-            MethodInfo method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
-            method.Invoke(instance, arguments);
-        }
-
         private void TickController(object controller, int count)
         {
             for (int i = 0; i < count; i++)
             {
-                Invoke(controller, "Tick", _keyboard, _mouse, 1f / 60f);
+                InvokePrivate(controller, "Tick", _keyboard, _mouse, 1f / 60f);
             }
         }
 

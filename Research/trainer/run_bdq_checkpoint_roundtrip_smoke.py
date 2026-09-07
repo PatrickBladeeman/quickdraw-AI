@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import hashlib
 import json
-import os
-import subprocess
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Dict, Sequence
 
@@ -20,6 +16,8 @@ from jsonschema import Draft202012Validator
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from quickdraw_bdq.acceptance import run_fresh_python_process  # noqa: E402
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
     BDQOptimizerController,
@@ -55,16 +53,6 @@ WORKER_TIMEOUT_SECONDS = 600
 RESULT_SCHEMA_VERSION = "quickdraw.bdq-checkpoint-roundtrip-result.v1"
 
 
-def _runtime_contract() -> Dict[str, str]:
-    return {
-        "python": ".".join(str(value) for value in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
-
-
 def _reference_settings() -> BDQOptimizationSettings:
     return BDQOptimizationSettings(
         replay_capacity=32,
@@ -83,13 +71,13 @@ def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
 
     binding = contract["base_fifth_update_contract"]
     base_contract_path = REPO_ROOT / binding["path"]
-    if _sha256_file(base_contract_path) != binding["sha256"]:
+    if sha256_file(base_contract_path) != binding["sha256"]:
         raise LLAPIContractError(f"Contract binding drifted: {binding['path']}.")
     base_contract = json.loads(base_contract_path.read_text(encoding="utf-8"))
     if base_contract["schema_version"] != binding["schema_version"]:
         raise LLAPIContractError("R3P's R3O schema binding drifted.")
 
-    if contract["runtime"] != _runtime_contract():
+    if contract["runtime"] != runtime_contract():
         raise LLAPIContractError("The active runtime differs from R3P.")
     if contract["runtime"] != base_contract["runtime"]:
         raise LLAPIContractError("R3P runtime differs from R3O.")
@@ -145,14 +133,6 @@ def validate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     if determinism["unity_player_required"]:
         raise LLAPIContractError("R3P must not require a Unity player.")
     return result_schema
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _configure_deterministic_execution() -> None:
@@ -309,7 +289,7 @@ def _run_saver_worker(
     _write_summary(
         {
             "at_boundary": summary,
-            "checkpoint_sha256": _sha256_file(checkpoint_path),
+            "checkpoint_sha256": sha256_file(checkpoint_path),
             "checkpoint_bytes": checkpoint_path.stat().st_size,
         },
         summary_path,
@@ -348,35 +328,6 @@ def _run_restored_worker(
     )
     print(f"summary={summary_path}")
     return 0
-
-
-def _spawn_worker(
-    output_directory: Path,
-    arguments: Sequence[str],
-    log_name: str,
-) -> None:
-    command = [sys.executable, "-B", str(Path(__file__).resolve()), *arguments]
-    process_environment = dict(os.environ)
-    process_environment["PYTHONDONTWRITEBYTECODE"] = "1"
-    process_environment["OMP_NUM_THREADS"] = "1"
-    process_environment["MKL_NUM_THREADS"] = "1"
-    completed = subprocess.run(
-        command,
-        cwd=REPO_ROOT,
-        env=process_environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        timeout=WORKER_TIMEOUT_SECONDS,
-        check=False,
-    )
-    log_path = output_directory / log_name
-    log_path.write_text(completed.stdout, encoding="utf-8")
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"R3P worker {log_name} failed with exit code "
-            f"{completed.returncode}; see {log_path}."
-        )
 
 
 def parse_arguments(
@@ -455,21 +406,51 @@ def main() -> int:
     output_directory.mkdir(parents=True)
 
     checkpoint_path = output_directory / "checkpoint.json"
-    _spawn_worker(
-        output_directory,
-        ["--mode", "saver", "--checkpoint", str(checkpoint_path), "--summary", str(output_directory / "saver.json")],
-        "saver.log",
+    worker_arguments = (
+        (
+            "saver.log",
+            [
+                "--mode",
+                "saver",
+                "--checkpoint",
+                str(checkpoint_path),
+                "--summary",
+                str(output_directory / "saver.json"),
+            ],
+        ),
+        (
+            "reference.log",
+            [
+                "--mode",
+                "reference",
+                "--summary",
+                str(output_directory / "reference.json"),
+            ],
+        ),
+        (
+            "restored.log",
+            [
+                "--mode",
+                "restored",
+                "--checkpoint",
+                str(checkpoint_path),
+                "--summary",
+                str(output_directory / "restored.json"),
+            ],
+        ),
     )
-    _spawn_worker(
-        output_directory,
-        ["--mode", "reference", "--summary", str(output_directory / "reference.json")],
-        "reference.log",
-    )
-    _spawn_worker(
-        output_directory,
-        ["--mode", "restored", "--checkpoint", str(checkpoint_path), "--summary", str(output_directory / "restored.json")],
-        "restored.log",
-    )
+    for log_name, worker_arguments_for_role in worker_arguments:
+        run_fresh_python_process(
+            runner_path=Path(__file__),
+            arguments=worker_arguments_for_role,
+            output_directory=output_directory,
+            log_name=log_name,
+            task_name="R3P",
+            contract=contract,
+            repo_root=REPO_ROOT,
+            timeout_seconds=WORKER_TIMEOUT_SECONDS,
+            failure_label=f"R3P worker {log_name}",
+        )
 
     saver_summary = json.loads(
         (output_directory / "saver.json").read_text(encoding="utf-8")
@@ -504,7 +485,7 @@ def main() -> int:
 
     result = {
         "schema_version": RESULT_SCHEMA_VERSION,
-        "contract_sha256": _sha256_file(CONTRACT_PATH),
+        "contract_sha256": sha256_file(CONTRACT_PATH),
         "checkpoint_sha256": saver_summary["checkpoint_sha256"],
         "checkpoint_bytes": saver_summary["checkpoint_bytes"],
         "fresh_process_count": 3,

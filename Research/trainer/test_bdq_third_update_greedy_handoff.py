@@ -5,7 +5,6 @@ import json
 import math
 import sys
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Callable
 
@@ -19,30 +18,24 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
+from bdq_test_support import (
+    REGISTERED_UPDATES,
+    handoff_controller,
+    scheduled_selector,
+    update_events,
+)  # noqa: E402
+from quickdraw_bdq.provenance import runtime_contract, sha256_file  # noqa: E402
 from quickdraw_bdq import (  # noqa: E402
     BDQOptimizationSettings,
-    BDQOptimizerController,
-    DirectReplayCollector,
     LLAPIContractError,
     LinearEpsilonSchedule,
-    network_sha256,
 )
 from quickdraw_bdq.acceptance import (  # noqa: E402
     masked_argmax as _masked_argmax,
     registered_settings as _registered_settings,
-    sha256_file,
 )
-from quickdraw_bdq.update_gate import (  # noqa: E402
-    _complete_gate_transition,
-    _select_post_update_greedy_action,
-)
-from run_bdq_third_update_greedy_handoff_smoke import (  # noqa: E402
-    _execution_mode,
-    _validate_distinct_trace_paths,
-    parse_arguments,
-    validate_contract,
-    validate_trace,
-)
+from quickdraw_bdq.update_gate import _select_post_update_greedy_action  # noqa: E402
+from run_bdq_third_update_greedy_handoff_smoke import validate_contract, validate_trace
 
 
 CONTRACT_PATH = HERE / "bdq-third-update-greedy-handoff-contract-v1.json"
@@ -76,100 +69,11 @@ def _masks() -> tuple[np.ndarray, np.ndarray]:
     )
 
 
-def _controller_after_three_updates() -> tuple[
-    BDQOptimizerController,
-    list[dict[str, object]],
-    str,
-]:
-    settings = BDQOptimizationSettings(
-        replay_capacity=8,
-        replay_warmup_decisions=2,
-        batch_size=2,
-        optimizer_update_interval_decisions=2,
-        hard_target_sync_interval_optimizer_updates=10_000,
-    )
-    controller = BDQOptimizerController(seed=51001, settings=settings)
-    collector = DirectReplayCollector(controller)
-    transitions: list[dict[str, object]] = []
-    events: list[dict[str, object]] = []
-    target_before = network_sha256(controller.target_network)
-
-    for index in range(6):
-        collector.begin(
-            0,
-            _observation(index / 10.0),
-            np.asarray([index % 3, index % 2], dtype=np.int64),
-            _masks(),
-        )
-        result = _complete_gate_transition(
-            collector,
-            0,
-            float(index - 2),
-            _observation((index + 1) / 10.0),
-            _masks(),
-            terminated=False,
-            truncated=False,
-            transitions=transitions,
-            optimization_events=events,
-            episode_index=0,
-            episode_decision_index=index,
-            expected_update_decisions=(2, 4, 6),
-            task_name="R3L",
-        )
-        if result.updated:
-            events[-1]["online_after_sha256"] = network_sha256(
-                controller.online_network
-            )
-
-    assert controller.decision_count == 6
-    assert controller.optimizer_update_count == 3
-    assert controller.target_sync_count == 0
-    assert len(events) == 3
-    assert collector.pending_agent_ids == ()
-    return controller, events, target_before
-
-
 def _task_trace(contract: dict[str, Any]) -> dict[str, Any]:
     prefix = contract["r3k_prefix"]
     schedule = contract["epsilon_schedule"]
     handoff_contract = contract["post_update_greedy_handoff"]
-    update_specs = (
-        (
-            10_000,
-            1,
-            prefix["first_update_loss"],
-            prefix["first_update_mean_absolute_td_error"],
-            prefix["online_after_first_update_sha256"],
-        ),
-        (
-            10_004,
-            2,
-            prefix["second_update_loss"],
-            prefix["second_update_mean_absolute_td_error"],
-            prefix["online_after_second_update_sha256"],
-        ),
-        (
-            10_008,
-            3,
-            prefix["third_update_loss"],
-            prefix["third_update_mean_absolute_td_error"],
-            prefix["online_after_third_update_sha256"],
-        ),
-    )
-    events = [
-        {
-            "decision_count": decision_count,
-            "replay_size": decision_count,
-            "optimizer_update_count": update_count,
-            "target_sync_count": 0,
-            "updated": True,
-            "target_synced": False,
-            "loss": loss,
-            "mean_absolute_td_error": td_error,
-            "online_after_sha256": online_hash,
-        }
-        for decision_count, update_count, loss, td_error, online_hash in update_specs
-    ]
+    events = update_events(REGISTERED_UPDATES[:3])
     action_masks = copy.deepcopy(handoff_contract["expected_action_masks"])
     online_q = [[0.1, 100.0, 0.3], [0.4, 0.5]]
     target_q = [[0.0, 0.0, 0.0], [0.0, 0.0]]
@@ -189,29 +93,10 @@ def _task_trace(contract: dict[str, Any]) -> dict[str, Any]:
             "target_after_sha256": prefix["frozen_target_sha256"],
         },
         "selector": {
+            **scheduled_selector(schedule),
             "selection_count": 10_009,
             "scheduled_selection_count": schedule["selection_count"],
             "post_update_greedy_selection_count": 1,
-            "full_exploration_selection_count": schedule[
-                "full_exploration_selection_count"
-            ],
-            "decay_selection_count": schedule["decay_selection_count"],
-            "first_decay_completed_transition_count": schedule[
-                "first_decay_completed_transition_count"
-            ],
-            "last_selection_completed_transition_count": schedule[
-                "last_selection_completed_transition_count"
-            ],
-            "completed_transition_count_source": schedule[
-                "completed_transition_count_source"
-            ],
-            "epsilon_samples": [
-                {"completed_transition_count": count, "epsilon": epsilon}
-                for count, epsilon in zip(
-                    schedule["trace_sample_completed_transition_counts"],
-                    schedule["trace_sample_epsilons"],
-                )
-            ],
         },
         "post_update_greedy_handoff": {
             "selection_after_decision_count": 10_008,
@@ -223,9 +108,7 @@ def _task_trace(contract: dict[str, Any]) -> dict[str, Any]:
             "target_sync_count": 0,
             "online_sha256": prefix["online_after_third_update_sha256"],
             "target_sha256": prefix["frozen_target_sha256"],
-            "observation_sha256": handoff_contract[
-                "expected_observation_sha256"
-            ],
+            "observation_sha256": handoff_contract["expected_observation_sha256"],
             "action_masks": action_masks,
             "online_q_values": online_q,
             "target_q_values": target_q,
@@ -248,13 +131,7 @@ def test_r3l_contract_schemas_runtime_binding_and_boundaries_are_exact() -> None
     Draft202012Validator(contract_schema).validate(contract)
     binding = contract["base_third_update_contract"]
     assert sha256_file(ROOT / binding["path"]) == binding["sha256"]
-    assert contract["runtime"] == {
-        "python": ".".join(str(item) for item in sys.version_info[:3]),
-        "mlagents_envs": version("mlagents-envs"),
-        "numpy": version("numpy"),
-        "torch": version("torch"),
-        "device": "cpu",
-    }
+    assert contract["runtime"] == runtime_contract()
     assert pyproject["project"]["name"] == contract["package"]["distribution"]
     assert pyproject["project"]["version"] == contract["package"]["version"]
     assert "entry-points" not in pyproject["project"]
@@ -366,7 +243,9 @@ def test_r3l_result_schema_freezes_mixed_selector_and_handoff_cutoff() -> None:
 
 
 def test_r3l_handoff_uses_update_3_online_network_and_legal_argmax() -> None:
-    controller, events, target_before = _controller_after_three_updates()
+    controller, events, target_before = handoff_controller(
+        (2, 4, 6), (-2, -1, 0, 1, 2, 3), task_name="R3L"
+    )
     action_masks = (
         np.asarray([False, True, False], dtype=np.bool_),
         np.asarray([False, False], dtype=np.bool_),
@@ -404,7 +283,9 @@ def test_r3l_handoff_uses_update_3_online_network_and_legal_argmax() -> None:
 
 
 def test_r3l_handoff_rejects_the_wrong_optimizer_boundary() -> None:
-    controller, events, target_before = _controller_after_three_updates()
+    controller, events, target_before = handoff_controller(
+        (2, 4, 6), (-2, -1, 0, 1, 2, 3), task_name="R3L"
+    )
 
     with pytest.raises(LLAPIContractError, match="wrong optimizer count"):
         _select_post_update_greedy_action(
@@ -434,7 +315,7 @@ def test_r3l_task_trace_validation_accepts_exact_prefix_and_handoff(
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "run_bdq_third_update_greedy_handoff_smoke.canonical_json_sha256",
+        "quickdraw_bdq.trajectory_validation.canonical_json_sha256",
         lambda value: contract["r3k_prefix"]["canonical_transitions_sha256"],
     )
 
@@ -495,7 +376,7 @@ def test_r3l_task_trace_validation_rejects_evidence_drift(
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "run_bdq_third_update_greedy_handoff_smoke.canonical_json_sha256",
+        "quickdraw_bdq.trajectory_validation.canonical_json_sha256",
         lambda value: contract["r3k_prefix"]["canonical_transitions_sha256"],
     )
     mutate(trace)
@@ -515,58 +396,9 @@ def test_r3l_task_trace_validation_rejects_prefix_drift(
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "run_bdq_third_update_greedy_handoff_smoke.canonical_json_sha256",
+        "quickdraw_bdq.trajectory_validation.canonical_json_sha256",
         lambda value: "0" * 64,
     )
 
     with pytest.raises(LLAPIContractError, match="canonical R3K prefix"):
         validate_trace(trace, result_schema)
-
-
-def test_r3l_cli_separates_parent_worker_and_comparison_modes() -> None:
-    parent = parse_arguments(
-        ["--env", "player.exe", "--output", "r3l-acceptance"]
-    )
-    worker = parse_arguments(
-        [
-            "--env",
-            "player.exe",
-            "--worker-output",
-            "run-1",
-            "--worker-index",
-            "0",
-        ]
-    )
-    comparison = parse_arguments(
-        [
-            "--output",
-            "r3l-recovered-acceptance",
-            "--first-trace",
-            "attempt-1.json",
-            "--second-trace",
-            "attempt-2.json",
-        ]
-    )
-
-    assert _execution_mode(parent) == "parent"
-    assert _execution_mode(worker) == "worker"
-    assert _execution_mode(comparison) == "compare"
-
-
-def test_r3l_comparison_mode_requires_two_distinct_trace_files(
-    tmp_path: Path,
-) -> None:
-    first = tmp_path / "first.json"
-    second = tmp_path / "second.json"
-    first.write_text("{}", encoding="utf-8")
-    second.write_text("{}", encoding="utf-8")
-
-    _validate_distinct_trace_paths(first.resolve(), second.resolve())
-    with pytest.raises(ValueError, match="two distinct trace files"):
-        _validate_distinct_trace_paths(first.resolve(), first.resolve())
-
-    incomplete = parse_arguments(
-        ["--output", "r3l-acceptance", "--first-trace", str(first)]
-    )
-    with pytest.raises(ValueError, match="Trace-comparison mode"):
-        _execution_mode(incomplete)
