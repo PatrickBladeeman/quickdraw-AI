@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -228,6 +229,65 @@ def load_bound_contract(
     return contract
 
 
+def copy_complete_player(
+    executable: Path,
+    destination: Path,
+    *,
+    required_siblings: Sequence[str] = (),
+) -> Path:
+    """Copy one complete standalone player into a fresh run-owned directory.
+
+    Unity standalone builds write profiling and timer files below their player
+    directory.  A run therefore owns a complete copy of the source directory,
+    rather than launching an executable from an accepted or otherwise frozen
+    artifact directory.
+    """
+
+    source_executable = executable.resolve()
+    source_root = source_executable.parent
+    target_root = destination.resolve()
+    if not source_executable.is_file():
+        raise FileNotFoundError(source_executable)
+    if not source_root.is_dir():
+        raise FileNotFoundError(source_root)
+    if source_root == target_root:
+        raise ValueError("A player copy destination must differ from its source.")
+    if source_root in target_root.parents:
+        raise ValueError("A player copy destination must not be inside its source.")
+    if target_root.exists():
+        raise FileExistsError(f"Player copy destination must be fresh: {target_root}")
+
+    required_paths = (source_executable.name, *required_siblings)
+    for relative_name in required_paths:
+        if not isinstance(relative_name, str):
+            raise ValueError(
+                f"Player sibling must be a direct child name: {relative_name}"
+            )
+        relative_path = Path(relative_name)
+        if (
+            not relative_name
+            or relative_name in {".", ".."}
+            or relative_path.is_absolute()
+            or relative_path.parent != Path(".")
+            or relative_path.name != relative_name
+        ):
+            raise ValueError(
+                f"Player sibling must be a direct child name: {relative_name}"
+            )
+        if not (source_root / relative_path).exists():
+            raise FileNotFoundError(source_root / relative_path)
+
+    target_root.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_root, target_root)
+    copied_executable = target_root / source_executable.name
+    for relative_name in required_paths:
+        if not (target_root / relative_name).exists():
+            raise RuntimeError(
+                f"Complete player copy omitted required sibling: {relative_name}."
+            )
+    return copied_executable
+
+
 def standard_execution_mode(arguments: argparse.Namespace) -> str:
     if arguments.worker_output is not None:
         if arguments.worker_index is None or arguments.output is not None:
@@ -347,6 +407,7 @@ def run_fresh_worker_process(
     announce: bool,
     repo_root: Path = REPO_ROOT,
     timeout_seconds: int = 1800,
+    worker_arguments: Sequence[str] = (),
 ) -> tuple[Dict[str, Any], Path]:
     worker_output = output_directory / f"run-{worker_index + 1}"
     if announce:
@@ -357,6 +418,7 @@ def run_fresh_worker_process(
             f"--env={executable}",
             f"--worker-output={worker_output}",
             f"--worker-index={worker_index}",
+            *worker_arguments,
         ],
         output_directory=output_directory,
         log_name=f"worker-{worker_index + 1}.log",

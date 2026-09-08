@@ -106,22 +106,30 @@ missing scene. Their public build entry methods and output options remain intact
   structured hashing protocols retain their existing serialization owners.
 - `acceptance.py` owns reusable, non-scientific acceptance plumbing: canonical
   hashing and serialization, runtime/package checks, execution-mode checks,
-  fresh-process launch, deterministic worker comparison, and result writing.
+  complete-player copying, fresh-process launch, deterministic worker
+  comparison, and result writing.
 - `trajectory_runner.py` owns the ordinary two-worker trajectory entry flow,
   configured explicitly for the eight historical update/handoff commands.
   Only R3F supports watch; only R3L/R3M/R3O support completed-trace comparison.
 - `trajectory_validation.py` owns repeated contract relationships, explicit
   ordinal prefix comparisons, scheduled-selector checks, and frozen-target
-  checks. Entry points retain schema validation and distinct research assertions.
+  checks for the registered historical gates. Its explicit update-field map and
+  zero-target-synchronization assertions are milestone acceptance rules, not a
+  general unrestricted-training validator. Entry points retain schema
+  validation and distinct research assertions.
 - `update_gate.py` owns the shared bounded Unity collection and optimizer-gate
-  mechanism used by the update-trajectory milestones, including the optional
-  clean-boundary handoff into `checkpoint.py`.
+  mechanism used by the update-trajectory milestones, including opt-in
+  per-update target-hash metadata, target synchronization events, continuation
+  callbacks, and the optional clean-boundary handoff into `checkpoint.py`.
 
-The milestone runners in `Research/trainer/` are historical compatibility
-entry points. They load milestone-specific contracts, expectations, schemas,
-and summaries, then compose the shared package modules into bounded acceptance
-gates. They are not a separate training framework and must not become the
-canonical owner of generic behavior needed by another milestone. The retired
+The milestone runners in `Research/trainer/` retain historical compatibility
+entry points and include the bounded R3R continuation runner. They load
+milestone-specific contracts, expectations, schemas, and summaries, then
+compose the shared package modules into bounded acceptance gates. The R3R
+runner owns its stage-specific continuation-prefix, target-synchronization,
+checkpoint-differential, and synthetic post-boundary rules; it is not a
+separate training framework and must not become the canonical owner of generic
+behavior needed by another milestone. The retired
 high-level ML-Agents `Trainer`/`Policy`/`Trajectory` experiment is historical,
 not an available runtime path.
 

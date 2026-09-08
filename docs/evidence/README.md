@@ -52,8 +52,9 @@ study unless its milestone file explicitly says otherwise.
 | R3O | [R3O.md](R3O.md) | Bounded scheduled optimizer update 5 |
 | R3P | [R3P.md](R3P.md) | Deterministic Python checkpoint round-trip |
 | R3Q | [R3Q.md](R3Q.md) | Live-derived checkpoint save/restore and replay parity |
+| R3R | [R3R.md](R3R.md) | Long-horizon continuation pilot and first target synchronization |
 
-## Shared R3D-R3Q runtime and optimizer reference
+## Shared R3D-R3R runtime and optimizer reference
 
 The individual R3D-R3Q contracts pin Python `3.11.13`,
 `mlagents_envs==1.1.0`, NumPy `1.23.5`, PyTorch `2.12.0+cpu`, device `cpu`,
@@ -79,7 +80,9 @@ updates and zero target synchronizations. R3P demonstrates deterministic
 Python-only checkpoint save/restore on the registered synthetic workload;
 R3Q extends that checkpoint mechanism to the live-derived R3O state and
 reproduces its next replay sample in a fresh Python process without Unity.
-R3Q does not resume the frozen Unity trajectory. Update 6, an extended
-epsilon-decay rollout, Unity resume, inference export, ROCm training,
+R3Q does not resume the frozen Unity trajectory. R3R replays that accepted
+prefix into trainer state, collects from fresh complete player copies, and
+demonstrates the registered pilot and first target synchronization gates; it
+does not claim to resume a Unity process. Inference export, ROCm training,
 held-out learned-policy evaluation, strategic combat, the research evade
 reflex, and the local LLM runtime are not demonstrated by this archive.

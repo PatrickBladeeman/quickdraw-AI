@@ -1,0 +1,738 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-long-horizon-smoke-result.schema.json",
+  "title": "QuickDraw bounded long-horizon BDQ continuation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_sha256",
+    "stage",
+    "fresh_process_count",
+    "exact_trace_equality",
+    "canonical_trace_sha256",
+    "canonical_trace",
+    "attempts",
+    "checkpoint_differential",
+    "restoration_differential",
+    "post_boundary_selection"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-long-horizon-smoke-result.v1"},
+    "contract_sha256": {"$ref": "#/$defs/sha256"},
+    "stage": {"enum": ["pilot", "synchronization"]},
+    "fresh_process_count": {"const": 2},
+    "exact_trace_equality": {"const": true},
+    "canonical_trace_sha256": {"$ref": "#/$defs/sha256"},
+    "canonical_trace": {"$ref": "#/$defs/trace"},
+    "attempts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/attempt"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "checkpoint_differential": {"$ref": "#/$defs/checkpoint_differential"},
+    "restoration_differential": {"$ref": "#/$defs/restoration_differential"},
+    "post_boundary_selection": {"$ref": "#/$defs/post_boundary_selection"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mask3": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "mask2": {
+      "type": "array",
+      "items": {"type": "boolean"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "masks": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/mask3"},
+        {"$ref": "#/$defs/mask2"}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "action": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "integer", "minimum": 0, "maximum": 2},
+        {"type": "integer", "minimum": 0, "maximum": 1}
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "episode_index",
+        "episode_decision_index",
+        "observation_sha256",
+        "next_observation_sha256",
+        "observation_shape",
+        "action",
+        "reward",
+        "action_masks",
+        "next_action_masks",
+        "terminated",
+        "truncated"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0, "maximum": 49995},
+        "episode_index": {"type": "integer", "minimum": 0},
+        "episode_decision_index": {"type": "integer", "minimum": 0, "maximum": 299},
+        "observation_sha256": {"$ref": "#/$defs/sha256"},
+        "next_observation_sha256": {"$ref": "#/$defs/sha256"},
+        "observation_shape": {"const": [84, 84, 4]},
+        "action": {"$ref": "#/$defs/action"},
+        "reward": {"type": "number"},
+        "action_masks": {"$ref": "#/$defs/masks"},
+        "next_action_masks": {"$ref": "#/$defs/masks"},
+        "terminated": {"type": "boolean"},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "transition_start_index",
+        "transition_count",
+        "return",
+        "end_kind",
+        "reason",
+        "interrupted",
+        "unity_episode_ended"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "transition_start_index": {"type": "integer", "minimum": 0, "maximum": 49995},
+        "transition_count": {"type": "integer", "minimum": 1, "maximum": 300},
+        "return": {"type": "number"},
+        "end_kind": {"enum": ["terminal", "truncated", "collection_cutoff"]},
+        "reason": {"enum": ["target_hit", "decision_limit", "collection_limit"]},
+        "interrupted": {"type": "boolean"},
+        "unity_episode_ended": {"type": "boolean"}
+      }
+    },
+    "truncation_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_index",
+        "decision_count",
+        "reason",
+        "position_slot",
+        "next_action_masks"
+      ],
+      "properties": {
+        "episode_index": {"type": "integer", "minimum": 0},
+        "decision_count": {"const": 300},
+        "reason": {"const": "decision_limit"},
+        "position_slot": {"type": "integer", "minimum": -4, "maximum": 4},
+        "next_action_masks": {"$ref": "#/$defs/masks"}
+      }
+    },
+    "epsilon_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completed_transition_count", "epsilon"],
+      "properties": {
+        "completed_transition_count": {"type": "integer", "minimum": 0, "maximum": 49995},
+        "epsilon": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "optimization_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_count",
+        "replay_size",
+        "optimizer_update_count",
+        "target_sync_count",
+        "updated",
+        "target_synced",
+        "loss",
+        "mean_absolute_td_error",
+        "online_after_sha256",
+        "online_before_sha256",
+        "target_before_sha256",
+        "target_after_sha256",
+        "epsilon_sample"
+      ],
+      "properties": {
+        "decision_count": {"type": "integer", "minimum": 10000, "maximum": 49996},
+        "replay_size": {"type": "integer", "minimum": 10000, "maximum": 49996},
+        "optimizer_update_count": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "target_sync_count": {"type": "integer", "minimum": 0, "maximum": 1},
+        "updated": {"const": true},
+        "target_synced": {"type": "boolean"},
+        "loss": {"type": "number", "minimum": 0},
+        "mean_absolute_td_error": {"type": "number", "minimum": 0},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"},
+        "online_before_sha256": {"$ref": "#/$defs/sha256"},
+        "target_before_sha256": {"$ref": "#/$defs/sha256"},
+        "target_after_sha256": {"$ref": "#/$defs/sha256"},
+        "epsilon_sample": {"$ref": "#/$defs/epsilon_sample"}
+      }
+    },
+    "target_sync_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_before_sha256",
+        "online_after_sha256",
+        "target_before_sha256",
+        "target_after_sha256"
+      ],
+      "properties": {
+        "decision_count": {"type": "integer", "minimum": 10000, "maximum": 49996},
+        "optimizer_update_count": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "target_sync_count": {"const": 1},
+        "online_before_sha256": {"$ref": "#/$defs/sha256"},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"},
+        "target_before_sha256": {"$ref": "#/$defs/sha256"},
+        "target_after_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "epsilon_decay_enabled",
+        "exploration_seed",
+        "selection_count",
+        "full_exploration_selection_count",
+        "decay_selection_count",
+        "first_decay_completed_transition_count",
+        "completed_transition_count_source",
+        "first_selection_completed_transition_count",
+        "last_selection_completed_transition_count",
+        "epsilon_samples",
+        "action_tuple_counts",
+        "unique_action_tuple_count"
+      ],
+      "properties": {
+        "name": {"const": "seeded_scheduled_branch_epsilon_greedy"},
+        "epsilon_decay_enabled": {"const": true},
+        "exploration_seed": {"const": 61001},
+        "selection_count": {"type": "integer", "enum": [13996, 49996]},
+        "full_exploration_selection_count": {"const": 10001},
+        "decay_selection_count": {"type": "integer", "enum": [3995, 39995]},
+        "first_decay_completed_transition_count": {"const": 10001},
+        "completed_transition_count_source": {"const": "BDQOptimizerController.decision_count"},
+        "first_selection_completed_transition_count": {"const": 0},
+        "last_selection_completed_transition_count": {"type": "integer", "enum": [13995, 49995]},
+        "epsilon_samples": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/epsilon_sample"},
+          "minItems": 1,
+          "maxItems": 10001
+        },
+        "action_tuple_counts": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0, "maximum": 49996},
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "unique_action_tuple_count": {"const": 6}
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "size",
+        "unique_frame_count",
+        "frame_reference_count",
+        "frame_payload_bytes",
+        "metadata_payload_bytes",
+        "accounted_storage_bytes",
+        "max_accounted_storage_bytes",
+        "remaining_accounted_storage_bytes",
+        "legacy_observation_payload_bytes",
+        "legacy_capacity_observation_payload_bytes",
+        "cursor"
+      ],
+      "properties": {
+        "capacity": {"const": 100000},
+        "size": {"type": "integer", "enum": [13996, 49996]},
+        "unique_frame_count": {"type": "integer", "minimum": 1},
+        "frame_reference_count": {"type": "integer", "minimum": 1},
+        "frame_payload_bytes": {"type": "integer", "minimum": 1},
+        "metadata_payload_bytes": {"type": "integer", "minimum": 1},
+        "accounted_storage_bytes": {"type": "integer", "minimum": 1},
+        "max_accounted_storage_bytes": {"const": 4294967296},
+        "remaining_accounted_storage_bytes": {"type": "integer", "minimum": 0},
+        "legacy_observation_payload_bytes": {"type": "integer", "minimum": 1},
+        "legacy_capacity_observation_payload_bytes": {"type": "integer", "minimum": 1},
+        "cursor": {"type": "integer", "enum": [13996, 49996]}
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "controller_seed",
+        "exploration_seed",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "online_network_sha256",
+        "target_network_sha256",
+        "replay",
+        "pending_agent_ids"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"},
+        "controller_seed": {"const": 51001},
+        "exploration_seed": {"const": 61001},
+        "decision_count": {"type": "integer", "enum": [13996, 49996]},
+        "optimizer_update_count": {"type": "integer", "enum": [1000, 10000]},
+        "target_sync_count": {"type": "integer", "enum": [0, 1]},
+        "online_network_sha256": {"$ref": "#/$defs/sha256"},
+        "target_network_sha256": {"$ref": "#/$defs/sha256"},
+        "replay": {"$ref": "#/$defs/storage"},
+        "pending_agent_ids": {"const": []}
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_sha256",
+        "stage",
+        "behavior",
+        "scenario_seed",
+        "policy_seed",
+        "selector",
+        "execution_determinism",
+        "episodes",
+        "completed_episode_count",
+        "episode_reset_count",
+        "truncation_events",
+        "transitions",
+        "replay",
+        "cutoff",
+        "optimization",
+        "continuation_prefix",
+        "final_clean_boundary"
+      ],
+      "properties": {
+        "schema_version": {"const": "quickdraw.bdq-long-horizon-trace.v1"},
+        "contract_sha256": {"$ref": "#/$defs/sha256"},
+        "stage": {"enum": ["pilot", "synchronization"]},
+        "behavior": {
+          "const": {
+            "name": "QuickDrawResearchBasic",
+            "observation_shape": [84, 84, 4],
+            "wire_layout": "HWC",
+            "dtype": "float32",
+            "discrete_branches": [3, 2],
+            "privileged_observation_count": 0
+          }
+        },
+        "scenario_seed": {"const": 31001},
+        "policy_seed": {"const": 51001},
+        "selector": {"$ref": "#/$defs/selector"},
+        "execution_determinism": {
+          "const": {
+            "torch_num_threads": 1,
+            "torch_num_interop_threads": 1,
+            "deterministic_algorithms": true
+          }
+        },
+        "episodes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/episode"},
+          "minItems": 2,
+          "maxItems": 49996
+        },
+        "completed_episode_count": {"type": "integer", "minimum": 1, "maximum": 49996},
+        "episode_reset_count": {"type": "integer", "minimum": 1, "maximum": 49996},
+        "truncation_events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/truncation_event"},
+          "maxItems": 167
+        },
+        "transitions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transition"},
+          "minItems": 13996,
+          "maxItems": 49996
+        },
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision_count",
+            "size",
+            "capacity",
+            "warmup_decisions",
+            "below_warmup",
+            "at_warmup",
+            "storage"
+          ],
+          "properties": {
+            "decision_count": {"type": "integer", "enum": [13996, 49996]},
+            "size": {"type": "integer", "enum": [13996, 49996]},
+            "capacity": {"const": 100000},
+            "warmup_decisions": {"const": 10000},
+            "below_warmup": {"const": false},
+            "at_warmup": {"const": false},
+            "storage": {"$ref": "#/$defs/storage"}
+          }
+        },
+        "cutoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transition_limit",
+            "pending_agent_ids",
+            "pending_decision_count",
+            "active_episode_index",
+            "ended_on_unity_boundary"
+          ],
+          "properties": {
+            "transition_limit": {"type": "integer", "enum": [13996, 49996]},
+            "pending_agent_ids": {"const": []},
+            "pending_decision_count": {"const": 0},
+            "active_episode_index": {"type": "integer", "minimum": 0},
+            "ended_on_unity_boundary": {"type": "boolean"}
+          }
+        },
+        "optimization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "optimizer_update_count",
+            "target_sync_count",
+            "update_events",
+            "target_sync_events",
+            "update_epsilon_samples",
+            "online_before_sha256",
+            "online_after_sha256",
+            "target_before_sha256",
+            "target_after_sha256",
+            "online_weights_changed",
+            "target_weights_unchanged"
+          ],
+          "properties": {
+            "optimizer_update_count": {"type": "integer", "enum": [1000, 10000]},
+            "target_sync_count": {"type": "integer", "enum": [0, 1]},
+            "update_events": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/optimization_event"},
+              "minItems": 1000,
+              "maxItems": 10000
+            },
+            "target_sync_events": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/target_sync_event"},
+              "maxItems": 1
+            },
+            "update_epsilon_samples": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/epsilon_sample"},
+              "minItems": 1000,
+              "maxItems": 10000
+            },
+            "online_before_sha256": {"$ref": "#/$defs/sha256"},
+            "online_after_sha256": {"$ref": "#/$defs/sha256"},
+            "target_before_sha256": {"$ref": "#/$defs/sha256"},
+            "target_after_sha256": {"$ref": "#/$defs/sha256"},
+            "online_weights_changed": {"const": true},
+            "target_weights_unchanged": {"type": "boolean"}
+          }
+        },
+        "continuation_prefix": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transition_count",
+            "decision_count",
+            "optimizer_update_count",
+            "target_sync_count",
+            "canonical_transitions_sha256",
+            "online_network_sha256",
+            "target_network_sha256",
+            "checkpoint_state_sha256",
+            "pending_agent_ids",
+            "post_boundary_action_selected"
+          ],
+          "properties": {
+            "transition_count": {"const": 10016},
+            "decision_count": {"const": 10016},
+            "optimizer_update_count": {"const": 5},
+            "target_sync_count": {"const": 0},
+            "canonical_transitions_sha256": {"$ref": "#/$defs/sha256"},
+            "online_network_sha256": {"$ref": "#/$defs/sha256"},
+            "target_network_sha256": {"$ref": "#/$defs/sha256"},
+            "checkpoint_state_sha256": {"$ref": "#/$defs/sha256"},
+            "pending_agent_ids": {"const": []},
+            "post_boundary_action_selected": {"const": false}
+          }
+        },
+        "final_clean_boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transition_count",
+            "decision_count",
+            "optimizer_update_count",
+            "target_sync_count",
+            "pending_agent_ids",
+            "post_boundary_action_selected",
+            "last_selection_completed_transition_count"
+          ],
+          "properties": {
+            "transition_count": {"type": "integer", "enum": [13996, 49996]},
+            "decision_count": {"type": "integer", "enum": [13996, 49996]},
+            "optimizer_update_count": {"type": "integer", "enum": [1000, 10000]},
+            "target_sync_count": {"type": "integer", "enum": [0, 1]},
+            "pending_agent_ids": {"const": []},
+            "post_boundary_action_selected": {"const": false},
+            "last_selection_completed_transition_count": {"type": "integer", "enum": [13995, 49995]}
+          }
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_index",
+        "player_copy",
+        "trace_sha256",
+        "trace_bytes",
+        "checkpoint_sha256",
+        "checkpoint_bytes",
+        "checkpoint_state_sha256"
+      ],
+      "properties": {
+        "attempt_index": {"type": "integer", "enum": [1, 2]},
+        "player_copy": {"enum": ["run-1", "run-2"]},
+        "trace_sha256": {"$ref": "#/$defs/sha256"},
+        "trace_bytes": {"type": "integer", "minimum": 1},
+        "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+        "checkpoint_bytes": {"type": "integer", "minimum": 1},
+        "checkpoint_state_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "field_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dtype", "shape", "sha256"],
+      "properties": {
+        "dtype": {"type": "string", "minLength": 1},
+        "shape": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["batch_size", "indices", "fields"],
+      "properties": {
+        "batch_size": {"const": 64},
+        "indices": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0, "maximum": 49995},
+          "minItems": 64,
+          "maxItems": 64
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "indices",
+            "observations",
+            "actions",
+            "rewards",
+            "next_observations",
+            "action_masks_0",
+            "action_masks_1",
+            "next_action_masks_0",
+            "next_action_masks_1",
+            "terminated",
+            "truncated"
+          ],
+          "properties": {
+            "indices": {"$ref": "#/$defs/field_fingerprint"},
+            "observations": {"$ref": "#/$defs/field_fingerprint"},
+            "actions": {"$ref": "#/$defs/field_fingerprint"},
+            "rewards": {"$ref": "#/$defs/field_fingerprint"},
+            "next_observations": {"$ref": "#/$defs/field_fingerprint"},
+            "action_masks_0": {"$ref": "#/$defs/field_fingerprint"},
+            "action_masks_1": {"$ref": "#/$defs/field_fingerprint"},
+            "next_action_masks_0": {"$ref": "#/$defs/field_fingerprint"},
+            "next_action_masks_1": {"$ref": "#/$defs/field_fingerprint"},
+            "terminated": {"$ref": "#/$defs/field_fingerprint"},
+            "truncated": {"$ref": "#/$defs/field_fingerprint"}
+          }
+        }
+      }
+    },
+    "bounded_update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_count",
+        "optimizer_update_count",
+        "replay_size",
+        "target_sync_count",
+        "sampled_indices",
+        "loss",
+        "mean_absolute_td_error",
+        "online_after_sha256",
+        "target_after_sha256",
+        "continuation_actions"
+      ],
+      "properties": {
+        "decision_count": {"const": 14000},
+        "optimizer_update_count": {"const": 1001},
+        "replay_size": {"const": 14000},
+        "target_sync_count": {"const": 0},
+        "sampled_indices": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0, "maximum": 13999},
+          "minItems": 64,
+          "maxItems": 64
+        },
+        "loss": {"type": "number", "minimum": 0},
+        "mean_absolute_td_error": {"type": "number", "minimum": 0},
+        "online_after_sha256": {"$ref": "#/$defs/sha256"},
+        "target_after_sha256": {"$ref": "#/$defs/sha256"},
+        "continuation_actions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/action"},
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    },
+    "synthetic_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completed_transition_count",
+        "action",
+        "action_masks",
+        "legal"
+      ],
+      "properties": {
+        "completed_transition_count": {"const": 49996},
+        "action": {"$ref": "#/$defs/action"},
+        "action_masks": {"$ref": "#/$defs/masks"},
+        "legal": {"const": true}
+      }
+    },
+    "restoration_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundary",
+        "boundary_state_sha256",
+        "next_replay_sample",
+        "bounded_optimizer_result",
+        "synthetic_post_boundary_selection",
+        "loaded_without_unity"
+      ],
+      "properties": {
+        "boundary": {"$ref": "#/$defs/boundary"},
+        "boundary_state_sha256": {"$ref": "#/$defs/sha256"},
+        "next_replay_sample": {"$ref": "#/$defs/sample"},
+        "bounded_optimizer_result": {
+          "anyOf": [
+            {"$ref": "#/$defs/bounded_update"},
+            {"type": "null"}
+          ]
+        },
+        "synthetic_post_boundary_selection": {
+          "anyOf": [
+            {"$ref": "#/$defs/synthetic_selection"},
+            {"type": "null"}
+          ]
+        },
+        "loaded_without_unity": {"type": "boolean"}
+      }
+    },
+    "checkpoint_differential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_checkpoint_bytes",
+        "same_checkpoint_state",
+        "checkpoint_sha256",
+        "checkpoint_state_sha256"
+      ],
+      "properties": {
+        "same_checkpoint_bytes": {"const": true},
+        "same_checkpoint_state": {"const": true},
+        "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+        "checkpoint_state_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "restoration_differential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_boundary_state",
+        "same_next_replay_sample",
+        "same_bounded_result",
+        "loaded_without_unity",
+        "reference",
+        "restored"
+      ],
+      "properties": {
+        "same_boundary_state": {"const": true},
+        "same_next_replay_sample": {"const": true},
+        "same_bounded_result": {"const": true},
+        "loaded_without_unity": {"const": true},
+        "reference": {"$ref": "#/$defs/restoration_observation"},
+        "restored": {"$ref": "#/$defs/restoration_observation"}
+      }
+    },
+    "post_boundary_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "live_action_selected",
+        "synthetic_selection_required",
+        "synthetic_selection"
+      ],
+      "properties": {
+        "policy": {"const": "stop_before_live_action; synthetic_selection_only"},
+        "live_action_selected": {"const": false},
+        "synthetic_selection_required": {"type": "boolean"},
+        "synthetic_selection": {
+          "anyOf": [
+            {"$ref": "#/$defs/synthetic_selection"},
+            {"type": "null"}
+          ]
+        }
+      }
+    }
+  }
+}

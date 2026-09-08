@@ -39,6 +39,7 @@ from .optimizer import (
     BDQOptimizerController,
     OptimizationStepResult,
 )
+from .replay import _FRAME_REFERENCES_PER_TRANSITION
 from .acceptance import (
     action_tuple_counts as _action_tuple_counts,
     episode_record as _episode_record,
@@ -121,6 +122,7 @@ def _complete_gate_transition(
     episode_decision_index: int,
     expected_update_decisions: Sequence[int],
     task_name: str,
+    allowed_target_sync_updates: Sequence[int] = (),
 ) -> OptimizationStepResult:
     transition, result = collector.complete(
         agent_id,
@@ -138,8 +140,13 @@ def _complete_gate_transition(
             episode_decision_index,
         )
     )
-    expected_updates = frozenset(int(value) for value in expected_update_decisions)
-    if result.target_synced:
+    expected_updates = (
+        expected_update_decisions
+        if isinstance(expected_update_decisions, frozenset)
+        else frozenset(int(value) for value in expected_update_decisions)
+    )
+    allowed_syncs = frozenset(int(value) for value in allowed_target_sync_updates)
+    if result.target_synced and result.optimizer_update_count not in allowed_syncs:
         raise LLAPIContractError(f"{task_name} synchronized the target network.")
     if result.updated:
         if result.decision_count not in expected_updates:
@@ -478,11 +485,13 @@ def execute_update_gate_worker(
     worker_index: int,
     contract: Dict[str, Any],
     *,
+    gate_contract: Dict[str, Any] | None = None,
     contract_path: Path,
     trace_file_name: str,
     trace_schema_version: str,
     task_name: str,
     record_update_hashes: bool,
+    record_target_hashes: bool = False,
     base_port: int = 5045,
     timeout_wait: int = 120,
     watch: bool = False,
@@ -497,11 +506,24 @@ def execute_update_gate_worker(
         None,
     ]
     | None = None,
+    trace_metadata: Dict[str, Any] | None = None,
+    boundary_callback: Callable[
+        [
+            BDQOptimizerController,
+            DirectReplayCollector,
+            ScheduledEpsilonGreedyBDQActionSelector,
+            Sequence[Dict[str, Any]],
+        ],
+        Dict[str, Any] | None,
+    ]
+    | None = None,
+    prefix_boundary_transition_count: int | None = None,
 ) -> Dict[str, Any]:
     worker_output.mkdir(parents=True, exist_ok=False)
-    collection = contract["collection"]
-    optimization = contract["optimization"]
-    determinism = contract["determinism"]
+    effective_contract = gate_contract if gate_contract is not None else contract
+    collection = effective_contract["collection"]
+    optimization = effective_contract["optimization"]
+    determinism = effective_contract["determinism"]
     settings = BDQOptimizationSettings()
     if _registered_settings(settings) != {
         key: optimization[key] for key in _registered_settings(settings)
@@ -517,6 +539,7 @@ def execute_update_gate_worker(
         + index * settings.optimizer_update_interval_decisions
         for index in range(expected_update_count)
     )
+    expected_update_decision_set = frozenset(expected_update_decisions)
     if expected_first_update != settings.replay_warmup_decisions:
         raise LLAPIContractError(
             f"{task_name} first update differs from production replay warmup."
@@ -534,9 +557,47 @@ def execute_update_gate_worker(
         raise LLAPIContractError(
             f"{task_name} registered update decisions differ from its schedule."
         )
-    greedy_handoff_contract = contract.get("post_update_greedy_handoff")
-    scheduled_handoff_contract = contract.get("scheduled_epsilon_handoff")
-    schedule_contract = contract.get("epsilon_schedule")
+    registered_schedule = optimization.get("expected_update_decision_schedule")
+    if registered_schedule is not None:
+        expected_schedule = {
+            "first_decision": expected_first_update,
+            "interval_decisions": settings.optimizer_update_interval_decisions,
+            "optimizer_update_count": expected_update_count,
+            "last_decision": expected_update_decisions[-1],
+        }
+        if registered_schedule != expected_schedule:
+            raise LLAPIContractError(
+                f"{task_name} registered update schedule differs from its schedule."
+            )
+    greedy_handoff_contract = effective_contract.get("post_update_greedy_handoff")
+    scheduled_handoff_contract = effective_contract.get("scheduled_epsilon_handoff")
+    schedule_contract = effective_contract.get("epsilon_schedule")
+    expected_target_sync_updates = tuple(
+        int(value)
+        for value in optimization.get("expected_target_sync_update_counts", ())
+    )
+    if len(expected_target_sync_updates) != int(
+        optimization["expected_target_synchronizations"]
+    ):
+        raise LLAPIContractError(
+            f"{task_name} target-sync event list differs from its contract."
+        )
+    if expected_target_sync_updates and not record_target_hashes:
+        raise LLAPIContractError(
+            f"{task_name} target synchronization requires per-update hashes."
+        )
+    if expected_target_sync_updates != tuple(sorted(expected_target_sync_updates)):
+        raise LLAPIContractError(
+            f"{task_name} target-sync events are not ordered."
+        )
+    if (
+        expected_target_sync_updates
+        and expected_target_sync_updates[-1] != expected_update_count
+    ):
+        raise LLAPIContractError(
+            f"{task_name} target synchronization must occur at the final "
+            "optimizer update."
+        )
     if (
         greedy_handoff_contract is not None
         and scheduled_handoff_contract is not None
@@ -600,6 +661,7 @@ def execute_update_gate_worker(
                 "trace_sample_completed_transition_counts"
             ]
         )
+    schedule_sample_count_set = frozenset(schedule_sample_counts)
     online_before = network_sha256(controller.online_network)
     target_before = network_sha256(controller.target_network)
     if online_before != target_before:
@@ -611,6 +673,8 @@ def execute_update_gate_worker(
     episodes: list[Dict[str, Any]] = []
     truncation_events: list[Dict[str, Any]] = []
     optimization_events: list[Dict[str, Any]] = []
+    target_sync_events: list[Dict[str, Any]] = []
+    prefix_boundary: Dict[str, Any] | None = None
     post_update_greedy_handoff: Dict[str, Any] | None = None
     scheduled_epsilon_handoff: Dict[str, Any] | None = None
     seeded_random_selection_count = 0
@@ -623,6 +687,84 @@ def execute_update_gate_worker(
     ended_on_unity_boundary = False
     maximum_iterations = transition_limit + transition_limit // 300 + 20
     environment: UnityEnvironment | None = None
+
+    def record_optimization_metadata(
+        result: OptimizationStepResult,
+        *,
+        online_before_update: str | None,
+        target_before_update: str | None,
+    ) -> None:
+        if not result.updated:
+            return
+        if record_update_hashes:
+            optimization_events[-1]["online_after_sha256"] = network_sha256(
+                controller.online_network
+            )
+        if not record_target_hashes:
+            return
+        if scheduled_selector is None:
+            raise LLAPIContractError(
+                f"{task_name} target-hash recording requires the scheduled selector."
+            )
+        if online_before_update is None or target_before_update is None:
+            raise LLAPIContractError(
+                f"{task_name} omitted pre-update network hashes."
+            )
+        event = optimization_events[-1]
+        epsilon_count = result.decision_count - 1
+        event["online_before_sha256"] = online_before_update
+        event["target_before_sha256"] = target_before_update
+        event["target_after_sha256"] = network_sha256(controller.target_network)
+        event["epsilon_sample"] = {
+            "completed_transition_count": epsilon_count,
+            "epsilon": scheduled_selector.schedule.epsilon_at(epsilon_count),
+        }
+        if result.target_synced:
+            target_sync_events.append(
+                {
+                    "decision_count": result.decision_count,
+                    "optimizer_update_count": result.optimizer_update_count,
+                    "target_sync_count": result.target_sync_count,
+                    "online_before_sha256": online_before_update,
+                    "online_after_sha256": network_sha256(
+                        controller.online_network
+                    ),
+                    "target_before_sha256": target_before_update,
+                    "target_after_sha256": network_sha256(
+                        controller.target_network
+                    ),
+                }
+            )
+
+    def pre_update_hashes() -> tuple[str | None, str | None]:
+        if (
+            not record_target_hashes
+            or controller.decision_count + 1 not in expected_update_decision_set
+        ):
+            return None, None
+        return (
+            network_sha256(controller.online_network),
+            network_sha256(controller.target_network),
+        )
+
+    def maybe_validate_prefix() -> None:
+        nonlocal prefix_boundary
+        if (
+            boundary_callback is not None
+            and prefix_boundary is None
+            and prefix_boundary_transition_count is not None
+            and len(transitions) == prefix_boundary_transition_count
+        ):
+            if scheduled_selector is None:
+                raise LLAPIContractError(
+                    f"{task_name} prefix validation requires the scheduled selector."
+                )
+            prefix_boundary = boundary_callback(
+                controller,
+                collector,
+                scheduled_selector,
+                transitions,
+            )
 
     try:
         environment_options: Dict[str, Any] = {
@@ -689,6 +831,7 @@ def execute_update_gate_worker(
                         np.zeros(branch_size, dtype=np.bool_)
                         for branch_size in (3, 2)
                     )
+                online_before_update, target_before_update = pre_update_hashes()
                 optimization_result = _complete_gate_transition(
                     collector,
                     agent_id,
@@ -701,13 +844,15 @@ def execute_update_gate_worker(
                     optimization_events=optimization_events,
                     episode_index=active_episode_index,
                     episode_decision_index=episode_decision_index,
-                    expected_update_decisions=expected_update_decisions,
+                    expected_update_decisions=expected_update_decision_set,
                     task_name=task_name,
+                    allowed_target_sync_updates=expected_target_sync_updates,
                 )
-                if optimization_result.updated and record_update_hashes:
-                    optimization_events[-1]["online_after_sha256"] = network_sha256(
-                        controller.online_network
-                    )
+                record_optimization_metadata(
+                    optimization_result,
+                    online_before_update=online_before_update,
+                    target_before_update=target_before_update,
+                )
                 if progress_interval > 0:
                     _emit_watch_progress(
                         optimization_result,
@@ -735,6 +880,8 @@ def execute_update_gate_worker(
                 if len(transitions) == transition_limit:
                     ended_on_unity_boundary = True
 
+            maybe_validate_prefix()
+
             if len(transitions) > transition_limit:
                 raise LLAPIContractError(
                     f"{task_name} exceeded its exact transition limit."
@@ -752,6 +899,7 @@ def execute_update_gate_worker(
                 )
                 action_masks = read_action_masks(decision_steps, decision_row)
                 if agent_id in collector.pending_agent_ids:
+                    online_before_update, target_before_update = pre_update_hashes()
                     optimization_result = _complete_gate_transition(
                         collector,
                         agent_id,
@@ -764,13 +912,15 @@ def execute_update_gate_worker(
                         optimization_events=optimization_events,
                         episode_index=active_episode_index,
                         episode_decision_index=episode_decision_index,
-                        expected_update_decisions=expected_update_decisions,
+                        expected_update_decisions=expected_update_decision_set,
                         task_name=task_name,
+                        allowed_target_sync_updates=expected_target_sync_updates,
                     )
-                    if optimization_result.updated and record_update_hashes:
-                        optimization_events[-1][
-                            "online_after_sha256"
-                        ] = network_sha256(controller.online_network)
+                    record_optimization_metadata(
+                        optimization_result,
+                        online_before_update=online_before_update,
+                        target_before_update=target_before_update,
+                    )
                     if progress_interval > 0:
                         _emit_watch_progress(
                             optimization_result,
@@ -785,6 +935,7 @@ def execute_update_gate_worker(
                     if len(transitions) == transition_limit:
                         reached_limit = True
                         break
+                maybe_validate_prefix()
                 if (
                     greedy_handoff_contract is not None
                     and controller.decision_count
@@ -815,7 +966,7 @@ def execute_update_gate_worker(
                     epsilon = scheduled_selector.schedule.epsilon_at(
                         completed_transition_count
                     )
-                    if completed_transition_count in schedule_sample_counts:
+                    if completed_transition_count in schedule_sample_count_set:
                         observed_epsilon_samples.append(
                             {
                                 "completed_transition_count": (
@@ -901,6 +1052,10 @@ def execute_update_gate_worker(
         if collector.pending_agent_ids:
             raise LLAPIContractError(
                 f"Pending decisions remain at cutoff: {collector.pending_agent_ids}."
+            )
+        if boundary_callback is not None and prefix_boundary is None:
+            raise LLAPIContractError(
+                f"{task_name} omitted its registered continuation-prefix boundary."
             )
         if greedy_handoff_contract is not None:
             if post_update_greedy_handoff is None:
@@ -989,14 +1144,45 @@ def execute_update_gate_worker(
             )
         if online_before == online_after:
             raise LLAPIContractError(f"{task_name} online weights did not change.")
-        if target_before != target_after:
+        if not expected_target_sync_updates:
+            if target_before != target_after:
+                raise LLAPIContractError(
+                    f"{task_name} target weights changed before synchronization."
+                )
+            if online_after == target_after:
+                raise LLAPIContractError(
+                    f"{task_name} online network still equals its frozen target."
+                )
+        elif online_after != target_after:
             raise LLAPIContractError(
-                f"{task_name} target weights changed before synchronization."
+                f"{task_name} online network was not copied to the target at its sync boundary."
             )
-        if online_after == target_after:
-            raise LLAPIContractError(
-                f"{task_name} online network still equals its frozen target."
-            )
+
+        if record_target_hashes:
+            if len(target_sync_events) != len(expected_target_sync_updates):
+                raise LLAPIContractError(
+                    f"{task_name} target-sync events do not match its count."
+                )
+            current_target_hash = target_before
+            for event in optimization_events:
+                if event["target_before_sha256"] != current_target_hash:
+                    raise LLAPIContractError(
+                        f"{task_name} target drifted before a registered sync."
+                    )
+                if event["target_synced"]:
+                    if event["optimizer_update_count"] not in expected_target_sync_updates:
+                        raise LLAPIContractError(
+                            f"{task_name} synchronized at an unregistered update."
+                        )
+                    current_target_hash = event["target_after_sha256"]
+                elif event["target_after_sha256"] != current_target_hash:
+                    raise LLAPIContractError(
+                        f"{task_name} target changed without a synchronization."
+                    )
+            if current_target_hash != target_after:
+                raise LLAPIContractError(
+                    f"{task_name} final target hash does not match its event history."
+                )
 
         action_tuple_counts = _action_tuple_counts(transitions)
         unique_action_tuple_count = sum(count > 0 for count in action_tuple_counts)
@@ -1153,6 +1339,30 @@ def execute_update_gate_worker(
                 "target_weights_unchanged": target_before == target_after,
             },
         }
+        if record_target_hashes:
+            trace["replay"]["storage"] = {
+                **controller.replay.storage_metrics.as_dict(),
+                "cursor": controller.replay.cursor,
+            }
+            trace["optimization"]["target_sync_events"] = target_sync_events
+            trace["optimization"]["update_epsilon_samples"] = [
+                event["epsilon_sample"] for event in optimization_events
+            ]
+            trace["final_clean_boundary"] = {
+                "transition_count": transition_limit,
+                "decision_count": controller.decision_count,
+                "optimizer_update_count": controller.optimizer_update_count,
+                "target_sync_count": controller.target_sync_count,
+                "pending_agent_ids": list(collector.pending_agent_ids),
+                "post_boundary_action_selected": False,
+                "last_selection_completed_transition_count": (
+                    scheduled_selection_count - 1
+                ),
+            }
+            if prefix_boundary is not None:
+                trace["continuation_prefix"] = prefix_boundary
+        if trace_metadata is not None:
+            trace.update(trace_metadata)
         if post_update_greedy_handoff is not None:
             trace["post_update_greedy_handoff"] = post_update_greedy_handoff
         if scheduled_epsilon_handoff is not None:
@@ -1176,6 +1386,130 @@ def execute_update_gate_worker(
             environment.close()
 
 
+def _validate_replay_storage(
+    replay: Dict[str, Any],
+    expected_replay: Dict[str, Any],
+    transition_limit: int,
+    *,
+    task_name: str,
+) -> None:
+    if {
+        key: replay[key]
+        for key in expected_replay
+        if key in replay
+    } != expected_replay or "storage" not in replay:
+        raise LLAPIContractError(
+            f"{task_name} replay counters differ from its contract."
+        )
+    storage = replay["storage"]
+    if storage["capacity"] != expected_replay["capacity"]:
+        raise LLAPIContractError(f"{task_name} replay capacity drifted.")
+    if storage["size"] != transition_limit:
+        raise LLAPIContractError(f"{task_name} replay storage size drifted.")
+    if storage["frame_reference_count"] != (
+        transition_limit * _FRAME_REFERENCES_PER_TRANSITION
+    ):
+        raise LLAPIContractError(f"{task_name} replay frame references drifted.")
+    if (
+        storage["accounted_storage_bytes"]
+        + storage["remaining_accounted_storage_bytes"]
+        != storage["max_accounted_storage_bytes"]
+    ):
+        raise LLAPIContractError(f"{task_name} replay storage accounting drifted.")
+
+
+def _validate_target_hash_relationships(
+    optimization: Dict[str, Any],
+    events: Sequence[Dict[str, Any]],
+    *,
+    expected_sync_count: int,
+    registered_sync_updates: Sequence[int],
+    task_name: str,
+    require_target_hashes: bool,
+) -> None:
+    if not require_target_hashes:
+        if optimization["target_before_sha256"] != optimization["target_after_sha256"]:
+            raise LLAPIContractError(f"{task_name} target weights changed.")
+        if optimization["online_after_sha256"] == optimization["target_after_sha256"]:
+            raise LLAPIContractError(
+                f"{task_name} online and target networks did not diverge."
+            )
+        return
+
+    if len(registered_sync_updates) != expected_sync_count:
+        raise LLAPIContractError(
+            f"{task_name} target-sync event list is incomplete."
+        )
+    current_online_hash = optimization["online_before_sha256"]
+    current_target_hash = optimization["target_before_sha256"]
+    observed_sync_events = []
+    for event in events:
+        if event["online_before_sha256"] != current_online_hash:
+            raise LLAPIContractError(
+                f"{task_name} online network drifted between updates."
+            )
+        current_online_hash = event["online_after_sha256"]
+        if event["target_before_sha256"] != current_target_hash:
+            raise LLAPIContractError(
+                f"{task_name} target drifted before a synchronization."
+            )
+        if event["target_synced"]:
+            if event["optimizer_update_count"] not in registered_sync_updates:
+                raise LLAPIContractError(
+                    f"{task_name} synchronized at an unregistered update."
+                )
+            current_target_hash = event["target_after_sha256"]
+            observed_sync_events.append(
+                {
+                    "decision_count": event["decision_count"],
+                    "optimizer_update_count": event["optimizer_update_count"],
+                    "target_sync_count": event["target_sync_count"],
+                    "online_before_sha256": event["online_before_sha256"],
+                    "online_after_sha256": event["online_after_sha256"],
+                    "target_before_sha256": event["target_before_sha256"],
+                    "target_after_sha256": event["target_after_sha256"],
+                }
+            )
+        elif event["target_after_sha256"] != current_target_hash:
+            raise LLAPIContractError(
+                f"{task_name} target changed without a synchronization."
+            )
+    if current_target_hash != optimization["target_after_sha256"]:
+        raise LLAPIContractError(
+            f"{task_name} final target hash differs from its event history."
+        )
+    if expected_sync_count:
+        if optimization["online_after_sha256"] != optimization[
+            "target_after_sha256"
+        ]:
+            raise LLAPIContractError(
+                f"{task_name} target did not equal online after synchronization."
+            )
+    elif (
+        optimization["target_before_sha256"]
+        != optimization["target_after_sha256"]
+        or optimization["online_after_sha256"]
+        == optimization["target_after_sha256"]
+    ):
+        raise LLAPIContractError(
+            f"{task_name} target/online boundary relationship is invalid."
+        )
+    if current_online_hash != optimization["online_after_sha256"]:
+        raise LLAPIContractError(
+            f"{task_name} final online hash differs from its event history."
+        )
+    if optimization["target_sync_events"] != observed_sync_events:
+        raise LLAPIContractError(
+            f"{task_name} target-sync event trace differs from update events."
+        )
+    if optimization["update_epsilon_samples"] != [
+        event["epsilon_sample"] for event in events
+    ]:
+        raise LLAPIContractError(
+            f"{task_name} optimizer epsilon samples differ from update events."
+        )
+
+
 def validate_update_gate_trace(
     trace: Dict[str, Any],
     result_schema: Dict[str, Any],
@@ -1183,15 +1517,24 @@ def validate_update_gate_trace(
     contract_path: Path,
     task_name: str,
     require_update_hashes: bool,
+    contract: Dict[str, Any] | None = None,
+    allow_replay_storage: bool = False,
+    allow_target_synchronization: bool = False,
+    expected_target_sync_updates: Sequence[int] = (),
+    require_target_hashes: bool = False,
 ) -> None:
     trace_schema = {
         **result_schema["$defs"]["trace"],
         "$defs": result_schema["$defs"],
     }
     Draft202012Validator(trace_schema).validate(trace)
-    contract = json.loads(contract_path.read_text(encoding="utf-8"))
-    collection = contract["collection"]
-    optimization_contract = contract["optimization"]
+    active_contract = (
+        contract
+        if contract is not None
+        else json.loads(contract_path.read_text(encoding="utf-8"))
+    )
+    collection = active_contract["collection"]
+    optimization_contract = active_contract["optimization"]
     transition_limit = int(collection["transition_limit"])
     if trace["contract_sha256"] != sha256_file(contract_path):
         raise LLAPIContractError(f"Trace contract hash differs from {task_name}.")
@@ -1209,7 +1552,7 @@ def validate_update_gate_trace(
         )
     if [item["episode_index"] for item in episodes] != list(range(len(episodes))):
         raise LLAPIContractError(f"{task_name} episode indices are not contiguous.")
-    if trace["replay"] != {
+    expected_replay = {
         "decision_count": transition_limit,
         "size": transition_limit,
         "capacity": int(optimization_contract["replay_capacity"]),
@@ -1219,7 +1562,15 @@ def validate_update_gate_trace(
             transition_limit
             == int(optimization_contract["replay_warmup_decisions"])
         ),
-    }:
+    }
+    if allow_replay_storage:
+        _validate_replay_storage(
+            trace["replay"],
+            expected_replay,
+            transition_limit,
+            task_name=task_name,
+        )
+    elif trace["replay"] != expected_replay:
         raise LLAPIContractError(
             f"{task_name} replay counters differ from its contract."
         )
@@ -1389,9 +1740,26 @@ def validate_update_gate_trace(
         raise LLAPIContractError(
             f"{task_name} update count differs from its contract."
         )
-    if optimization["target_sync_count"] != int(
+    expected_sync_count = int(
         optimization_contract["expected_target_synchronizations"]
+    )
+    registered_sync_updates = tuple(
+        int(value)
+        for value in optimization_contract.get(
+            "expected_target_sync_update_counts", expected_target_sync_updates
+        )
+    )
+    if not allow_target_synchronization and expected_sync_count != 0:
+        raise LLAPIContractError(
+            f"{task_name} target synchronization is not enabled for this gate."
+        )
+    if expected_target_sync_updates and registered_sync_updates != tuple(
+        expected_target_sync_updates
     ):
+        raise LLAPIContractError(
+            f"{task_name} target-sync events differ from its contract."
+        )
+    if optimization["target_sync_count"] != expected_sync_count:
         raise LLAPIContractError(
             f"{task_name} target-sync count differs from its contract."
         )
@@ -1409,6 +1777,18 @@ def validate_update_gate_trace(
         first_update + index * update_interval
         for index in range(expected_event_count)
     ]
+    registered_update_schedule = optimization_contract.get(
+        "expected_update_decision_schedule"
+    )
+    if registered_update_schedule is not None and registered_update_schedule != {
+        "first_decision": first_update,
+        "interval_decisions": update_interval,
+        "optimizer_update_count": expected_event_count,
+        "last_decision": expected_update_decisions[-1],
+    }:
+        raise LLAPIContractError(
+            f"{task_name} contract update schedule differs from its schedule."
+        )
     if optimization_contract.get(
         "expected_update_decisions",
         expected_update_decisions,
@@ -1443,12 +1823,14 @@ def validate_update_gate_trace(
         raise LLAPIContractError(f"{task_name} networks did not begin equal.")
     if optimization["online_before_sha256"] == optimization["online_after_sha256"]:
         raise LLAPIContractError(f"{task_name} online weights did not change.")
-    if optimization["target_before_sha256"] != optimization["target_after_sha256"]:
-        raise LLAPIContractError(f"{task_name} target weights changed.")
-    if optimization["online_after_sha256"] == optimization["target_after_sha256"]:
-        raise LLAPIContractError(
-            f"{task_name} online and target networks did not diverge."
-        )
+    _validate_target_hash_relationships(
+        optimization,
+        events,
+        expected_sync_count=expected_sync_count,
+        registered_sync_updates=registered_sync_updates,
+        task_name=task_name,
+        require_target_hashes=require_target_hashes,
+    )
     if require_update_hashes:
         update_hashes = [event["online_after_sha256"] for event in events]
         previous_hashes = [optimization["online_before_sha256"], *update_hashes[:-1]]

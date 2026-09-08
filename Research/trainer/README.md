@@ -34,9 +34,13 @@ records. All output paths below are generated and ignored.
 - `trajectory_runner.py` — shared CLI dispatch and orchestration for the eight
   update/handoff entry points, preserving their existing modes;
 - `trajectory_validation.py` — repeated contract/prefix and scheduled-selector
-  relationships with explicit historical field mappings; and
+  relationships for the registered historical gates, with explicit historical
+  field mappings; and
 - `update_gate.py` — shared bounded Unity collection and optimizer-gate
-  execution for the update-trajectory milestones.
+  execution for the update-trajectory milestones;
+- `run_bdq_long_horizon_smoke.py` — the contract-driven R3R continuation pilot
+  and first target-synchronization gate, including fresh player copies,
+  checkpoint differential checks, and Unity-free restore checks.
 
 The `run_bdq_*` files preserve historical commands and milestone-specific
 contracts, expectations, validation, and summaries. Generic behavior used by
@@ -46,6 +50,14 @@ extend a shared execution mechanism through contract/configuration data. A new
 bespoke runner/test/schema stack is appropriate only when that claim requires a
 substantially different contract or execution boundary; a new label, cutoff,
 or expected value alone is not enough.
+
+The shared trajectory validators are deliberately specialized to these
+registered milestones. `UPDATE_PREFIX_FIELDS` explicitly names the first four
+historical update fields, and the scheduled-optimization and continuation
+checks enforce the registered pre-target-synchronization and no-post-update
+action boundaries. These checks preserve the existing acceptance gates; they do
+not make the package an unrestricted training runner. A future update or open-
+ended training path needs its own contract mapping, boundary rules, and tests.
 
 The former high-level ML-Agents trainer, policy, trajectory, settings, YAML,
 plugin registration, and next-mask registry were superseded and removed.
@@ -102,6 +114,41 @@ Legacy Unity Editor batch mode may also invoke the same
 `QuickDraw.Editor.ResearchBasicBuild.BuildWindows` method. Build logs may
 contain sensitive command-line context; retain only necessary excerpts.
 
+## Isolated historical player copies
+
+Any command that launches a standalone historical player must use a fresh copy
+of the complete player directory. Copy the executable, its `*_Data` directory,
+`UnityPlayer.dll`, and every other sibling file before starting a runner. The
+ML-Agents timer writer places `ML-Agents/Timers/<scene>_timers.json` beneath the
+player data directory, so pointing `--env` at a historical build directory can
+rewrite a frozen profiling log even when the runner's output directory is new.
+
+The following copies both player directories into ignored, fresh locations and
+then uses only those copies for standalone runs. Choose new destination names
+for every reproduction; the command deliberately refuses an existing target.
+
+```powershell
+$isolatedPlayers = 'Artifacts\Experiments\isolated-players'
+New-Item -ItemType Directory -LiteralPath $isolatedPlayers -Force | Out-Null
+
+$playerSources = @{
+  R3M = 'Artifacts\Experiments\r3m-fourth-update\build'
+  R3O = 'Artifacts\Experiments\r3o-fifth-update\build'
+}
+foreach ($name in $playerSources.Keys) {
+  $destination = Join-Path $isolatedPlayers $name
+  if (Test-Path -LiteralPath $destination) {
+    throw "Choose a fresh isolated player directory: $destination"
+  }
+  New-Item -ItemType Directory -LiteralPath $destination | Out-Null
+  Copy-Item -Path (Join-Path $playerSources[$name] '*') `
+    -Destination $destination -Recurse
+}
+
+$player = Join-Path $isolatedPlayers 'R3M\QuickDrawResearchBasic.exe'
+$playerR3O = Join-Path $isolatedPlayers 'R3O\QuickDrawResearchBasic.exe'
+```
+
 ## Milestone runners
 
 Each acceptance runner requires a fresh `--output` directory. It starts two
@@ -126,12 +173,11 @@ Unity-free Python restorer, as registered by its contract.
 | R3O update 5 | `run_bdq_fifth_update_smoke.py` | [`R3O.md`](../../docs/evidence/R3O.md) |
 | R3P checkpoint round-trip | `run_bdq_checkpoint_roundtrip_smoke.py` | [`R3P.md`](../../docs/evidence/R3P.md) |
 | R3Q live-derived checkpoint | `run_bdq_live_checkpoint_smoke.py` | [`R3Q.md`](../../docs/evidence/R3Q.md) |
+| R3R long-horizon continuation and first sync | `run_bdq_long_horizon_smoke.py` | [`R3R.md`](../../docs/evidence/R3R.md) |
 
-Set the player once, then select the required command:
+Set up the isolated copies above, then select the required command:
 
 ```powershell
-$player = 'Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.exe'
-
 & $python Research\trainer\run_bdq_llapi_smoke.py `
   --env $player --output Artifacts\Experiments\r3d-llapi\acceptance
 
@@ -160,15 +206,35 @@ $player = 'Artifacts\Experiments\r3m-fourth-update\build\QuickDrawResearchBasic.
   --env $player --output Artifacts\Experiments\r3m-fourth-update\acceptance
 
 & $python Research\trainer\run_bdq_fifth_update_smoke.py `
-  --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
+  --env $playerR3O `
   --output Artifacts\Experiments\r3o-fifth-update\acceptance
 
 & $python Research\trainer\run_bdq_checkpoint_roundtrip_smoke.py `
   --output Artifacts\Experiments\r3p-checkpoint-roundtrip\acceptance
 
 & $python Research\trainer\run_bdq_live_checkpoint_smoke.py `
-  --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
+  --env $playerR3O `
   --output Artifacts\Experiments\r3q-live-checkpoint\acceptance
+```
+
+R3R creates a fresh complete copy for each of its two workers. Run the pilot
+first; the synchronization command refuses to start without its passing pilot
+result:
+
+```powershell
+$r3rPilot = 'Artifacts\Experiments\r3r-long-horizon-pilot-reproduction'
+$r3rSync = 'Artifacts\Experiments\r3r-long-horizon-synchronization-reproduction'
+
+& $python Research\trainer\run_bdq_long_horizon_smoke.py `
+  --stage pilot `
+  --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
+  --output $r3rPilot
+
+& $python Research\trainer\run_bdq_long_horizon_smoke.py `
+  --stage synchronization `
+  --pilot-result (Join-Path $r3rPilot 'result.json') `
+  --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
+  --output $r3rSync
 ```
 
 R3I is a Python-only unit gate:
@@ -253,8 +319,11 @@ Unity invocation are preserved in [`R3N.md`](../../docs/evidence/R3N.md).
 
 ## Claim boundary
 
-These runners are bounded collection/integration gates. They do not demonstrate
-extended training, target synchronization, checkpoint/export, learned-policy
-evaluation, ROCm training, strategic combat, reflex behavior, local-model
-behavior, or policy effectiveness. Current truth is maintained in
+These runners are bounded collection/integration gates. R3R demonstrates only
+its registered one-seed continuation boundaries, first target synchronization,
+checkpoint differential, and deterministic Unity-free restore checks. The suite
+does not demonstrate unrestricted training, convergence, learned-policy
+effectiveness, held-out evaluation, checkpoint/export beyond the registered
+restore checks, ROCm training, strategic combat, reflex behavior, or local-model
+behavior. Current truth is maintained in
 [`STATE.md`](../../STATE.md).

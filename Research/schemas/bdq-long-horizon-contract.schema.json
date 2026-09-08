@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-long-horizon-contract.schema.json",
+  "title": "QuickDraw bounded long-horizon BDQ continuation contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_r3o_contract",
+    "base_r3q_contract",
+    "base_checkpoint_contract",
+    "runtime",
+    "package",
+    "transport",
+    "player_execution",
+    "continuation_prefix",
+    "epsilon_schedule",
+    "stages",
+    "determinism",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-long-horizon.v1"},
+    "task": {"const": "R3R"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_r3o_contract": {"$ref": "#/$defs/contract_binding_r3o"},
+    "base_r3q_contract": {"$ref": "#/$defs/contract_binding_r3q"},
+    "base_checkpoint_contract": {"$ref": "#/$defs/contract_binding_checkpoint"},
+    "runtime": {"$ref": "#/$defs/runtime"},
+    "package": {"$ref": "#/$defs/package"},
+    "transport": {"$ref": "#/$defs/transport"},
+    "player_execution": {"$ref": "#/$defs/player_execution"},
+    "continuation_prefix": {"$ref": "#/$defs/continuation_prefix"},
+    "epsilon_schedule": {"$ref": "#/$defs/epsilon_schedule"},
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pilot", "synchronization"],
+      "properties": {
+        "pilot": {"$ref": "#/$defs/stage"},
+        "synchronization": {"$ref": "#/$defs/stage"}
+      }
+    },
+    "determinism": {"$ref": "#/$defs/determinism"},
+    "exclusions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "contract_binding_r3o": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-fifth-update-contract-v1.json"},
+        "sha256": {"const": "35dcd10971878bef31d8e2dd9392599cd71607a009ac6cb8d93bff3857eadcb0"},
+        "schema_version": {"const": "quickdraw.bdq-fifth-update.v1"}
+      }
+    },
+    "contract_binding_r3q": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-live-checkpoint-contract-v1.json"},
+        "sha256": {"const": "a5e96d9e40202c1326cee0c6d738cc98ee82dcc76812de823a12a84c1cb5f6f6"},
+        "schema_version": {"const": "quickdraw.bdq-live-checkpoint.v1"}
+      }
+    },
+    "contract_binding_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"const": "Research/trainer/bdq-checkpoint-contract-v1.json"},
+        "sha256": {"const": "071fa03eac09f451bf87455951a634943e77ba6873a3457ca6bf00a4d447c755"},
+        "schema_version": {"const": "quickdraw.bdq-checkpoint.v1"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "device": {"const": "cpu"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "version", "metadata_path", "trainer_entry_points"],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.3.0"},
+        "metadata_path": {"const": "Research/trainer/pyproject.toml"},
+        "trainer_entry_points": {"const": []}
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api",
+        "behavior_name",
+        "agent_count",
+        "observation_shape",
+        "observation_layout",
+        "observation_dtype",
+        "discrete_branches",
+        "transition_completion",
+        "truncation_mask_transport",
+        "privileged_scene_inference_permitted"
+      ],
+      "properties": {
+        "api": {"const": "mlagents_envs.environment.UnityEnvironment"},
+        "behavior_name": {"const": "QuickDrawResearchBasic"},
+        "agent_count": {"const": 1},
+        "observation_shape": {"const": [84, 84, 4]},
+        "observation_layout": {"const": "HWC"},
+        "observation_dtype": {"const": "float32"},
+        "discrete_branches": {"const": [3, 2]},
+        "transition_completion": {"const": "complete the pending action when the same agent next appears in DecisionSteps or TerminalSteps"},
+        "truncation_mask_transport": {"const": "quickdraw.basic-truncation-mask.v1"},
+        "privileged_scene_inference_permitted": {"const": false}
+      }
+    },
+    "player_execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_settings_path",
+        "run_in_background",
+        "source_executable_argument",
+        "copy_complete_player",
+        "required_siblings",
+        "no_graphics",
+        "standalone_player_arguments",
+        "profiling_output_directory"
+      ],
+      "properties": {
+        "project_settings_path": {"const": "ProjectSettings/ProjectSettings.asset"},
+        "run_in_background": {"const": true},
+        "source_executable_argument": {"const": "--env"},
+        "copy_complete_player": {"const": true},
+        "required_siblings": {"const": ["QuickDrawResearchBasic_Data", "UnityPlayer.dll"]},
+        "no_graphics": {"const": false},
+        "standalone_player_arguments": {"const": []},
+        "profiling_output_directory": {"const": "worker-output/player-log"}
+      }
+    },
+    "continuation_prefix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "transition_count",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "accepted_serialized_trace_sha256",
+        "accepted_canonical_trace_sha256",
+        "canonical_transitions_sha256",
+        "online_network_sha256",
+        "target_network_sha256",
+        "checkpoint_state_sha256",
+        "pending_agent_ids",
+        "post_boundary_action_selected"
+      ],
+      "properties": {
+        "source": {"const": "accepted R3O trace and R3Q live-derived checkpoint"},
+        "transition_count": {"const": 10016},
+        "decision_count": {"const": 10016},
+        "optimizer_update_count": {"const": 5},
+        "target_sync_count": {"const": 0},
+        "accepted_serialized_trace_sha256": {"const": "798492f929b27dfbef5b4d3e6f9c886fdd34193f958359e4b6b9de49e535fc2f"},
+        "accepted_canonical_trace_sha256": {"const": "e50182eb2ac6459b835648b3d3eadb7e16f27b33e3c22084de602bfe0c686eca"},
+        "canonical_transitions_sha256": {"const": "3f973d98648255fda4e37637120c3591f14560e958c71cf048a09df506be37ba"},
+        "online_network_sha256": {"const": "8275fed953fb594fea0e88c50da15a862e1db6a3e296dd953dd10e048c2c3cbe"},
+        "target_network_sha256": {"const": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb"},
+        "checkpoint_state_sha256": {"const": "a899a2e0832623ef933a11e086db1c9036d9e5fc112aab2cd6eccd59b7d9299b"},
+        "pending_agent_ids": {"const": []},
+        "post_boundary_action_selected": {"const": false}
+      }
+    },
+    "epsilon_schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "selector_class",
+        "completed_transition_count_source",
+        "replay_warmup_decisions",
+        "decay_decisions",
+        "initial_epsilon",
+        "final_epsilon",
+        "sample_policy",
+        "continuous_selector_rng_from_completed_count_zero"
+      ],
+      "properties": {
+        "class": {"const": "quickdraw_bdq.exploration.LinearEpsilonSchedule"},
+        "selector_class": {"const": "quickdraw_bdq.llapi.ScheduledEpsilonGreedyBDQActionSelector"},
+        "completed_transition_count_source": {"const": "BDQOptimizerController.decision_count"},
+        "replay_warmup_decisions": {"const": 10000},
+        "decay_decisions": {"const": 100000},
+        "initial_epsilon": {"const": 1.0},
+        "final_epsilon": {"const": 0.1},
+        "sample_policy": {"const": "record completed-transition count 0 and the count immediately before every registered optimizer decision"},
+        "continuous_selector_rng_from_completed_count_zero": {"const": true}
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "order",
+        "collection",
+        "optimization",
+        "epsilon_schedule",
+        "continuation",
+        "final_clean_boundary",
+        "target_sync_events",
+        "post_boundary_action_policy"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "order": {"type": "integer", "enum": [1, 2]},
+        "collection": {"$ref": "#/$defs/stage_collection"},
+        "optimization": {"$ref": "#/$defs/stage_optimization"},
+        "epsilon_schedule": {"$ref": "#/$defs/stage_epsilon_schedule"},
+        "continuation": {"$ref": "#/$defs/stage_continuation"},
+        "final_clean_boundary": {"$ref": "#/$defs/final_clean_boundary"},
+        "target_sync_events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/registered_sync_event"}
+        },
+        "post_boundary_action_policy": {"const": "stop_before_live_action; synthetic_selection_only"}
+      }
+    },
+    "stage_collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_seed",
+        "policy_seed",
+        "exploration_seed",
+        "selector",
+        "epsilon_decay_enabled",
+        "start_transition_count",
+        "transition_limit",
+        "scheduled_transition_count",
+        "minimum_completed_episodes",
+        "minimum_unique_action_tuples",
+        "require_no_pending_decision_at_cutoff"
+      ],
+      "properties": {
+        "scenario_seed": {"const": 31001},
+        "policy_seed": {"const": 51001},
+        "exploration_seed": {"const": 61001},
+        "selector": {"const": "seeded_scheduled_branch_epsilon_greedy"},
+        "epsilon_decay_enabled": {"const": true},
+        "start_transition_count": {"const": 10016},
+        "transition_limit": {"type": "integer", "enum": [13996, 49996]},
+        "scheduled_transition_count": {"type": "integer", "enum": [13996, 49996]},
+        "minimum_completed_episodes": {"const": 1},
+        "minimum_unique_action_tuples": {"const": 6},
+        "require_no_pending_decision_at_cutoff": {"const": true}
+      }
+    },
+    "stage_optimization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay_capacity",
+        "replay_warmup_decisions",
+        "batch_size",
+        "gamma",
+        "optimizer",
+        "learning_rate",
+        "optimizer_update_interval_decisions",
+        "hard_target_sync_interval_optimizer_updates",
+        "expected_first_update_decision",
+        "expected_update_decision_schedule",
+        "expected_optimizer_updates",
+        "expected_target_synchronizations",
+        "expected_target_sync_update_counts",
+        "require_finite_loss",
+        "require_finite_mean_absolute_td_error",
+        "require_online_weights_changed_after_each_update",
+        "require_target_weights_unchanged",
+        "record_every_optimizer_update",
+        "record_epsilon_sample_per_update"
+      ],
+      "properties": {
+        "replay_capacity": {"const": 100000},
+        "replay_warmup_decisions": {"const": 10000},
+        "batch_size": {"const": 64},
+        "gamma": {"const": 0.99},
+        "optimizer": {"const": "Adam"},
+        "learning_rate": {"const": 0.0001},
+        "optimizer_update_interval_decisions": {"const": 4},
+        "hard_target_sync_interval_optimizer_updates": {"const": 10000},
+        "expected_first_update_decision": {"const": 10000},
+        "expected_update_decision_schedule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["first_decision", "interval_decisions", "optimizer_update_count", "last_decision"],
+          "properties": {
+            "first_decision": {"const": 10000},
+            "interval_decisions": {"const": 4},
+            "optimizer_update_count": {"type": "integer", "enum": [1000, 10000]},
+            "last_decision": {"type": "integer", "enum": [13996, 49996]}
+          }
+        },
+        "expected_optimizer_updates": {"type": "integer", "enum": [1000, 10000]},
+        "expected_target_synchronizations": {"type": "integer", "enum": [0, 1]},
+        "expected_target_sync_update_counts": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "maxItems": 1
+        },
+        "require_finite_loss": {"const": true},
+        "require_finite_mean_absolute_td_error": {"const": true},
+        "require_online_weights_changed_after_each_update": {"const": true},
+        "require_target_weights_unchanged": {"type": "boolean"},
+        "record_every_optimizer_update": {"const": true},
+        "record_epsilon_sample_per_update": {"const": true}
+      }
+    },
+    "stage_epsilon_schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_count",
+        "full_exploration_selection_count",
+        "decay_selection_count",
+        "first_decay_completed_transition_count",
+        "last_selection_completed_transition_count"
+      ],
+      "properties": {
+        "selection_count": {"type": "integer", "enum": [13996, 49996]},
+        "full_exploration_selection_count": {"const": 10001},
+        "decay_selection_count": {"type": "integer", "enum": [3995, 39995]},
+        "first_decay_completed_transition_count": {"const": 10001},
+        "last_selection_completed_transition_count": {"type": "integer", "enum": [13995, 49995]}
+      }
+    },
+    "stage_continuation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "prefix_validation_required", "prefix_checkpoint_state_required", "unity_process_resume_claim"],
+      "properties": {
+        "method": {"const": "deterministic_replay_of_accepted_prefix_then_trainer_state_continuation"},
+        "prefix_validation_required": {"const": true},
+        "prefix_checkpoint_state_required": {"const": true},
+        "unity_process_resume_claim": {"const": false}
+      }
+    },
+    "final_clean_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transition_count",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "pending_agent_ids",
+        "post_boundary_action_selected",
+        "last_selection_completed_transition_count",
+        "target_equals_online",
+        "target_unchanged_from_prefix"
+      ],
+      "properties": {
+        "transition_count": {"type": "integer", "enum": [13996, 49996]},
+        "decision_count": {"type": "integer", "enum": [13996, 49996]},
+        "optimizer_update_count": {"type": "integer", "enum": [1000, 10000]},
+        "target_sync_count": {"type": "integer", "enum": [0, 1]},
+        "pending_agent_ids": {"const": []},
+        "post_boundary_action_selected": {"const": false},
+        "last_selection_completed_transition_count": {"type": "integer", "enum": [13995, 49995]},
+        "target_equals_online": {"type": "boolean"},
+        "target_unchanged_from_prefix": {"type": "boolean"}
+      }
+    },
+    "registered_sync_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "target_before_sha256",
+        "target_after_equals_online_after"
+      ],
+      "properties": {
+        "decision_count": {"const": 49996},
+        "optimizer_update_count": {"const": 10000},
+        "target_sync_count": {"const": 1},
+        "target_before_sha256": {"const": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb"},
+        "target_after_equals_online_after": {"const": true}
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fresh_processes",
+        "exact_trace_equality",
+        "torch_num_threads",
+        "torch_num_interop_threads",
+        "deterministic_algorithms",
+        "unity_player_required_for_live_collection",
+        "unity_process_resume_proven"
+      ],
+      "properties": {
+        "fresh_processes": {"const": 2},
+        "exact_trace_equality": {"const": true},
+        "torch_num_threads": {"const": 1},
+        "torch_num_interop_threads": {"const": 1},
+        "deterministic_algorithms": {"const": true},
+        "unity_player_required_for_live_collection": {"const": true},
+        "unity_process_resume_proven": {"const": false}
+      }
+    }
+  }
+}

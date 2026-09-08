@@ -47,7 +47,7 @@ implemented and repeatable. It is the control environment for R3.
 
 ## R3 — Branching Double DQN
 
-Status: implementation and acceptance infrastructure complete through R3Q;
+Status: implementation and acceptance infrastructure complete through R3R;
 the full R3 learning and evaluation goal is not complete.
 
 Completed boundaries:
@@ -70,6 +70,9 @@ Completed boundaries:
 - R3Q: live-derived checkpoint save/restore at the unchanged R3O boundary,
   with exact state and next replay sample parity in a fresh Python process
   without Unity.
+- R3R: bounded long-horizon continuation through optimizer update 1,000 in the
+  pilot and update 10,000 with the first target synchronization, with exact
+  fresh-worker checkpoint and fresh-restorer parity.
 
 Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 
@@ -83,9 +86,10 @@ Remaining R3 work, in dependency order:
 3. Evaluate held-out Basic success and random-policy improvement.
 4. Run and report the joint-action Double DQN factorization control.
 
-The first target synchronization is scheduled by optimizer-update count; it
-has not occurred. A roadmap item is not permission to start it or to choose the
-next SSNT.
+The first target synchronization is accepted at the bounded R3R update-10,000
+boundary. Optimizer update 10,001, a second synchronization, and the remaining
+live-trajectory/export work are not authorized by this roadmap entry; a
+roadmap item is not permission to choose the next SSNT.
 
 ## Deferred post-R3 variant — Gradual-motion Basic
 
@@ -147,8 +151,10 @@ R3P is completed, accepted, committed, and pushed at
 `0d78c783897225395ed44304fb6b0124a4620582`. A behavior-preserving
 acceptance-harness consolidation is completed, verified, committed, and pushed
 at `4fa825b6c8ca45797abaaf6da85cde9357aa3657`; it does not advance the
-research roadmap. R3Q is implemented and verified in the current working tree
-on 2026-09-04 (uncommitted and unpushed by instruction): it persists and
-exactly restores the live-derived R3O trainer state without advancing Unity or
-starting export work. See [`TASK.md`](TASK.md) for the exact scope and
+research roadmap. R3Q is implemented and verified at the committed checkpoint;
+it persists and exactly restores the live-derived R3O trainer state without
+advancing Unity or starting export work. R3R is implemented and verified in the
+current uncommitted and unpushed task changes; it adds the bounded continuation
+pilot and first target synchronization without proving Unity-process resume or
+policy effectiveness. See [`TASK.md`](TASK.md) for the exact scope and
 [`STATE.md`](STATE.md) for current truth.
