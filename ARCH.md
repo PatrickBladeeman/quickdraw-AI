@@ -175,12 +175,8 @@ not be hidden behind placeholder descriptions that imply implementation.
   terminal/truncation truth.
 - Python owns collection, replay, action selection, targets, and optimization;
   it never infers Unity legality from privileged scene state.
-- Every research milestone states a genuinely new acceptance or research
-  claim. It extends an existing execution boundary through shared acceptance
-  mechanisms plus contract/configuration data unless the claim also requires a
-  substantially different contract or execution boundary; only then is a
-  bespoke runner/test/schema stack justified. A new label, cutoff, or expected
-  value alone is not a new boundary.
+- Milestone runners compose canonical capability modules; the criteria for
+  adding an execution boundary belong in [AGENTS.md](AGENTS.md#implementation-principles).
 - Policies emit typed intent; they do not emulate keyboard or mouse input.
 - The shared actuator is the exclusive intent-to-mechanics path.
 - A strategic director may publish only a validated categorical goal. It may

@@ -5,10 +5,6 @@ authorization document and does not repeat the registered numeric experiment
 contract. See [`TASK.md`](TASK.md) for current authorization and
 [`RESEARCH.md`](RESEARCH.md) for frozen values.
 
-Status terms are deliberately distinct: planned, implemented, verified,
-committed, pushed, experimentally validated, and effectiveness demonstrated
-must not be collapsed.
-
 ## Completed foundation
 
 ### Deterministic Tasks 1–8
@@ -62,16 +58,13 @@ Completed boundaries:
 - R3I/R3J: stateless production epsilon schedule and bounded live integration.
 - R3K/R3M: scheduled optimizer updates 3 and 4.
 - R3L: diagnostic update-3 greedy handoff.
-- R3N: lossless, memory-bounded replay representation with frozen-trace
-  regression.
-- R3O: bounded scheduled optimizer update 5 at transition 10,016.
+- R3N: lossless, memory-bounded replay with frozen-trace regression.
+- R3O: bounded scheduled optimizer update 5.
 - R3P: deterministic Python-only checkpoint round-trip on the registered
   synthetic workload.
-- R3Q: live-derived checkpoint save/restore at the unchanged R3O boundary,
-  with exact state and next replay sample parity in a fresh Python process
-  without Unity.
-- R3R: bounded long-horizon continuation through optimizer update 1,000 in the
-  pilot and update 10,000 with the first target synchronization, with exact
+- R3Q: live-derived checkpoint save/restore at the unchanged R3O boundary;
+  exact state and next-sample parity in a fresh Python process without Unity.
+- R3R: bounded continuation pilot and first target synchronization, with
   fresh-worker checkpoint and fresh-restorer parity.
 - R3S: live Unity-process handoff across a fresh trainer restore at the R3R
   boundary, plus accepted-network ONNX/CPU inference parity.
@@ -84,11 +77,6 @@ Remaining R3 work, in dependency order:
    curves, manifests, and hashes.
 2. Evaluate held-out Basic success and random-policy improvement.
 3. Run and report the joint-action Double DQN factorization control.
-
-The first target synchronization is accepted at the bounded R3R update-10,000
-boundary. Optimizer update 10,001, a second synchronization, extended live
-resumption, and effectiveness evaluation remain outside the accepted R3S
-boundary; a roadmap item is not permission to choose the next SSNT.
 
 ## Deferred post-R3 variant — Gradual-motion Basic
 
@@ -144,18 +132,8 @@ commands, and limitations. Keep raw runs and large models in the ignored
 artifact boundary. Every published claim must trace to a run manifest and an
 analysis command.
 
-## Current authorization
+## Current execution boundary
 
-R3P is completed, accepted, committed, and pushed at
-`0d78c783897225395ed44304fb6b0124a4620582`. A behavior-preserving
-acceptance-harness consolidation is completed, verified, committed, and pushed
-at `4fa825b6c8ca45797abaaf6da85cde9357aa3657`; it does not advance the
-research roadmap. R3Q is implemented and verified at the committed checkpoint;
-it persists and exactly restores the live-derived R3O trainer state without
-advancing Unity or starting export work. R3R is implemented, accepted,
-committed, and pushed at the repository checkpoint; it adds the bounded
-continuation pilot and first target synchronization without proving
-Unity-process resume or policy effectiveness. R3S is implemented and accepted
-in the current uncommitted task changes; it proves only run-owned live-process
-continuity and software-level ONNX/CPU parity. See [`TASK.md`](TASK.md) for the
-exact scope and [`STATE.md`](STATE.md) for current truth.
+See [STATE.md](STATE.md) for the current implementation frontier and
+[TASK.md](TASK.md) for current authorization. Roadmap ordering does not
+authorize implementation.

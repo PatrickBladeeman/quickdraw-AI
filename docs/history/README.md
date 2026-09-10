@@ -10,6 +10,8 @@
 - [`DETERMINISTIC_V1.md`](DETERMINISTIC_V1.md) preserves the completed Tasks 1–8 vertical slice and its continuing role as a regression fixture.
 - [`SUPERSEDED_APPROACHES.md`](SUPERSEDED_APPROACHES.md) records approaches that must not silently return as current requirements.
 - [`DOCUMENTATION_MIGRATION_2026-08-29.md`](DOCUMENTATION_MIGRATION_2026-08-29.md) records the move from mirrored monoliths to selective loading.
+- [`MAINTENANCE_2026-09.md`](MAINTENANCE_2026-09.md) preserves later maintenance checkpoints and the historical timing-log exception.
+- Completed task specifications: [R3R](tasks/R3R.md) and [R3S](tasks/R3S.md). These preserve scope and acceptance requirements, not current authorization; results remain in evidence.
 
 Detailed verification belongs in [`docs/evidence`](../evidence/README.md).
 Decision rationale belongs in [`docs/decisions`](../decisions/README.md).
