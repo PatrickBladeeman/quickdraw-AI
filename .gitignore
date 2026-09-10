@@ -35,6 +35,7 @@ sysinfo.txt
 
 # Generated research artifacts and disposable environments
 /Artifacts/Experiments/
+/practice/
 __pycache__/
 *.py[cod]
 *.egg-info/

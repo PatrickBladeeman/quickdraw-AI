@@ -38,13 +38,14 @@ The complete frozen design, hypotheses, thresholds, and fairness rules are in
 The deterministic Unity fixture, reproducible ML infrastructure, and
 slot-based `Research_Basic` visual benchmark are implemented and verified. The
 custom Python BDQ path has progressed through direct LLAPI collection, lossless
-bounded replay, the production epsilon schedule, and four bounded Unity-derived
-optimizer updates ending at transition 10,012. This is integration evidence,
+bounded replay, the production epsilon schedule, the accepted first target
+synchronization at transition 49,996, and the bounded R3S live-process handoff
+and ONNX/CPU parity gates. This is integration and serving-boundary evidence,
 not extended training or a useful-policy result.
 
-Extended training, target synchronization, checkpoint/export, learned-policy
-evaluation, strategic combat, the research evade reflex, the local-model
-runtime, and factorial evaluation remain unimplemented. See
+Extended training beyond the accepted R3S boundary, learned-policy evaluation,
+strategic combat, the research evade reflex, the local-model runtime, and
+factorial evaluation remain unimplemented. See
 [`STATE.md`](STATE.md) for current truth and
 [`docs/evidence/`](docs/evidence/README.md) for exact results and limitations.
 

@@ -14,9 +14,10 @@ or detailed acceptance evidence.
 
 ## Repository checkpoint
 
-- R3R task-start branch: `main`; HEAD and local `origin/main` both pointed to
-  `d4f935152c4731c8892b49ffac38d23d90895a7b`, the second implementation
-  consolidation. That commit builds on the R3Q checkpoint implementation at
+- R3S task-start branch: `main`; HEAD and local `origin/main` both point to
+  `885da143b01e6309e7b215afd684fd2977fd2f90`, the committed R3R
+  long-horizon continuation and first-sync implementation. That commit builds
+  on the R3Q checkpoint implementation at
   `549617b08b0d88199c0a97531350d9c61a2428ae`.
 - The hierarchical documentation migration and its QA cleanup are committed
   and pushed in `563c726fb3e782bd3bece11c0ce38dbcf3a8feed` and
@@ -25,14 +26,17 @@ or detailed acceptance evidence.
   and pushed in `75bfb6427a1f17518e0b8487d7cdf8c31399f7d8`.
 - The acceptance-harness consolidation and repository-wide bloat-control rule
   are committed and pushed in `4fa825b6c8ca45797abaaf6da85cde9357aa3657`.
-- The committed research implementation frontier is R3Q, extending the R3P
-  deterministic Python-only trainer checkpoint round-trip. The R3R
-  continuation implementation, contracts, tests, and evidence are the
-  current uncommitted task changes and have not been committed or pushed.
+- The committed research implementation frontier at task start was R3R; the
+  R3S live-resume/export implementation, contracts, tests, and evidence are
+  the current uncommitted task changes and have not been committed or pushed.
 - The verified live collection frontier now includes R3R: a bounded
   deterministic continuation from the accepted R3Q boundary through transition
   49,996, optimizer update 10,000, and the first target synchronization. R3R
   uses fresh complete player copies and does not claim Unity-process resume.
+- R3S extends that frontier with two accepted fresh live-process handoffs and
+  exact ONNX/CPU inference parity for the accepted R3R online network. Its raw
+  result and rejected attempts are retained under the ignored R3S artifact
+  directory.
 
 ## Current research phase
 
@@ -44,7 +48,10 @@ contains five scheduled batch-64 optimizer updates on one deterministic
 Unity-derived prefix, while R3R continues that accepted trainer state through
 update 1,000 in its pilot and update 10,000 with the first target
 synchronization. R3R is a one-seed deterministic continuation gate, not a
-policy-effectiveness result or unrestricted training run.
+policy-effectiveness result or unrestricted training run. R3S then proves
+run-owned live-process continuity for one bounded post-sync action and
+software-level ONNX/CPU parity for the accepted online network; neither claim
+is a policy-effectiveness result.
 
 ## Implemented and verified
 
@@ -80,7 +87,7 @@ policy-effectiveness result or unrestricted training run.
   is a separately versioned future variant.
 - Detailed evidence: [`docs/evidence/DETERMINISTIC-R0-R2.md`](docs/evidence/DETERMINISTIC-R0-R2.md).
 
-### R3 — BDQ boundary through R3R
+### R3 — BDQ boundary through R3S
 
 - R3A/R3B implement and test replay semantics, the registered visual dueling
   branch network, legal masking, Double-DQN targets, averaged branch Huber
@@ -114,11 +121,17 @@ policy-effectiveness result or unrestricted training run.
   synchronization. Fresh player-copy workers and fresh Python restorers agreed
   on the registered traces, checkpoints, boundary state, replay sample, and
   synthetic post-boundary selection; no live post-boundary action was selected.
-- Final task verification passes 298 trainer cases, with the repository's 100
+- R3S adds a contract-driven live Unity handoff and accepted-network ONNX/CPU
+  parity gate. Two fresh attempts preserve one Unity PID/start marker across a
+  fresh trainer restore, complete exactly transition 49,997 with no update
+  10,001, and match canonically. Its 64-row parity corpus and two fresh CPU
+  inference processes match with maximum absolute Q-value error
+  `2.384185791015625e-07` against the registered `1e-5` tolerance.
+- Final task verification passes 328 trainer cases, with the repository's 100
   pre-existing ML-Agents protobuf deprecation warnings; contract/schema checks,
   frozen artifact hashes, and the R3R evidence hashes also pass.
 - Detailed evidence: [`docs/evidence/README.md`](docs/evidence/README.md), with
-  one record per R3D–R3R milestone.
+  one record per R3D–R3S milestone.
 
 ## Not implemented or not demonstrated
 
@@ -128,8 +141,9 @@ policy-effectiveness result or unrestricted training run.
 - Resume of the frozen Unity trajectory or final checkpoint selection. R3Q
   saves and restores a live-derived state in a fresh Python process without
   resuming Unity; R3R replays the accepted prefix and collects from fresh
-  complete player copies but does not prove Unity-process resume. ONNX export
-  for the learned BDQ policy remains unproven.
+  complete player copies but does not prove resumption of the frozen historical
+  Unity process. R3S proves continuity only for its own run-owned live player
+  and does not establish policy effectiveness.
 - Held-out learned-policy evaluation, the Basic BDQ acceptance result, or the
   joint-action Double DQN comparison.
 - The separately versioned gradual-motion Basic variant.
@@ -164,10 +178,12 @@ support.
 - R3Q is implemented, verified, and committed. It does not open transition 10,017,
   select an action after update 5, synchronize the target, resume Unity, or
   authorize extended training/export.
-- R3R is implemented and live-verified in the current working tree. It does not
+- R3R is implemented, accepted, committed, and pushed. It does not
   open optimizer update 10,001, perform a second target synchronization, select
   a live post-boundary action, resume the frozen Unity process, or establish
-  policy effectiveness.
+  policy effectiveness. R3S is implemented and accepted in the current
+  uncommitted task changes; its claim is limited to run-owned live-process
+  continuity and software-level ONNX/CPU parity.
 - Local context and handoff archives are intentionally ignored. Their absence
   from a fresh checkout is not public-documentation drift.
 
@@ -219,9 +235,13 @@ R3P is implemented, accepted, committed, and pushed at
 live boundary at 10,016 transitions with five optimizer updates and zero target
 synchronizations. R3Q is implemented and verified at the committed repository
 checkpoint above: its live-derived state was saved and restored in a fresh
-Python process without Unity with exact next-sample parity. R3R is implemented
-and verified in the current working tree. Its pilot ends at 13,996
+Python process without Unity with exact next-sample parity. R3R is implemented,
+accepted, committed, and pushed at the repository checkpoint above. Its pilot
+ends at 13,996
 transitions/update 1,000/zero synchronizations, and its synchronization stage
 ends at 49,996 transitions/update 10,000/one synchronization, with exact
 two-worker and fresh-restorer parity. R3R does not resume the frozen Unity
-process or extend its claim to policy effectiveness.
+process or extend its claim to policy effectiveness. R3S is implemented and
+accepted in the current uncommitted task changes: it proves two run-owned live
+Unity handoffs and ONNX/CPU parity, but does not open optimizer update 10,001
+or make a policy-effectiveness claim.

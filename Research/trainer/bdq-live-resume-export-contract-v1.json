@@ -1,0 +1,193 @@
+{
+  "schema_version": "quickdraw.bdq-live-resume-export.v1",
+  "task": "R3S",
+  "purpose": "Prove one bounded fresh-trainer takeover of a still-live Unity trajectory and exported ONNX parity for the accepted R3R online network.",
+  "base_r3r_contract": {
+    "path": "Research/trainer/bdq-long-horizon-contract-v1.json",
+    "sha256": "cfb0ecad1105411f8596eedba8cf18ea5f5238bbfdc4b75b5fa0f387d7febe56",
+    "schema_version": "quickdraw.bdq-long-horizon.v1"
+  },
+  "accepted_r3r": {
+    "result": {
+      "path": "Artifacts/Experiments/r3r-long-horizon-synchronization-final/result.json",
+      "sha256": "644a6c3c295f3c5a5c10f1a6c6f36a034e84dfffcecc2a0c4e133fd83034c1b7",
+      "schema_version": "quickdraw.bdq-long-horizon-smoke-result.v1"
+    },
+    "canonical_trace_sha256": "6605bb688cf4a7c3c4b5478e5042746a0bcb17b6d698676dd98ee2cb16ce3bff",
+    "trace": {
+      "path": "Artifacts/Experiments/r3r-long-horizon-synchronization-final/run-1/trace.json",
+      "sha256": "739c43fc0ff841cd3d1885e50cfe717f36bae0ee35ee5bfd841b339422eb6189"
+    },
+    "checkpoint": {
+      "path": "Artifacts/Experiments/r3r-long-horizon-synchronization-final/run-1/checkpoint.json",
+      "sha256": "c58c2cb8ff1b82b832055656be027145e3792643e3dd9a2623dbef449bc2613d",
+      "state_sha256": "bb7bc2a0f52f20adc6fd13f49ea3057a8e4f1af1a94be3ee4b33f29bf459da27"
+    },
+    "boundary": {
+      "transition_count": 49996,
+      "decision_count": 49996,
+      "optimizer_update_count": 10000,
+      "target_sync_count": 1,
+      "last_selection_completed_transition_count": 49995,
+      "pending_agent_ids": [],
+      "post_boundary_action_selected": false,
+      "online_network_sha256": "5e455aac0264f98a364ec9d296671e91539fea0522d48f438b416950983f747f",
+      "target_network_sha256": "5e455aac0264f98a364ec9d296671e91539fea0522d48f438b416950983f747f",
+      "target_before_sync_sha256": "b605debdd6073caa41a95d636bcf20b35d000dc959b06d5cbe585cac0bb433bb",
+      "replay_capacity": 100000,
+      "replay_size": 49996,
+      "replay_cursor": 49996,
+      "frame_reference_count": 399968,
+      "maximum_accounted_storage_bytes": 4294967296
+    }
+  },
+  "runtime": {
+    "python": "3.11.13",
+    "mlagents_envs": "1.1.0",
+    "numpy": "1.23.5",
+    "torch": "2.12.0+cpu",
+    "device": "cpu"
+  },
+  "package": {
+    "distribution": "quickdraw-bdq-trainer",
+    "version": "0.3.0",
+    "metadata_path": "Research/trainer/pyproject.toml",
+    "metadata_sha256": "acba293a5ed9f094074e6b8facf49b2188342c7590deb75ec96a019c9166faa1",
+    "trainer_entry_points": []
+  },
+  "export_dependencies": {
+    "base_support_lock": {
+      "path": "Research/environment/requirements-rocm-py311-support-lock.txt",
+      "sha256": "2ec004895be5f601bdb57619381695a0c975414a8518fa3992f8ce1efa4df8ff"
+    },
+    "cpu_parity_lock": {
+      "path": "Research/environment/requirements-r1f-parity-lock.txt",
+      "sha256": "c9ab76297bf1f23f80702be47c11e4be89ec5cf9dfd506cd19a323c4b4aeb7db"
+    },
+    "onnx": "1.15.0",
+    "onnxruntime": "1.23.2",
+    "execution_provider": "CPUExecutionProvider"
+  },
+  "player": {
+    "source_executable": "Artifacts/Experiments/r3r-long-horizon-synchronization-final/player-copies/run-1/QuickDrawResearchBasic.exe",
+    "required_siblings": [
+      "QuickDrawResearchBasic_Data",
+      "UnityPlayer.dll"
+    ],
+    "source_manifest_sha256": "83cb3b701e842d26e732be7f01ba6559dbc360c8cad53e10846b970ec1c7429d",
+    "source_file_count": 187,
+    "source_total_bytes": 104896089,
+    "executable_sha256": "54e68068a5db103d572ae99f2d378c87cd2ba05bde395df7cf41e3ee42d3a55e",
+    "copy_complete_player": true,
+    "no_graphics": false,
+    "profiling_output_directory": "worker-output/player-log"
+  },
+  "live_handoff": {
+    "protocol": "quickdraw.r3s-local-supervisor-handoff.v1",
+    "transport": "authenticated_loopback_multiprocessing_connection",
+    "fresh_attempts": 2,
+    "player_process_owner": "initial_trainer_process_becomes_transport_supervisor",
+    "restored_trainer_connection": "plain_data_proxy_to_existing_unity_environment",
+    "process_creation_marker": "windows_filetime_100ns_since_1601",
+    "start_boundary": {
+      "transition_count": 49996,
+      "decision_count": 49996,
+      "optimizer_update_count": 10000,
+      "target_sync_count": 1,
+      "pending_agent_ids": [],
+      "post_boundary_action_selected": false
+    },
+    "final_boundary": {
+      "transition_count": 49997,
+      "decision_count": 49997,
+      "optimizer_update_count": 10000,
+      "target_sync_count": 1,
+      "pending_agent_ids": [],
+      "post_boundary_action_selected": false
+    },
+    "environment_counters": {
+      "launches": 1,
+      "resets_before_handoff": 1,
+      "steps_before_handoff": 49996,
+      "resumed_actions": 1,
+      "steps_after_handoff": 49997,
+      "optimizer_update_10001_permitted": false
+    },
+    "canonical_event_sequence": [
+      "r3r_boundary_verified",
+      "checkpoint_saved",
+      "initial_trainer_detached_without_action",
+      "restored_trainer_started",
+      "checkpoint_restored",
+      "existing_decision_transferred",
+      "resumed_action_selected",
+      "resumed_action_applied",
+      "unity_stepped_once",
+      "transition_49997_completed",
+      "final_clean_boundary_verified"
+    ]
+  },
+  "export": {
+    "source_network": "accepted_r3r_post_sync_online",
+    "source_network_sha256": "5e455aac0264f98a364ec9d296671e91539fea0522d48f438b416950983f747f",
+    "format": "ONNX",
+    "opset": 17,
+    "exporter": "torch.onnx.export",
+    "input": {
+      "name": "observations",
+      "dtype": "float32",
+      "shape": ["N", 84, 84, 4],
+      "minimum_value": 0.0,
+      "maximum_value": 1.0,
+      "nonempty_batch": true
+    },
+    "outputs": [
+      {
+        "name": "branch_0_q_values",
+        "dtype": "float32",
+        "shape": ["N", 3]
+      },
+      {
+        "name": "branch_1_q_values",
+        "dtype": "float32",
+        "shape": ["N", 2]
+      }
+    ],
+    "parity_corpus": {
+      "schema_version": "quickdraw.bdq-export-parity-corpus.v1",
+      "count": 64,
+      "accepted_checkpoint_observation_count": 63,
+      "live_resume_observation_count": 1,
+      "selection_rule": "first row of every accepted-checkpoint current-mask pattern, then lowest unused replay indices, followed by the post-resume observation",
+      "cover_all_checkpoint_current_mask_patterns": true
+    },
+    "maximum_absolute_difference": 0.00001,
+    "masked_argmax_tie_break": "lowest ascending legal branch index",
+    "fresh_cpu_inference_processes": 2,
+    "require_exact_action_equality": true,
+    "require_exact_repeat_outputs": true,
+    "single_and_batched_inference_required": true
+  },
+  "canonicalization": {
+    "canonical": [
+      "event sequence and protocol counters",
+      "start and final trainer boundaries",
+      "post-resume observation, masks, action, reward, and episode flags",
+      "trainer/checkpoint/replay/RNG/network state hashes",
+      "ONNX interface, corpus content, Q-value, and action hashes"
+    ],
+    "volatile": [
+      "process IDs and creation markers",
+      "wall-clock times and durations",
+      "temporary paths, loopback ports, launch commands, and log locations"
+    ]
+  },
+  "exclusions": [
+    "optimizer update 10001 or a second target synchronization",
+    "more than one post-resume live action",
+    "fresh-player replay described as live resume",
+    "checkpoint mutation or policy-effectiveness evaluation during export",
+    "ROCm inference or training",
+    "unrestricted training, convergence, held-out evaluation, or final checkpoint selection"
+  ]
+}

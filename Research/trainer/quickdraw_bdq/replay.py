@@ -386,34 +386,51 @@ class ReplayBuffer:
         if batch_size > self._size:
             raise ValueError("Cannot sample more transitions than replay contains.")
         indices = self._random.choice(self._size, size=batch_size, replace=False)
+        return self.batch_at_indices(indices)
+
+    def batch_at_indices(self, indices: Sequence[int] | np.ndarray) -> ReplayBatch:
+        """Return a non-mutating batch for explicit live replay indices."""
+
+        raw_indices = np.asarray(indices)
+        if raw_indices.ndim != 1 or raw_indices.size == 0:
+            raise ValueError("Replay indices must be a non-empty one-dimensional array.")
+        if not np.issubdtype(raw_indices.dtype, np.integer):
+            raise TypeError("Replay indices must use an integer dtype.")
+        validated_indices = np.asarray(raw_indices, dtype=np.int64)
+        if (validated_indices < 0).any() or (validated_indices >= self._size).any():
+            raise IndexError("Replay index is outside the live buffer.")
         return ReplayBatch(
             observations=self._reconstruct_observations(
-                self._observation_frame_ids[indices]
+                self._observation_frame_ids[validated_indices]
             ),
-            actions=np.array(self._actions[indices], dtype=np.int64, copy=True),
-            rewards=np.array(self._rewards[indices], dtype=np.float32, copy=True),
+            actions=np.array(
+                self._actions[validated_indices], dtype=np.int64, copy=True
+            ),
+            rewards=np.array(
+                self._rewards[validated_indices], dtype=np.float32, copy=True
+            ),
             next_observations=self._reconstruct_observations(
-                self._next_observation_frame_ids[indices]
+                self._next_observation_frame_ids[validated_indices]
             ),
             action_masks=tuple(
-                np.array(mask[indices], dtype=np.bool_, copy=True)
+                np.array(mask[validated_indices], dtype=np.bool_, copy=True)
                 for mask in self._action_masks
             ),
             next_action_masks=tuple(
-                np.array(mask[indices], dtype=np.bool_, copy=True)
+                np.array(mask[validated_indices], dtype=np.bool_, copy=True)
                 for mask in self._next_action_masks
             ),
             terminated=np.array(
-                self._terminated[indices],
+                self._terminated[validated_indices],
                 dtype=np.bool_,
                 copy=True,
             ),
             truncated=np.array(
-                self._truncated[indices],
+                self._truncated[validated_indices],
                 dtype=np.bool_,
                 copy=True,
             ),
-            indices=np.asarray(indices, dtype=np.int64),
+            indices=np.array(validated_indices, dtype=np.int64, copy=True),
         )
 
     def export_checkpoint_state(self) -> Dict[str, Any]:

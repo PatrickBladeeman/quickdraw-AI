@@ -47,7 +47,7 @@ implemented and repeatable. It is the control environment for R3.
 
 ## R3 — Branching Double DQN
 
-Status: implementation and acceptance infrastructure complete through R3R;
+Status: implementation and acceptance infrastructure complete through R3S;
 the full R3 learning and evaluation goal is not complete.
 
 Completed boundaries:
@@ -73,23 +73,22 @@ Completed boundaries:
 - R3R: bounded long-horizon continuation through optimizer update 1,000 in the
   pilot and update 10,000 with the first target synchronization, with exact
   fresh-worker checkpoint and fresh-restorer parity.
+- R3S: live Unity-process handoff across a fresh trainer restore at the R3R
+  boundary, plus accepted-network ONNX/CPU inference parity.
 
 Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 
 Remaining R3 work, in dependency order:
 
-1. Extend durable checkpoint/resume from R3Q's Unity-free live-derived restore
-   toward actual live-trajectory resumption and add learned-policy export
-   parity without weakening deterministic replay or schedule contracts.
-2. Run the five registered Basic training seeds and retain complete lineage,
+1. Run the five registered Basic training seeds and retain complete lineage,
    curves, manifests, and hashes.
-3. Evaluate held-out Basic success and random-policy improvement.
-4. Run and report the joint-action Double DQN factorization control.
+2. Evaluate held-out Basic success and random-policy improvement.
+3. Run and report the joint-action Double DQN factorization control.
 
 The first target synchronization is accepted at the bounded R3R update-10,000
-boundary. Optimizer update 10,001, a second synchronization, and the remaining
-live-trajectory/export work are not authorized by this roadmap entry; a
-roadmap item is not permission to choose the next SSNT.
+boundary. Optimizer update 10,001, a second synchronization, extended live
+resumption, and effectiveness evaluation remain outside the accepted R3S
+boundary; a roadmap item is not permission to choose the next SSNT.
 
 ## Deferred post-R3 variant — Gradual-motion Basic
 
@@ -153,8 +152,10 @@ acceptance-harness consolidation is completed, verified, committed, and pushed
 at `4fa825b6c8ca45797abaaf6da85cde9357aa3657`; it does not advance the
 research roadmap. R3Q is implemented and verified at the committed checkpoint;
 it persists and exactly restores the live-derived R3O trainer state without
-advancing Unity or starting export work. R3R is implemented and verified in the
-current uncommitted and unpushed task changes; it adds the bounded continuation
-pilot and first target synchronization without proving Unity-process resume or
-policy effectiveness. See [`TASK.md`](TASK.md) for the exact scope and
-[`STATE.md`](STATE.md) for current truth.
+advancing Unity or starting export work. R3R is implemented, accepted,
+committed, and pushed at the repository checkpoint; it adds the bounded
+continuation pilot and first target synchronization without proving
+Unity-process resume or policy effectiveness. R3S is implemented and accepted
+in the current uncommitted task changes; it proves only run-owned live-process
+continuity and software-level ONNX/CPU parity. See [`TASK.md`](TASK.md) for the
+exact scope and [`STATE.md`](STATE.md) for current truth.

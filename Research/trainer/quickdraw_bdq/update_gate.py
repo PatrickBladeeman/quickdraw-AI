@@ -518,6 +518,11 @@ def execute_update_gate_worker(
     ]
     | None = None,
     prefix_boundary_transition_count: int | None = None,
+    environment_factory: Callable[..., UnityEnvironment] = UnityEnvironment,
+    live_boundary_callback: Callable[
+        [UnityEnvironment, str, BasicTruncationMaskSideChannel], None
+    ]
+    | None = None,
 ) -> Dict[str, Any]:
     worker_output.mkdir(parents=True, exist_ok=False)
     effective_contract = gate_contract if gate_contract is not None else contract
@@ -778,7 +783,7 @@ def execute_update_gate_worker(
         }
         if executable is not None:
             environment_options["log_folder"] = str(worker_output / "player-log")
-        environment = UnityEnvironment(**environment_options)
+        environment = environment_factory(**environment_options)
         environment.reset()
         behavior_names = list(environment.behavior_specs)
         expected_behavior_id = f"{BASIC_BEHAVIOR_NAME}?team=0"
@@ -1380,6 +1385,12 @@ def execute_update_gate_worker(
             scheduled_selector=scheduled_selector,
             task_name=task_name,
         )
+        if live_boundary_callback is not None:
+            if checkpoint_path is None:
+                raise LLAPIContractError(
+                    f"{task_name} live handoff requires a saved checkpoint."
+                )
+            live_boundary_callback(environment, behavior_id, side_channel)
         return trace
     finally:
         if environment is not None:

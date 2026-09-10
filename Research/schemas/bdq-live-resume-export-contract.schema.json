@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickdraw.local/schemas/bdq-live-resume-export-contract.schema.json",
+  "title": "QuickDraw R3S live-resume and export contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "purpose",
+    "base_r3r_contract",
+    "accepted_r3r",
+    "runtime",
+    "package",
+    "export_dependencies",
+    "player",
+    "live_handoff",
+    "export",
+    "canonicalization",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": {"const": "quickdraw.bdq-live-resume-export.v1"},
+    "task": {"const": "R3S"},
+    "purpose": {"type": "string", "minLength": 1},
+    "base_r3r_contract": {"$ref": "#/$defs/schemaBinding"},
+    "accepted_r3r": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "canonical_trace_sha256",
+        "trace",
+        "checkpoint",
+        "boundary"
+      ],
+      "properties": {
+        "result": {"$ref": "#/$defs/schemaBinding"},
+        "canonical_trace_sha256": {"$ref": "#/$defs/hash"},
+        "trace": {"$ref": "#/$defs/pathBinding"},
+        "checkpoint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "state_sha256"],
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "sha256": {"$ref": "#/$defs/hash"},
+            "state_sha256": {"$ref": "#/$defs/hash"}
+          }
+        },
+        "boundary": {"$ref": "#/$defs/acceptedBoundary"}
+      }
+    },
+    "runtime": {"$ref": "#/$defs/runtime"},
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "metadata_path",
+        "metadata_sha256",
+        "trainer_entry_points"
+      ],
+      "properties": {
+        "distribution": {"const": "quickdraw-bdq-trainer"},
+        "version": {"const": "0.3.0"},
+        "metadata_path": {"type": "string", "minLength": 1},
+        "metadata_sha256": {"$ref": "#/$defs/hash"},
+        "trainer_entry_points": {"type": "array", "maxItems": 0}
+      }
+    },
+    "export_dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_support_lock",
+        "cpu_parity_lock",
+        "onnx",
+        "onnxruntime",
+        "execution_provider"
+      ],
+      "properties": {
+        "base_support_lock": {"$ref": "#/$defs/pathBinding"},
+        "cpu_parity_lock": {"$ref": "#/$defs/pathBinding"},
+        "onnx": {"const": "1.15.0"},
+        "onnxruntime": {"const": "1.23.2"},
+        "execution_provider": {"const": "CPUExecutionProvider"}
+      }
+    },
+    "player": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_executable",
+        "required_siblings",
+        "source_manifest_sha256",
+        "source_file_count",
+        "source_total_bytes",
+        "executable_sha256",
+        "copy_complete_player",
+        "no_graphics",
+        "profiling_output_directory"
+      ],
+      "properties": {
+        "source_executable": {"type": "string", "minLength": 1},
+        "required_siblings": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "source_manifest_sha256": {"$ref": "#/$defs/hash"},
+        "source_file_count": {"type": "integer", "minimum": 1},
+        "source_total_bytes": {"type": "integer", "minimum": 1},
+        "executable_sha256": {"$ref": "#/$defs/hash"},
+        "copy_complete_player": {"const": true},
+        "no_graphics": {"const": false},
+        "profiling_output_directory": {"type": "string", "minLength": 1}
+      }
+    },
+    "live_handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol",
+        "transport",
+        "fresh_attempts",
+        "player_process_owner",
+        "restored_trainer_connection",
+        "process_creation_marker",
+        "start_boundary",
+        "final_boundary",
+        "environment_counters",
+        "canonical_event_sequence"
+      ],
+      "properties": {
+        "protocol": {"const": "quickdraw.r3s-local-supervisor-handoff.v1"},
+        "transport": {"const": "authenticated_loopback_multiprocessing_connection"},
+        "fresh_attempts": {"const": 2},
+        "player_process_owner": {"type": "string", "minLength": 1},
+        "restored_trainer_connection": {"type": "string", "minLength": 1},
+        "process_creation_marker": {"const": "windows_filetime_100ns_since_1601"},
+        "start_boundary": {"$ref": "#/$defs/cleanBoundary"},
+        "final_boundary": {"$ref": "#/$defs/cleanBoundary"},
+        "environment_counters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "launches",
+            "resets_before_handoff",
+            "steps_before_handoff",
+            "resumed_actions",
+            "steps_after_handoff",
+            "optimizer_update_10001_permitted"
+          ],
+          "properties": {
+            "launches": {"const": 1},
+            "resets_before_handoff": {"const": 1},
+            "steps_before_handoff": {"const": 49996},
+            "resumed_actions": {"const": 1},
+            "steps_after_handoff": {"const": 49997},
+            "optimizer_update_10001_permitted": {"const": false}
+          }
+        },
+        "canonical_event_sequence": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_network",
+        "source_network_sha256",
+        "format",
+        "opset",
+        "exporter",
+        "input",
+        "outputs",
+        "parity_corpus",
+        "maximum_absolute_difference",
+        "masked_argmax_tie_break",
+        "fresh_cpu_inference_processes",
+        "require_exact_action_equality",
+        "require_exact_repeat_outputs",
+        "single_and_batched_inference_required"
+      ],
+      "properties": {
+        "source_network": {"const": "accepted_r3r_post_sync_online"},
+        "source_network_sha256": {"$ref": "#/$defs/hash"},
+        "format": {"const": "ONNX"},
+        "opset": {"type": "integer", "minimum": 1},
+        "exporter": {"const": "torch.onnx.export"},
+        "input": {"$ref": "#/$defs/tensorInterface"},
+        "outputs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"$ref": "#/$defs/tensorInterface"}
+        },
+        "parity_corpus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "count",
+            "accepted_checkpoint_observation_count",
+            "live_resume_observation_count",
+            "selection_rule",
+            "cover_all_checkpoint_current_mask_patterns"
+          ],
+          "properties": {
+            "schema_version": {"const": "quickdraw.bdq-export-parity-corpus.v1"},
+            "count": {"type": "integer", "minimum": 64},
+            "accepted_checkpoint_observation_count": {"type": "integer", "minimum": 1},
+            "live_resume_observation_count": {"const": 1},
+            "selection_rule": {"type": "string", "minLength": 1},
+            "cover_all_checkpoint_current_mask_patterns": {"const": true}
+          }
+        },
+        "maximum_absolute_difference": {"const": 0.00001},
+        "masked_argmax_tie_break": {"const": "lowest ascending legal branch index"},
+        "fresh_cpu_inference_processes": {"const": 2},
+        "require_exact_action_equality": {"const": true},
+        "require_exact_repeat_outputs": {"const": true},
+        "single_and_batched_inference_required": {"const": true}
+      }
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonical", "volatile"],
+      "properties": {
+        "canonical": {"$ref": "#/$defs/nonemptyStrings"},
+        "volatile": {"$ref": "#/$defs/nonemptyStrings"}
+      }
+    },
+    "exclusions": {"$ref": "#/$defs/nonemptyStrings"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "pathBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "schemaBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "schema_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "mlagents_envs", "numpy", "torch", "device"],
+      "properties": {
+        "python": {"const": "3.11.13"},
+        "mlagents_envs": {"const": "1.1.0"},
+        "numpy": {"const": "1.23.5"},
+        "torch": {"const": "2.12.0+cpu"},
+        "device": {"const": "cpu"}
+      }
+    },
+    "cleanBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transition_count",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "pending_agent_ids",
+        "post_boundary_action_selected"
+      ],
+      "properties": {
+        "transition_count": {"type": "integer", "minimum": 0},
+        "decision_count": {"type": "integer", "minimum": 0},
+        "optimizer_update_count": {"type": "integer", "minimum": 0},
+        "target_sync_count": {"type": "integer", "minimum": 0},
+        "pending_agent_ids": {"type": "array", "maxItems": 0},
+        "post_boundary_action_selected": {"const": false}
+      }
+    },
+    "acceptedBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transition_count",
+        "decision_count",
+        "optimizer_update_count",
+        "target_sync_count",
+        "pending_agent_ids",
+        "post_boundary_action_selected",
+        "last_selection_completed_transition_count",
+        "online_network_sha256",
+        "target_network_sha256",
+        "target_before_sync_sha256",
+        "replay_capacity",
+        "replay_size",
+        "replay_cursor",
+        "frame_reference_count",
+        "maximum_accounted_storage_bytes"
+      ],
+      "properties": {
+        "transition_count": {"type": "integer", "minimum": 0},
+        "decision_count": {"type": "integer", "minimum": 0},
+        "optimizer_update_count": {"type": "integer", "minimum": 0},
+        "target_sync_count": {"type": "integer", "minimum": 0},
+        "pending_agent_ids": {"type": "array", "maxItems": 0},
+        "post_boundary_action_selected": {"const": false},
+        "last_selection_completed_transition_count": {"type": "integer", "minimum": 0},
+        "online_network_sha256": {"$ref": "#/$defs/hash"},
+        "target_network_sha256": {"$ref": "#/$defs/hash"},
+        "target_before_sync_sha256": {"$ref": "#/$defs/hash"},
+        "replay_capacity": {"type": "integer", "minimum": 1},
+        "replay_size": {"type": "integer", "minimum": 1},
+        "replay_cursor": {"type": "integer", "minimum": 0},
+        "frame_reference_count": {"type": "integer", "minimum": 1},
+        "maximum_accounted_storage_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "tensorInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "dtype", "shape"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "dtype": {"const": "float32"},
+        "shape": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"type": ["string", "integer"]}
+        },
+        "minimum_value": {"type": "number"},
+        "maximum_value": {"type": "number"},
+        "nonempty_batch": {"type": "boolean"}
+      }
+    },
+    "nonemptyStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

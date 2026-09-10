@@ -28,7 +28,8 @@ records. All output paths below are generated and ignored.
 - `llapi.py` — behavior validation, pending decisions, transition completion,
   action selection, and truncation-mask side-channel ingestion;
 - `checkpoint.py` — versioned, integrity-bound trainer state save and restore;
-- `provenance.py` — dependency-light raw-file hashing and CPU runtime identity;
+- `provenance.py` — dependency-light file hashing, complete-player manifests,
+  process creation markers, and CPU runtime identity;
 - `acceptance.py` — canonical JSON hashing, serialization, runtime checks,
   fresh process execution, deterministic comparison, and result writing;
 - `trajectory_runner.py` — shared CLI dispatch and orchestration for the eight
@@ -41,6 +42,8 @@ records. All output paths below are generated and ignored.
 - `run_bdq_long_horizon_smoke.py` — the contract-driven R3R continuation pilot
   and first target-synchronization gate, including fresh player copies,
   checkpoint differential checks, and Unity-free restore checks.
+- `run_bdq_live_resume_export_smoke.py` — the bounded R3S live Unity
+  handoff and accepted-network ONNX/CPU inference-parity gate.
 
 The `run_bdq_*` files preserve historical commands and milestone-specific
 contracts, expectations, validation, and summaries. Generic behavior used by
@@ -174,6 +177,7 @@ Unity-free Python restorer, as registered by its contract.
 | R3P checkpoint round-trip | `run_bdq_checkpoint_roundtrip_smoke.py` | [`R3P.md`](../../docs/evidence/R3P.md) |
 | R3Q live-derived checkpoint | `run_bdq_live_checkpoint_smoke.py` | [`R3Q.md`](../../docs/evidence/R3Q.md) |
 | R3R long-horizon continuation and first sync | `run_bdq_long_horizon_smoke.py` | [`R3R.md`](../../docs/evidence/R3R.md) |
+| R3S live Unity resume and ONNX parity | `run_bdq_live_resume_export_smoke.py` | [`R3S.md`](../../docs/evidence/R3S.md) |
 
 Set up the isolated copies above, then select the required command:
 
@@ -235,6 +239,16 @@ $r3rSync = 'Artifacts\Experiments\r3r-long-horizon-synchronization-reproduction'
   --pilot-result (Join-Path $r3rPilot 'result.json') `
   --env Artifacts\Experiments\r3o-fifth-update\build\QuickDrawResearchBasic.exe `
   --output $r3rSync
+```
+
+R3S starts from the accepted R3R synchronization artifacts. It copies the
+complete player for each attempt, preserves the live Unity process across a
+fresh trainer handoff, and then exports the accepted online network for two
+fresh CPU parity workers:
+
+```powershell
+& $python -B Research\trainer\run_bdq_live_resume_export_smoke.py `
+  --output Artifacts\Experiments\r3s-live-resume-export\acceptance
 ```
 
 R3I is a Python-only unit gate:
@@ -320,10 +334,10 @@ Unity invocation are preserved in [`R3N.md`](../../docs/evidence/R3N.md).
 ## Claim boundary
 
 These runners are bounded collection/integration gates. R3R demonstrates only
-its registered one-seed continuation boundaries, first target synchronization,
-checkpoint differential, and deterministic Unity-free restore checks. The suite
-does not demonstrate unrestricted training, convergence, learned-policy
-effectiveness, held-out evaluation, checkpoint/export beyond the registered
-restore checks, ROCm training, strategic combat, reflex behavior, or local-model
-behavior. Current truth is maintained in
+its registered one-seed continuation boundaries and first target
+synchronization. R3S demonstrates live-process continuity for one bounded
+post-sync action and software-level ONNX/CPU inference parity for the accepted
+network. Neither milestone demonstrates unrestricted training, convergence,
+learned-policy effectiveness, held-out evaluation, ROCm training, strategic
+combat, reflex behavior, or local-model behavior. Current truth is maintained in
 [`STATE.md`](../../STATE.md).

@@ -101,7 +101,8 @@ missing scene. Their public build entry methods and output options remain intact
 - `checkpoint.py` owns the versioned fail-closed trainer checkpoint: exact
   state encoding, identity binding, integrity hashing, and clean-boundary
   save plus fresh-object restore.
-- `provenance.py` owns raw-file SHA-256 and registered CPU runtime identity,
+- `provenance.py` owns raw-file SHA-256, complete-directory manifests,
+  platform-safe process creation markers, and registered CPU runtime identity,
   using only the standard library. Checkpoint persistence imports it directly;
   structured hashing protocols retain their existing serialization owners.
 - `acceptance.py` owns reusable, non-scientific acceptance plumbing: canonical
@@ -120,10 +121,12 @@ missing scene. Their public build entry methods and output options remain intact
 - `update_gate.py` owns the shared bounded Unity collection and optimizer-gate
   mechanism used by the update-trajectory milestones, including opt-in
   per-update target-hash metadata, target synchronization events, continuation
-  callbacks, and the optional clean-boundary handoff into `checkpoint.py`.
+  callbacks, the optional clean-boundary handoff into `checkpoint.py`, and the
+  explicit live-environment callback used by the R3S supervisor boundary.
 
 The milestone runners in `Research/trainer/` retain historical compatibility
-entry points and include the bounded R3R continuation runner. They load
+entry points and include the bounded R3R continuation runner and R3S
+live-resume/export gate. They load
 milestone-specific contracts, expectations, schemas, and summaries, then
 compose the shared package modules into bounded acceptance gates. The R3R
 runner owns its stage-specific continuation-prefix, target-synchronization,
@@ -132,6 +135,13 @@ separate training framework and must not become the canonical owner of generic
 behavior needed by another milestone. The retired
 high-level ML-Agents `Trainer`/`Policy`/`Trajectory` experiment is historical,
 not an available runtime path.
+
+The R3S runner owns only the new execution boundary: an authenticated loopback
+supervisor keeps one run-owned Unity process alive while a fresh trainer process
+restores the shared checkpoint, then exports the accepted R3R online network
+through the registered ONNX/CPU parity contract. It does not own checkpoint
+encoding, replay sampling, action-mask semantics, or an unrestricted resume
+framework.
 
 R3P retains its ordered saver/reference/restorer protocol and R3Q its live-saver
 and Python-restorer protocol; both use the common process launcher. Neither is

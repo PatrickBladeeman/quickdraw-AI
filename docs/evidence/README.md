@@ -53,15 +53,18 @@ study unless its milestone file explicitly says otherwise.
 | R3P | [R3P.md](R3P.md) | Deterministic Python checkpoint round-trip |
 | R3Q | [R3Q.md](R3Q.md) | Live-derived checkpoint save/restore and replay parity |
 | R3R | [R3R.md](R3R.md) | Long-horizon continuation pilot and first target synchronization |
+| R3S | [R3S.md](R3S.md) | Live Unity-process handoff and accepted-network ONNX/CPU parity |
 
-## Shared R3D-R3R runtime and optimizer reference
+## Shared R3D-R3S runtime and optimizer reference
 
-The individual R3D-R3Q contracts pin Python `3.11.13`,
+The individual R3D-R3R contracts pin Python `3.11.13`,
 `mlagents_envs==1.1.0`, NumPy `1.23.5`, PyTorch `2.12.0+cpu`, device `cpu`,
 and `quickdraw-bdq-trainer==0.3.0` with no current
 `mlagents.trainer_type` entry point. The Unity behavior is
 `QuickDrawResearchBasic`, with one agent, float32 HWC `[84,84,4]`
 observations, discrete branches `[3,2]`, and no privileged scene inference.
+R3S additionally pins ONNX `1.15.0` and ONNX Runtime `1.23.2` for its isolated
+CPU parity lane; those versions are not part of the trainer package runtime.
 
 Where collection uses the production seeded stream, the seeds are scenario
 `31001`, policy `51001`, and exploration `61001`. The registered optimizer
@@ -83,6 +86,7 @@ reproduces its next replay sample in a fresh Python process without Unity.
 R3Q does not resume the frozen Unity trajectory. R3R replays that accepted
 prefix into trainer state, collects from fresh complete player copies, and
 demonstrates the registered pilot and first target synchronization gates; it
-does not claim to resume a Unity process. Inference export, ROCm training,
+does not claim to resume a Unity process. R3S adds run-owned live-process
+continuity and accepted-network ONNX/CPU inference parity only. ROCm training,
 held-out learned-policy evaluation, strategic combat, the research evade
 reflex, and the local LLM runtime are not demonstrated by this archive.
