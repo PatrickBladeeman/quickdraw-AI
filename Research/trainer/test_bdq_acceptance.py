@@ -187,15 +187,20 @@ def test_fresh_worker_sets_deterministic_environment_and_loads_trace(
     trace_path.write_text('{"ok": true}\n', encoding="utf-8")
     captured: dict[str, Any] = {}
 
-    def completed_run(
-        command: list[str], **kwargs: Any
-    ) -> subprocess.CompletedProcess[str]:
+    class CompletedProcess:
+        returncode = 0
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[str, None]:
+            assert timeout == 1800
+            return "worker output\n", None
+
+    def popen(command: list[str], **kwargs: Any) -> CompletedProcess:
         captured["command"] = command
         captured["environment"] = kwargs["env"]
         captured["options"] = kwargs
-        return subprocess.CompletedProcess(command, 0, stdout="worker output\n")
+        return CompletedProcess()
 
-    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.run", completed_run)
+    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.Popen", popen)
     trace, returned_path = run_fresh_worker_process(
         runner_path=tmp_path / "runner.py",
         executable=tmp_path / "player.exe",
@@ -213,12 +218,12 @@ def test_fresh_worker_sets_deterministic_environment_and_loads_trace(
     assert captured["environment"]["PYTHONDONTWRITEBYTECODE"] == "1"
     assert captured["environment"]["OMP_NUM_THREADS"] == "1"
     assert captured["environment"]["MKL_NUM_THREADS"] == "1"
-    assert captured["options"]["timeout"] == 1800
     assert captured["options"]["cwd"] == tmp_path
     assert captured["options"]["stderr"] == subprocess.STDOUT
     assert captured["options"]["stdout"] == subprocess.PIPE
     assert captured["options"]["text"] is True
-    assert captured["options"]["check"] is False
+    assert "check" not in captured["options"]
+    assert "timeout" not in captured["options"]
     assert captured["command"] == [
         sys.executable,
         "-B",
@@ -257,12 +262,17 @@ def test_fresh_worker_fails_on_process_error_or_missing_trace(
         trace_path.parent.mkdir(parents=True)
         trace_path.write_text("{}\n", encoding="utf-8")
 
-    def completed_run(
-        command: list[str], **kwargs: Any
-    ) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(command, return_code, stdout="log\n")
+    class CompletedProcess:
+        returncode = return_code
 
-    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.run", completed_run)
+        def communicate(self, *, timeout: int | None = None) -> tuple[str, None]:
+            assert timeout == 1800
+            return "log\n", None
+
+    monkeypatch.setattr(
+        "quickdraw_bdq.acceptance.subprocess.Popen",
+        lambda *args, **kwargs: CompletedProcess(),
+    )
     with pytest.raises(RuntimeError, match=message):
         run_fresh_worker_process(
             runner_path=tmp_path / "runner.py",
@@ -336,11 +346,29 @@ def test_fresh_process_preserves_timeout_exception(
 ) -> None:
     timeout = subprocess.TimeoutExpired(["worker"], 7, output="partial output")
 
-    def expire(*args: Any, **kwargs: Any) -> None:
-        assert kwargs["timeout"] == 7
-        raise timeout
+    class TimedOutProcess:
+        returncode = None
 
-    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.run", expire)
+        def __init__(self) -> None:
+            self.communicate_calls = 0
+            self.killed = False
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[str, None]:
+            self.communicate_calls += 1
+            if timeout is not None:
+                assert timeout == 7
+                raise timeout_error
+            return "partial output", None
+
+        def kill(self) -> None:
+            self.killed = True
+
+    timeout_error = timeout
+    process = TimedOutProcess()
+    monkeypatch.setattr(
+        "quickdraw_bdq.acceptance.subprocess.Popen",
+        lambda *args, **kwargs: process,
+    )
     with pytest.raises(subprocess.TimeoutExpired) as caught:
         run_fresh_python_process(
             runner_path=tmp_path / "worker.py",
@@ -352,6 +380,117 @@ def test_fresh_process_preserves_timeout_exception(
             timeout_seconds=7,
         )
     assert caught.value is timeout
+    assert process.killed
+    assert process.communicate_calls == 2
+    assert not (tmp_path / "worker.log").exists()
+
+
+def test_fresh_process_start_callback_runs_after_child_spawn(tmp_path: Path) -> None:
+    runner = tmp_path / "worker.py"
+    runner.write_text("print('worker output')\n", encoding="utf-8")
+    started: list[bool] = []
+
+    log_path = run_fresh_python_process(
+        runner_path=runner,
+        arguments=[],
+        output_directory=tmp_path,
+        log_name="worker.log",
+        task_name="TEST",
+        contract=None,
+        repo_root=tmp_path,
+        timeout_seconds=7,
+        on_process_started=lambda: started.append(True),
+    )
+
+    assert started == [True]
+    assert log_path.read_text(encoding="utf-8") == "worker output\n"
+
+
+def test_fresh_process_callback_preserves_timeout_and_kills_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class TimedOutProcess:
+        returncode = None
+
+        def __init__(self) -> None:
+            self.communicate_calls = 0
+            self.killed = False
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[str, None]:
+            if timeout is not None:
+                assert timeout == 7
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                raise subprocess.TimeoutExpired(
+                    ["worker"], 7, output="partial output"
+                )
+            return "partial output", None
+
+        def kill(self) -> None:
+            self.killed = True
+
+    process = TimedOutProcess()
+    monkeypatch.setattr(
+        "quickdraw_bdq.acceptance.subprocess.Popen",
+        lambda *args, **kwargs: process,
+    )
+    started: list[bool] = []
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_fresh_python_process(
+            runner_path=tmp_path / "worker.py",
+            arguments=[],
+            output_directory=tmp_path,
+            log_name="worker.log",
+            task_name="TEST",
+            contract=None,
+            timeout_seconds=7,
+            on_process_started=lambda: started.append(True),
+        )
+    assert started == [True]
+    assert process.killed
+    assert process.communicate_calls == 2
+    assert not (tmp_path / "worker.log").exists()
+
+
+def test_fresh_process_callback_kills_child_on_keyboard_interrupt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class InterruptedProcess:
+        returncode = None
+
+        def __init__(self) -> None:
+            self.communicate_calls = 0
+            self.killed = False
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[str, None]:
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                assert timeout == 7
+                raise KeyboardInterrupt
+            assert timeout is None
+            return "partial output", None
+
+        def kill(self) -> None:
+            self.killed = True
+
+    process = InterruptedProcess()
+    monkeypatch.setattr(
+        "quickdraw_bdq.acceptance.subprocess.Popen",
+        lambda *args, **kwargs: process,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_fresh_python_process(
+            runner_path=tmp_path / "worker.py",
+            arguments=[],
+            output_directory=tmp_path,
+            log_name="worker.log",
+            task_name="TEST",
+            contract=None,
+            timeout_seconds=7,
+            on_process_started=lambda: None,
+        )
+    assert process.killed
+    assert process.communicate_calls == 2
     assert not (tmp_path / "worker.log").exists()
 
 

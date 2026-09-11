@@ -364,6 +364,7 @@ def run_fresh_python_process(
     repo_root: Path = REPO_ROOT,
     timeout_seconds: int = 1800,
     failure_label: str | None = None,
+    on_process_started: Callable[[], None] | None = None,
 ) -> Path:
     """Run one bounded fresh Python process and retain its combined log."""
 
@@ -374,15 +375,41 @@ def run_fresh_python_process(
         thread_count = str(contract["determinism"]["torch_num_threads"])
         process_environment["OMP_NUM_THREADS"] = thread_count
         process_environment["MKL_NUM_THREADS"] = thread_count
-    completed = subprocess.run(
+    process = subprocess.Popen(
         command,
         cwd=repo_root,
         env=process_environment,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        timeout=timeout_seconds,
-        check=False,
+    )
+
+    def terminate_and_collect() -> tuple[str | None, str | None]:
+        try:
+            process.kill()
+        except OSError:
+            pass
+        return process.communicate()
+
+    try:
+        if on_process_started is not None:
+            on_process_started()
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as error:
+        collected_stdout, collected_stderr = terminate_and_collect()
+        if error.output is None:
+            error.output = collected_stdout
+        if error.stderr is None:
+            error.stderr = collected_stderr
+        raise
+    except BaseException:
+        terminate_and_collect()
+        raise
+    completed = subprocess.CompletedProcess(
+        command,
+        process.returncode,
+        stdout,
+        stderr,
     )
     log_path = output_directory / log_name
     log_path.write_text(completed.stdout, encoding="utf-8")

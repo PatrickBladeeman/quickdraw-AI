@@ -43,7 +43,7 @@ implemented and repeatable. It is the control environment for R3.
 
 ## R3 — Branching Double DQN
 
-Status: implementation and acceptance infrastructure complete through R3S;
+Status: implementation and acceptance infrastructure complete through R3T;
 the full R3 learning and evaluation goal is not complete.
 
 Completed boundaries:
@@ -68,15 +68,15 @@ Completed boundaries:
   fresh-worker checkpoint and fresh-restorer parity.
 - R3S: live Unity-process handoff across a fresh trainer restore at the R3R
   boundary, plus accepted-network ONNX/CPU inference parity.
+- R3T: five-seed Basic training with complete ordered lineage, retained
+  checkpoints, and fresh-Python restore parity.
 
 Evidence: [`docs/evidence/README.md`](docs/evidence/README.md).
 
 Remaining R3 work, in dependency order:
 
-1. Run the five registered Basic training seeds and retain complete lineage,
-   curves, manifests, and hashes.
-2. Evaluate held-out Basic success and random-policy improvement.
-3. Run and report the joint-action Double DQN factorization control.
+1. Evaluate held-out Basic success and random-policy improvement.
+2. Run and report the joint-action Double DQN factorization control.
 
 ## Deferred post-R3 variant — Gradual-motion Basic
 

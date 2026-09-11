@@ -522,6 +522,58 @@ The exact strategic held-out scenario list, opponent-seed list, analysis-
 bootstrap RNG seed, and live-LLM seed are not yet numerically registered. They
 must be frozen before the corresponding data are generated.
 
+## R3T Basic multi-seed training registration
+
+R3T is a bounded training and artifact-lineage gate. It is not the Basic
+effectiveness acceptance and does not generate held-out evaluation data. Its
+machine-readable owner is
+[`Research/trainer/bdq-r3t-basic-multiseed-contract-v1.json`](Research/trainer/bdq-r3t-basic-multiseed-contract-v1.json),
+with matching contract and result schemas under `Research/schemas/`. The
+decision rationale is recorded in
+[`ADR-0013`](docs/decisions/ADR-0013-r3t-basic-multiseed-training.md).
+
+The registered campaign uses:
+
+- five independent policy seeds `51001`, `51002`, `51003`, `51004`, and `51005`;
+- scenario seed `31001` for every training episode;
+- exploration seed `61001`, reset for each independent scheduled selector;
+- exactly `49,996` completed decisions/transitions;
+- exactly `10,000` optimizer updates, with the first hard target synchronization
+  at update `10,000` and a clean stop before the next live action;
+- checkpoints after updates `2,500`, `5,000`, `7,500`, and `10,000`, selecting
+  update `10,000` solely by its predeclared position; and
+- a learning-curve sample every `100` optimizer updates, recording `100` samples
+  per seed with finite loss/TD/Q/return/success metrics and explicit episode
+  denominators; return uses completed episodes plus the active episode prefix
+  when a sample lands before reset, while success counts target-hit episodes over
+  that observed-episode denominator.
+
+Each seed starts fresh with the registered Basic/BDQ contract, empty replay,
+fresh optimizer and selector state, and a fresh complete run-owned copy of the
+accepted Basic player. Policy initialization and replay sampling use the same
+explicit policy seed because that is the established `BDQOptimizerController`
+boundary; this coupling is written in the R3T seed table and is not derived.
+R3T records source/player/runtime/package identities, full ordered traces,
+checkpoint-equivalent state hashes, rejected attempts, and artifact checksums
+under the ignored `Artifacts/Experiments/r3t-basic-multiseed/` root. Volatile
+paths, process identifiers, timestamps, wall-clock timings, and the serialized
+trace/metrics byte/hash descriptors in campaign metadata do not affect
+canonical equality. Direct serialized artifact hashes remain recorded for
+audit; canonical trace and metrics hashes remain the stable semantic bindings.
+
+The fresh run-owned player copy is required to match the accepted source before
+launch. During execution the Unity ML-Agents timer writer may rewrite exactly
+`QuickDrawResearchBasic_Data/ML-Agents/Timers/Research_Basic_timers.json`;
+that registered sidecar is recorded with source and observed hashes and is
+excluded from canonical campaign equality. Any other player file-set or content
+mutation rejects the run, and the frozen source player remains untouched.
+
+R3T may report finite training completion, complete lineage, and fresh-Python
+checkpoint parity only. It does not select a final policy or claim success-rate
+improvement, policy effectiveness, convergence, generalization, sample
+efficiency, held-out performance, joint-action comparison, or numeric ViZDoom
+replication.
+
 ## Deterministic evade reflex
 
 `EvadeTelegraphedShot` subscribes to the structured imminent-shot event. When

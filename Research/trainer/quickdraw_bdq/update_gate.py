@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
+import time
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Dict, Sequence
 
 import numpy as np
@@ -479,6 +480,42 @@ def _environment_side_channels(
     return channels
 
 
+def _profiling_output_path(
+    worker_output: Path,
+    profiling_output_directory: str | None,
+    task_name: str,
+) -> Path:
+    raw_path = (
+        "player-log"
+        if profiling_output_directory is None
+        else str(profiling_output_directory)
+    )
+    profiling_path = Path(raw_path)
+    windows_path = PureWindowsPath(raw_path)
+    posix_path = PurePosixPath(raw_path)
+    if (
+        not profiling_path.parts
+        or any(part in {"", ".", ".."} for part in profiling_path.parts)
+        or profiling_path.is_absolute()
+        or posix_path.is_absolute()
+        or windows_path.drive
+        or windows_path.root
+    ):
+        raise LLAPIContractError(
+            f"{task_name} profiling output must be a safe relative path."
+        )
+
+    worker_root = worker_output.resolve()
+    profiling_root = (worker_root / profiling_path).resolve()
+    try:
+        profiling_root.relative_to(worker_root)
+    except ValueError as error:
+        raise LLAPIContractError(
+            f"{task_name} profiling output must remain under the worker output."
+        ) from error
+    return profiling_root
+
+
 def execute_update_gate_worker(
     executable: Path | None,
     worker_output: Path,
@@ -521,6 +558,20 @@ def execute_update_gate_worker(
     environment_factory: Callable[..., UnityEnvironment] = UnityEnvironment,
     live_boundary_callback: Callable[
         [UnityEnvironment, str, BasicTruncationMaskSideChannel], None
+    ]
+    | None = None,
+    profiling_output_directory: str | None = None,
+    update_observer: Callable[
+        [
+            BDQOptimizerController,
+            DirectReplayCollector,
+            ScheduledEpsilonGreedyBDQActionSelector,
+            OptimizationStepResult,
+            Dict[str, Any],
+            Dict[str, Any],
+            Dict[str, Any],
+        ],
+        None,
     ]
     | None = None,
 ) -> Dict[str, Any]:
@@ -693,6 +744,10 @@ def execute_update_gate_worker(
     maximum_iterations = transition_limit + transition_limit // 300 + 20
     environment: UnityEnvironment | None = None
 
+    profiling_path = _profiling_output_path(
+        worker_output, profiling_output_directory, task_name
+    )
+
     def record_optimization_metadata(
         result: OptimizationStepResult,
         *,
@@ -752,6 +807,36 @@ def execute_update_gate_worker(
             network_sha256(controller.target_network),
         )
 
+    def observe_update(
+        result: OptimizationStepResult,
+        transition: Dict[str, Any],
+        elapsed_seconds: float,
+        active_episode_return: float,
+    ) -> None:
+        if update_observer is None or not result.updated:
+            return
+        if scheduled_selector is None:
+            raise LLAPIContractError(
+                f"{task_name} update observation requires the scheduled selector."
+            )
+        if not optimization_events:
+            raise LLAPIContractError(
+                f"{task_name} update observation has no optimization event."
+            )
+        update_observer(
+            controller,
+            collector,
+            scheduled_selector,
+            result,
+            transition,
+            optimization_events[-1],
+            {
+                "duration_seconds": float(elapsed_seconds),
+                "episodes": [dict(episode) for episode in episodes],
+                "active_episode_return": float(active_episode_return),
+            },
+        )
+
     def maybe_validate_prefix() -> None:
         nonlocal prefix_boundary
         if (
@@ -782,7 +867,7 @@ def execute_update_gate_worker(
             "timeout_wait": timeout_wait,
         }
         if executable is not None:
-            environment_options["log_folder"] = str(worker_output / "player-log")
+            environment_options["log_folder"] = str(worker_output / profiling_path)
         environment = environment_factory(**environment_options)
         environment.reset()
         behavior_names = list(environment.behavior_specs)
@@ -837,6 +922,7 @@ def execute_update_gate_worker(
                         for branch_size in (3, 2)
                     )
                 online_before_update, target_before_update = pre_update_hashes()
+                optimization_started = time.perf_counter()
                 optimization_result = _complete_gate_transition(
                     collector,
                     agent_id,
@@ -878,6 +964,12 @@ def execute_update_gate_worker(
                         end_kind="truncated" if interrupted else "terminal",
                     )
                 )
+                observe_update(
+                    optimization_result,
+                    transitions[-1],
+                    time.perf_counter() - optimization_started,
+                    episode_return,
+                )
                 active_episode_index += 1
                 episode_decision_index = 0
                 episode_start_index = len(transitions)
@@ -905,6 +997,7 @@ def execute_update_gate_worker(
                 action_masks = read_action_masks(decision_steps, decision_row)
                 if agent_id in collector.pending_agent_ids:
                     online_before_update, target_before_update = pre_update_hashes()
+                    optimization_started = time.perf_counter()
                     optimization_result = _complete_gate_transition(
                         collector,
                         agent_id,
@@ -937,6 +1030,12 @@ def execute_update_gate_worker(
                         )
                     episode_return += float(decision_steps.reward[decision_row])
                     episode_decision_index += 1
+                    observe_update(
+                        optimization_result,
+                        transitions[-1],
+                        time.perf_counter() - optimization_started,
+                        episode_return,
+                    )
                     if len(transitions) == transition_limit:
                         reached_limit = True
                         break

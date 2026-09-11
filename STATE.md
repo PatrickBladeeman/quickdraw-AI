@@ -1,15 +1,17 @@
 # quickdraw-AI — Current State
 
 Last checked against repository: 2026-09-10.
-Research acceptance remains the recorded R3S result of 2026-09-09.
+Research acceptance remains the recorded R3S result of 2026-09-09; R3T was
+accepted on 2026-09-10 as a bounded five-seed Basic training and lineage gate.
+Neither acceptance establishes policy effectiveness or convergence.
 
 ## Repository checkpoint
 
 - Branch: `main`; committed implementation frontier:
   `61ba19ebe9fab3c888fc67c88cdeb30a6333e86c` (R3S).
-- This documentation consolidation is uncommitted. The R3T authorization in
-  [TASK.md](TASK.md) was already a local modification when consolidation began;
-  the pre-existing untracked `tmp/` directory is outside this cleanup.
+- The R3T implementation, contract, schemas, evidence, and documentation
+  consolidation are uncommitted. The pre-existing untracked `tmp/` directory
+  is outside this cleanup.
 - Verify Git status at task start; this checkpoint is not a live worktree ledger.
   Earlier checkpoints and maintenance provenance are in
   [history](docs/history/MAINTENANCE_2026-09.md).
@@ -17,8 +19,9 @@ Research acceptance remains the recorded R3S result of 2026-09-09.
 ## Current research phase
 
 **R3 — Branching Double DQN.** The implementation and bounded acceptance
-infrastructure are complete through R3S. Full multi-seed learning and
-effectiveness evaluation are not complete. The scientific design is in
+infrastructure are complete through R3T. R3T accepted finite five-seed Basic
+training and complete lineage; effectiveness evaluation remains separate. The
+scientific design is in
 [RESEARCH.md](RESEARCH.md); future ordering is in [ROADMAP.md](ROADMAP.md).
 
 ## Implemented capabilities
@@ -38,6 +41,14 @@ effectiveness evaluation are not complete. The scientific design is in
 - **Execution:** shared capability modules support bounded historical entry
   points; collection loops and validators retain their distinct contracts.
   Module ownership and compatibility boundaries are in [ARCH.md](ARCH.md).
+- **R3T:** the registered five-seed Basic campaign contract, result schemas,
+  thin runner, update telemetry, provenance checks, checkpoint lineage, and
+  fresh Python restore path are implemented, focused-tested, and accepted.
+  Each seed completed `49,996` transitions, `10,000` optimizer updates, one
+  target synchronization, four checkpoints, and fresh-Python restore parity.
+  The accepted result and exact hashes are owned by [R3T evidence](docs/evidence/R3T.md);
+  two earlier rejected attempts remain retained under the ignored artifact
+  tree.
 - The [evidence index](docs/evidence/README.md) supplies each acceptance record;
   the [roadmap](ROADMAP.md#r3--branching-double-dqn) supplies milestone ordering.
 
@@ -56,12 +67,15 @@ effectiveness evaluation are not complete. The scientific design is in
 - These gates establish deterministic continuation, live-process continuity,
   and exported-inference software parity. They do not establish a useful policy,
   convergence, generalization, sample efficiency, or the registered hypotheses.
+- R3T accepted five independent Basic training runs with complete ordered
+  lineage and fresh-Python checkpoint parity. The result explicitly does not
+  claim a useful policy, convergence, generalization, sample efficiency, or
+  held-out performance.
 
 ## Not implemented / not demonstrated
 
-- R3T five-seed training and lineage, final checkpoint selection, held-out
-  learned-policy evaluation, Basic effectiveness acceptance, or the joint-action
-  Double-DQN factorization comparison.
+- Held-out learned-policy evaluation, Basic effectiveness acceptance, or the
+  joint-action Double-DQN factorization comparison.
 - Optimizer update 10,001, a second target synchronization, or extended live
   resumption beyond the R3S gate.
 - Resume of the original frozen historical Unity trajectory. R3S continuity
@@ -78,9 +92,10 @@ effectiveness evaluation are not complete. The scientific design is in
 
 - Basic remains the slot-based R3 control. R3T starts fresh per seed; the
   accepted R3S checkpoint is not a multi-seed training starting point.
-- Training duration, checkpoint selection, stopping, and other unresolved
-  choices need pre-run registration under
-  [RESEARCH.md](RESEARCH.md#values-that-must-be-registered-before-their-dependent-work).
+- R3T training duration, checkpoint selection, stopping, seed mapping, and
+  metric definitions are registered in [ADR-0013](docs/decisions/ADR-0013-r3t-basic-multiseed-training.md)
+  and [RESEARCH.md](RESEARCH.md#r3t-basic-multi-seed-training-registration),
+  with accepted hashes in [R3T evidence](docs/evidence/R3T.md).
   Strategic shaping potentials/coefficients remain unresolved until R4.
 - Frozen player directories must not receive profiling output; use complete
   run-owned copies. The prior timing-log exception is retained in
@@ -92,5 +107,5 @@ effectiveness evaluation are not complete. The scientific design is in
 
 ## Authorization
 
-[TASK.md](TASK.md) alone owns the current R3T authorization envelope.
-Accepted evidence and roadmap ordering do not authorize additional work.
+There is no active implementation authorization after the completed R3T task.
+Any new work requires a new explicit objective in [TASK.md](TASK.md).

@@ -20,6 +20,7 @@ All records below are accepted unless a later ADR explicitly supersedes one.
 10. [ADR-0010: Share mechanical aiming across conditions](ADR-0010-shared-mechanical-aim.md)
 11. [ADR-0011: Transport final masks for bootstrapped truncations](ADR-0011-terminal-truncation-mask.md)
 12. [ADR-0012: Store replay losslessly under a hard memory ceiling](ADR-0012-lossless-bounded-replay.md)
+13. [ADR-0013: Register the R3T Basic multi-seed training boundary](ADR-0013-r3t-basic-multiseed-training.md)
 
 The documentation migration that extracted these records is described in
 [`DOCUMENTATION_MIGRATION_2026-08-29.md`](../history/DOCUMENTATION_MIGRATION_2026-08-29.md).

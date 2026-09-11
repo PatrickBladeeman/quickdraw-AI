@@ -571,7 +571,7 @@ def test_r3p_process_roles_keep_launch_order_arguments_and_failure_context(
     output = tmp_path / "roundtrip"
     calls = []
 
-    def complete(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    def start(command: list[str], **kwargs: Any) -> Any:
         role = command[command.index("--mode") + 1]
         calls.append(role)
         expected = [
@@ -586,18 +586,23 @@ def test_r3p_process_roles_keep_launch_order_arguments_and_failure_context(
         expected.extend(["--summary", str(output / f"{role}.json")])
         assert command == expected
         assert kwargs["cwd"] == ROOT
-        assert kwargs["timeout"] == 600
         assert kwargs["env"]["OMP_NUM_THREADS"] == "1"
         assert kwargs["env"]["MKL_NUM_THREADS"] == "1"
-        return subprocess.CompletedProcess(
-            command,
-            7 if role == failing_role else 0,
-            stdout=f"{role} output\n",
-        )
+
+        class Process:
+            returncode = 7 if role == failing_role else 0
+
+            def communicate(
+                self, *, timeout: int | None = None
+            ) -> tuple[str, None]:
+                assert timeout == 600
+                return f"{role} output\n", None
+
+        return Process()
 
     monkeypatch.setattr(runner, "ARTIFACT_ROOT", tmp_path)
     monkeypatch.setattr(sys, "argv", [runner.__file__, "--output", str(output)])
-    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.run", complete)
+    monkeypatch.setattr("quickdraw_bdq.acceptance.subprocess.Popen", start)
     with pytest.raises(RuntimeError) as error:
         runner.main()
     roles = ["saver", "reference", "restored"]

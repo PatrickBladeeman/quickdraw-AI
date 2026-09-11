@@ -99,6 +99,7 @@ class BDQOptimizerController:
         self._decision_count = 0
         self._optimizer_update_count = 0
         self._target_sync_count = 0
+        self._last_update_telemetry: dict | None = None
 
     @property
     def online_network(self) -> DuelingBranchingQNetwork:
@@ -123,6 +124,17 @@ class BDQOptimizerController:
     @property
     def target_sync_count(self) -> int:
         return self._target_sync_count
+
+    @property
+    def last_update_telemetry(self) -> dict | None:
+        """Return compact telemetry captured for the most recent update.
+
+        The telemetry is deliberately separate from checkpoint state.  It is an
+        opt-in observation surface for bounded campaign runners and does not
+        alter the optimizer's persistent state or historical gate behavior.
+        """
+
+        return copy.deepcopy(self._last_update_telemetry)
 
     def record_transition(
         self,
@@ -370,6 +382,30 @@ class BDQOptimizerController:
             )
             selected = gather_branch_values(current_q, batch.actions)
             mean_absolute_td_error = torch.mean(torch.abs(targets - selected))
+
+        def q_value_summary(values: tuple[torch.Tensor, ...]) -> list[dict[str, float]]:
+            summary: list[dict[str, float]] = []
+            for branch in values:
+                detached = branch.detach()
+                summary.append(
+                    {
+                        "mean": float(detached.mean().item()),
+                        "minimum": float(detached.min().item()),
+                        "maximum": float(detached.max().item()),
+                    }
+                )
+            return summary
+
+        self._last_update_telemetry = {
+            "sampled_indices": [
+                int(value) for value in batch.indices.detach().cpu().tolist()
+            ],
+            "q_value_summary": {
+                "current": q_value_summary(current_q),
+                "online_next": q_value_summary(online_next_q),
+                "target_next": q_value_summary(target_next_q),
+            },
+        }
 
         loss = mean_branch_huber_loss(current_q, batch.actions, targets)
         self._optimizer.zero_grad(set_to_none=True)

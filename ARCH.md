@@ -122,7 +122,9 @@ missing scene. Their public build entry methods and output options remain intact
   mechanism used by the update-trajectory milestones, including opt-in
   per-update target-hash metadata, target synchronization events, continuation
   callbacks, the optional clean-boundary handoff into `checkpoint.py`, and the
-  explicit live-environment callback used by the R3S supervisor boundary.
+  explicit live-environment callback used by the R3S supervisor boundary. Its
+  unconditional update telemetry capture feeds a default-off observer for
+  bounded campaign telemetry without changing historical trace output.
 
 The milestone runners in `Research/trainer/` retain historical compatibility
 entry points and include the bounded R3R continuation runner and R3S
@@ -142,6 +144,15 @@ restores the shared checkpoint, then exports the accepted R3R online network
 through the registered ONNX/CPU parity contract. It does not own checkpoint
 encoding, replay sampling, action-mask semantics, or an unrestricted resume
 framework.
+
+The R3T runner owns only the five-seed campaign boundary. It validates the
+registered seed table and player/runtime identities, creates one fresh complete
+player copy per seed, and composes `update_gate.py` with the shared checkpoint
+writer. Its opt-in update observer records the registered learning-curve
+telemetry and saves the predeclared checkpoint cadence; a fresh Python restore
+worker validates each selected checkpoint. R3T does not transfer weights,
+resume a Unity process, select actions after its clean boundary, or provide a
+generic/unbounded training API.
 
 R3P retains its ordered saver/reference/restorer protocol and R3Q its live-saver
 and Python-restorer protocol; both use the common process launcher. Neither is

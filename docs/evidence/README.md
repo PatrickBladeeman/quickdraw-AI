@@ -54,10 +54,11 @@ study unless its milestone file explicitly says otherwise.
 | R3Q | [R3Q.md](R3Q.md) | Live-derived checkpoint save/restore and replay parity |
 | R3R | [R3R.md](R3R.md) | Long-horizon continuation pilot and first target synchronization |
 | R3S | [R3S.md](R3S.md) | Live Unity-process handoff and accepted-network ONNX/CPU parity |
+| R3T | [R3T.md](R3T.md) | Five-seed Basic training, complete lineage, and fresh-Python checkpoint parity |
 
-## Shared R3D-R3S runtime and optimizer reference
+## Shared R3D-R3T runtime and optimizer reference
 
-The individual R3D-R3R contracts pin Python `3.11.13`,
+The individual R3D-R3T contracts pin Python `3.11.13`,
 `mlagents_envs==1.1.0`, NumPy `1.23.5`, PyTorch `2.12.0+cpu`, device `cpu`,
 and `quickdraw-bdq-trainer==0.3.0` with no current
 `mlagents.trainer_type` entry point. The Unity behavior is
@@ -73,6 +74,10 @@ transitions, batch size `64`, `gamma=0.99`, Adam learning rate `0.0001`, one
 update every `4` decisions, and hard target synchronization every `10000`
 optimizer updates. Accepted deterministic live gates use one PyTorch intra-op
 thread, one inter-op thread, and deterministic algorithms.
+
+R3T uses scenario seed `31001`, explicit policy/replay seeds `51001` through
+`51005`, and the registered exploration seed `61001`; its exact mapping is
+recorded in [R3T evidence](R3T.md).
 
 The initial online and frozen target network SHA-256 is:
 

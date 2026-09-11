@@ -39,6 +39,9 @@ records. All output paths below are generated and ignored.
   field mappings; and
 - `update_gate.py` — shared bounded Unity collection and optimizer-gate
   execution for the update-trajectory milestones;
+- `run_bdq_r3t_multiseed.py` — the contract-bound five-seed Basic training and
+  lineage campaign, including checkpoint cadence and fresh Python restore
+  audits;
 - `run_bdq_long_horizon_smoke.py` — the contract-driven R3R continuation pilot
   and first target-synchronization gate, including fresh player copies,
   checkpoint differential checks, and Unity-free restore checks.
@@ -126,6 +129,10 @@ ML-Agents timer writer places `ML-Agents/Timers/<scene>_timers.json` beneath the
 player data directory, so pointing `--env` at a historical build directory can
 rewrite a frozen profiling log even when the runner's output directory is new.
 
+R3T registers the exact Basic timer sidecar as the only permitted post-launch
+mutation of its fresh copy and records its before/after hashes; all other
+player mutations remain invalid.
+
 The following copies both player directories into ignored, fresh locations and
 then uses only those copies for standalone runs. Choose new destination names
 for every reproduction; the command deliberately refuses an existing target.
@@ -178,6 +185,7 @@ Unity-free Python restorer, as registered by its contract.
 | R3Q live-derived checkpoint | `run_bdq_live_checkpoint_smoke.py` | [`R3Q.md`](../../docs/evidence/R3Q.md) |
 | R3R long-horizon continuation and first sync | `run_bdq_long_horizon_smoke.py` | [`R3R.md`](../../docs/evidence/R3R.md) |
 | R3S live Unity resume and ONNX parity | `run_bdq_live_resume_export_smoke.py` | [`R3S.md`](../../docs/evidence/R3S.md) |
+| R3T Basic five-seed training and lineage | `run_bdq_r3t_multiseed.py` | [`R3T.md`](../../docs/evidence/R3T.md) |
 
 Set up the isolated copies above, then select the required command:
 
@@ -250,6 +258,30 @@ fresh CPU parity workers:
 & $python -B Research\trainer\run_bdq_live_resume_export_smoke.py `
   --output Artifacts\Experiments\r3s-live-resume-export\acceptance
 ```
+
+R3T uses the accepted Basic player source bound by its versioned contract. The
+runner creates a fresh complete player copy for each registered policy seed,
+records all transitions and sampled learning-curve updates, saves checkpoints
+at the registered optimizer boundaries, and validates each selected checkpoint
+in a fresh Python process. The output directory must be exactly the registered
+campaign root, and that root must be fresh:
+
+Run the parent command from the repository root. The generated manifest records
+the parent command with repository-root paths; its worker and restore templates
+use paths relative to the registered campaign root.
+
+```powershell
+& $python -B Research\trainer\run_bdq_r3t_multiseed.py `
+  --env Artifacts\Experiments\r3r-long-horizon-synchronization-final\player-copies\run-1\QuickDrawResearchBasic.exe `
+  --output Artifacts\Experiments\r3t-basic-multiseed
+```
+
+The R3T horizon, seed mapping, checkpoint selection, stopping rules, artifact
+layout, and claim boundary are owned by
+[`bdq-r3t-basic-multiseed-contract-v1.json`](bdq-r3t-basic-multiseed-contract-v1.json).
+Do not add duration, seed, setting, or checkpoint-selection overrides to the
+command. Training output is not evidence of effectiveness or held-out policy
+quality.
 
 R3I is a Python-only unit gate:
 
